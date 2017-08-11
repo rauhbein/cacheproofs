@@ -17,7 +17,7 @@ val _ = Datatype `acc = R | W`;
 
 val _ = Parse.type_abbrev("mem_view", ``:bool -> padr -> word``);
 
-val _ = Datatype `dop = RD padr | WT padr | CL padr`;
+val _ = Datatype `dop = RD padr bool | WT padr word bool | CL padr`;
 
 (*********** finish ************)
 
