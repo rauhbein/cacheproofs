@@ -55,6 +55,11 @@ val ctf_def = Define `
 			     else NONE))
 `;
 
+(* proof obligations on any cache model *)
+
+(* TODO: add useful lemmas about cache semantics *)
+
+
 (*********** finish ************)
 
 val _ = export_theory();
