@@ -58,6 +58,30 @@ val not_wt_lem = store_thm("not_wt_lem", ``
   )
 );
 
+val rd_lem = store_thm("rd_lem", ``
+!dop. rd dop <=> ?pa c. dop = RD pa c
+``,
+  Cases >> (
+      METIS_TAC [rd_def]
+  )
+);
+
+val wt_lem = store_thm("wt_lem", ``
+!dop. wt dop <=> ?pa w c. dop = WT pa w c
+``,
+  Cases >> (
+      METIS_TAC [wt_def]
+  )
+);
+
+val cl_lem = store_thm("cl_lem", ``
+!dop. cl dop <=> ?pa. dop = CL pa
+``,
+  Cases >> (
+      METIS_TAC [cl_def]
+  )
+);
+
 (*********** finish ************)
 
 val _ = export_theory();

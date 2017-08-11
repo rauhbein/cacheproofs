@@ -51,6 +51,24 @@ val mtfca_def = Define `
 
 (* TODO: add some useful lemmas *)
 
+val cl_mem_unchanged = store_thm("cl_mem_unchanged", ``
+!m dop m'. ~wt dop /\ (mtfcl m dop = m') ==>
+(MVcl m = MVcl m')
+``,
+  RW_TAC std_ss [not_wt_lem, rd_lem, cl_lem] >> (
+      RW_TAC std_ss [mtfcl_def]
+  )
+);    
+
+val cl_write_semantics = store_thm("cl_write_semantics", ``
+!m m' pa w c. (mtfcl m (WT pa w c) = m') ==>
+   (!c. (MVcl m') c pa = w) 
+/\ (!pa' c. pa <> pa' ==> ((MVcl m) c pa' = (MVcl m') c pa'))
+``,
+  RW_TAC std_ss [MVcl_def, mtfcl_def] >> (
+      RW_TAC std_ss [combinTheory.APPLY_UPDATE_THM]
+  )
+);    
 
 (*********** finish ************)
 
