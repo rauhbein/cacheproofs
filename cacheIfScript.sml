@@ -57,6 +57,76 @@ val ctf_def = Define `
 
 (* proof obligations on any cache model *)
 
+val chit_lem = store_thm("chit_lem", ``
+!ca pa. chit_ ca pa <=> ?w d. ca pa = SOME (w,d)
+``,
+  RW_TAC std_ss [chit_def] >>
+  Cases_on `ca pa` 
+  >| [(* case: NONE *)
+      RW_TAC std_ss [hit_def]
+      , 
+      (* case: SOME x *)
+      `?w d. x = (w,d)` by (
+          RW_TAC std_ss [pairTheory.pair_CASES]
+      ) >>
+      RW_TAC std_ss [hit_def]
+     ]
+);
+
+val not_chit_lem = store_thm("not_chit_lem", ``
+!ca pa. ~chit_ ca pa <=> (ca pa = NONE)
+``,
+  RW_TAC std_ss [chit_def] >>
+  Cases_on `ca pa` 
+  >| [(* case: NONE *)
+      RW_TAC std_ss [hit_def]
+      , 
+      (* case: SOME x *)
+      `?w d. x = (w,d)` by (
+          RW_TAC std_ss [pairTheory.pair_CASES]
+      ) >>
+      RW_TAC std_ss [hit_def]
+     ]
+);
+
+val cfill_chit_ = store_thm("cfill_chit_", ``
+!ca mv pa x ca' y. (cfill ca mv pa x = (ca', y)) ==>
+    chit_ ca' pa					     
+``,
+  RW_TAC std_ss [chit_lem] >>
+  Cases_on `x` >> (
+      FULL_SIMP_TAC std_ss [cfill_def] >>
+      METIS_TAC [combinTheory.APPLY_UPDATE_THM]
+  )
+);
+
+val ctf_chit_oblg = store_thm("ctf_chit_oblg", ``
+!ca mv dop ca' y. CA dop /\ ~cl dop /\ ((ca',y) = ctf ca mv dop) ==>
+    chit_ ca' (PA dop)
+``,
+  RW_TAC std_ss [CA_lem, cl_lem] >> ( FULL_SIMP_TAC std_ss [ctf_def, PA_def] ) 
+  >| [(* read *)
+      Cases_on `chit_ ca pa` >> (
+          FULL_SIMP_TAC std_ss [] >>
+	  METIS_TAC [cfill_chit_]
+      )
+      ,
+      (* write *)
+      Cases_on `chit_ ca pa`
+      >| [(* hit *)
+          FULL_SIMP_TAC std_ss [] >>
+	  REWRITE_TAC [chit_def, combinTheory.UPDATE_APPLY, hit_def]
+	  ,
+	  (* miss *)
+	  `?ca2 wb. cfill ca mv pa (evpol ca pa) = (ca2, wb)` by (
+	      METIS_TAC [pairTheory.pair_CASES]
+	  ) >>
+          FULL_SIMP_TAC std_ss [LET_THM] >> 
+	  REWRITE_TAC [chit_def, combinTheory.UPDATE_APPLY, hit_def]
+	 ]
+     ]
+);
+
 (* TODO: add useful lemmas about cache semantics *)
 
 

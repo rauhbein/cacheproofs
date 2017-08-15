@@ -82,6 +82,24 @@ val cl_lem = store_thm("cl_lem", ``
   )
 );
 
+val not_CA_lem = store_thm("not_CA_lem", ``
+!dop. ~CA dop <=> (?pa. dop = RD pa F) \/ (?pa w. dop = WT pa w F)
+``,
+  Cases >> (
+      RW_TAC std_ss [CA_def]
+  )
+);
+
+val CA_lem = store_thm("CA_lem", ``
+!dop. CA dop <=> (?pa. dop = RD pa T) \/ (?pa w. dop = WT pa w T) 
+			              \/ (?pa. dop = CL pa)
+``,
+  Cases >> (
+      RW_TAC std_ss [CA_def]
+  )
+);
+
+
 (*********** finish ************)
 
 val _ = export_theory();

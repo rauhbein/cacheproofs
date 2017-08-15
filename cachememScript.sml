@@ -68,7 +68,33 @@ val cl_write_semantics = store_thm("cl_write_semantics", ``
   RW_TAC std_ss [MVcl_def, mtfcl_def] >> (
       RW_TAC std_ss [combinTheory.APPLY_UPDATE_THM]
   )
-);    
+); 
+
+val ca_uncacheable = store_thm("ca_uncacheable", ``
+!ca m dop ca' m'. ~CA dop /\ (mtfca ca m dop = (ca',m')) ==>
+   (ca' = ca) /\ (m' = mtfcl m dop)
+``,
+  RW_TAC std_ss [not_CA_lem] >> (
+      FULL_SIMP_TAC std_ss [mtfca_def, mtfcl_def]
+  )
+);
+
+val ca_cl_reduction = store_thm("ca_cl_reduction", ``
+!ca m c. MVca ca m F = MVcl m c 
+``,
+  RW_TAC std_ss [MVcl_def, MVca_def]
+);
+
+
+(* val ca_cacheable_mem = store_thm("ca_cacheable_mem", `` *)
+(* !ca m dop ca' m'. CA dop /\ (mtfca ca m dop = (ca',m')) ==> *)
+(*     !pa. (m' pa = m pa) \/ (ca pa = SOME(m' pa, T)) *)
+(* ``, *)
+(*   RW_TAC std_ss [CA_lem] >> ( *)
+(*       FULL_SIMP_TAC std_ss [mtfca_def, mtfcl_def, ctf_def] *)
+(*   ) *)
+(* ); *)
+
 
 (*********** finish ************)
 
