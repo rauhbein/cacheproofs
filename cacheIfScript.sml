@@ -22,6 +22,16 @@ val dirty_def = Define `
 /\ (dirty (SOME (w:word,d:bool)) = d)
 `;
 
+val dirty_hit_lem = store_thm("dirty_hit_lem", ``
+!l. dirty l ==> hit l
+``,
+  Cases >- ( RW_TAC std_ss [dirty_def, hit_def] ) >>
+  `?w d. x = (w,d)` by ( RW_TAC std_ss [pairTheory.pair_CASES] ) >>
+  RW_TAC std_ss [dirty_def, hit_def]
+);
+
+(* SPEC_ALL |> (CONV_RULE CONTRAPOS_CONV)  dirty_hit_lem *)
+
 val cnt_def = Define `
    (cnt (SOME (w:word,d:bool)) = w)
 `;
@@ -41,6 +51,29 @@ val cfill_def = Define `
         if cdirty_ ca pa' then SOME (pa', ccnt_ ca pa')
 	else NONE))
 `;
+
+val cevict_def = Define `
+   (cevict ca NONE = ca)
+/\ (cevict ca (SOME pa) = (pa =+ NONE) ca)
+`;
+
+val cfill_ca_def = Define `
+cfill_ca ca (mv:mem_view) pa ev = (pa =+ SOME (mv T pa,F)) (cevict ca ev)
+`;
+
+val levict_def = Define `
+   (levict ca NONE = NONE)
+/\ (levict ca (SOME pa) = if cdirty_ ca pa then SOME (pa, ccnt_ ca pa) else NONE)
+`; 
+
+val cfill_lem = store_thm("cfill_lem", ``
+!ca mv pa ev. cfill ca mv pa ev = (cfill_ca ca mv pa ev, levict ca ev)
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `ev` >> (
+      RW_TAC std_ss [cfill_def, cfill_ca_def, cevict_def, levict_def]
+  )
+); 
 
 val ctf_def = Define `
    (ctf ca mv (RD pa T)   = if chit_ ca pa then (ca, NONE) 

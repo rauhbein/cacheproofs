@@ -40,6 +40,27 @@ val wb_def = Define `
 /\ (wb (ca,SOME(pa,w)) m = (ca,(pa =+ w) m))
 `;
 
+val wb_mem_def = Define `
+   (wb_mem m NONE = m)
+/\ (wb_mem m (SOME (pa,w)) = (pa =+ w) m)
+`;
+
+val wb_lem = store_thm("wb_lem", ``
+!ca m w. wb (ca,w) m = (ca,wb_mem m w)
+``,
+  Cases_on `w`
+  >| [(* NONE *)
+      RW_TAC std_ss [wb_def, wb_mem_def]
+      ,
+      (* SOME x *)
+      REPEAT STRIP_TAC >>
+      `?c w. x = (c,w)` by (
+          RW_TAC std_ss [pairTheory.pair_CASES]
+      ) >>
+      RW_TAC std_ss [wb_def, wb_mem_def]
+     ]
+);
+
 (* cache-aware *)
 val mtfca_def = Define `
    (mtfca ca m (RD pa T)   = wb (ctf ca (MVcl m) (RD pa T)) m)
@@ -50,6 +71,14 @@ val mtfca_def = Define `
 `;
 
 (* TODO: add some useful lemmas *)
+
+val mtfca_cacheable = store_thm("mtfca_cacheable", ``
+!ca m dop. CA dop ==> (mtfca ca m dop = wb (ctf ca (MVcl m) dop) m)
+``,
+  RW_TAC std_ss [CA_lem] >> (
+      FULL_SIMP_TAC std_ss [mtfca_def]
+  )
+);
 
 val cl_mem_unchanged = store_thm("cl_mem_unchanged", ``
 !m dop m'. ~wt dop /\ (mtfcl m dop = m') ==>
@@ -86,14 +115,13 @@ val ca_cl_reduction = store_thm("ca_cl_reduction", ``
 );
 
 
-(* val ca_cacheable_mem = store_thm("ca_cacheable_mem", `` *)
-(* !ca m dop ca' m'. CA dop /\ (mtfca ca m dop = (ca',m')) ==> *)
-(*     !pa. (m' pa = m pa) \/ (ca pa = SOME(m' pa, T)) *)
-(* ``, *)
-(*   RW_TAC std_ss [CA_lem] >> ( *)
-(*       FULL_SIMP_TAC std_ss [mtfca_def, mtfcl_def, ctf_def] *)
-(*   ) *)
-(* ); *)
+val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
+!ca m dop ca' m'. CA dop /\ ((ca',m') = mtfca ca m dop) ==>
+    !pa. (m' pa = m pa) \/ (ca pa = SOME(m' pa, T))
+``,
+  RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
+  
+);
 
 
 (*********** finish ************)
