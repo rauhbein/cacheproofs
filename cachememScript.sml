@@ -120,7 +120,7 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
     !pa. (m' pa = m pa) \/ (ca pa = SOME(m' pa, T))
 ``,
   RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
-  
+  cheat
 );
 
 
