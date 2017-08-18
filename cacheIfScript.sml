@@ -30,7 +30,8 @@ val dirty_hit_lem = store_thm("dirty_hit_lem", ``
   RW_TAC std_ss [dirty_def, hit_def]
 );
 
-(* SPEC_ALL |> (CONV_RULE CONTRAPOS_CONV)  dirty_hit_lem *)
+val not_hit_not_dirty_lem = 
+dirty_hit_lem |> SPEC_ALL |> (CONV_RULE CONTRAPOS_CONV) |> GEN_ALL;
 
 val cnt_def = Define `
    (cnt (SOME (w:word,d:bool)) = w)
@@ -39,6 +40,18 @@ val cnt_def = Define `
 val chit_def = Define `chit_ (ca:cache_state) pa = hit (ca pa)`;
 
 val cdirty_def = Define `cdirty_ (ca:cache_state) pa = dirty (ca pa)`;
+
+val cdirty_chit_lem = store_thm("cdirty_chit_lem", ``
+!ca pa. cdirty_ ca pa ==> chit_ ca pa
+``,
+  RW_TAC std_ss [cdirty_def, chit_def, dirty_hit_lem]
+);
+
+val not_chit_not_cdirty_lem = store_thm("not_chit_not_cdirty_lem", ``
+!ca pa. ~chit_ ca pa ==> ~cdirty_ ca pa 
+``,
+  RW_TAC std_ss [cdirty_def, chit_def, not_hit_not_dirty_lem]
+);
 
 val ccnt_def = Define `ccnt_ (ca:cache_state) pa = cnt (ca pa)`;
 
@@ -87,6 +100,156 @@ val ctf_def = Define `
                              if cdirty_ ca pa then SOME (pa, ccnt_ ca pa)
 			     else NONE))
 `;
+
+val ctf_ca_def = Define `
+   (ctf_ca ca mv (RD pa T)   = if chit_ ca pa then ca 
+			       else cfill_ca ca mv pa (evpol ca pa))
+/\ (ctf_ca ca mv (WT pa w T) = if chit_ ca pa then (pa =+ SOME (w,T)) ca 
+			       else (pa =+ SOME (w,T)) 
+			            (cfill_ca ca mv pa (evpol ca pa)))
+/\ (ctf_ca ca mv (CL pa)     = (pa =+ NONE) ca)
+`;
+
+val ctf_wb_def = Define `
+   (ctf_wb ca mv (RD pa T)   = if chit_ ca pa then NONE 
+			       else levict ca (evpol ca pa))
+/\ (ctf_wb ca mv (WT pa w T) = if chit_ ca pa then NONE 
+			       else levict ca (evpol ca pa))
+/\ (ctf_wb ca mv (CL pa)     = if cdirty_ ca pa then SOME (pa, ccnt_ ca pa)
+			       else NONE)
+`;
+
+val ctf_lem = store_thm("ctf_lem", ``
+!ca mv dop. CA dop ==> (ctf ca mv dop = (ctf_ca ca mv dop, ctf_wb ca mv dop))
+``,
+  RW_TAC std_ss [CA_lem] >> (
+      RW_TAC std_ss [ctf_def, ctf_ca_def, ctf_wb_def, cfill_lem]
+  )
+);
+
+val ctf_ca_rd_lem = store_thm("ctf_ca_rd_lem", ``
+!ca mv dop pa. rd dop /\ CA dop ==> 
+    ((ctf_ca ca mv dop) pa = if pa = PA dop 
+			     then (if chit_ ca pa 
+				   then ca pa
+				   else SOME (mv T pa,F))
+			     else (if ~chit_ ca (PA dop) /\ 
+				      (evpol ca (PA dop) = SOME pa)
+				   then NONE
+			           else ca pa))
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [CA_lem] >> (
+      RW_TAC std_ss [PA_def, ctf_ca_def, cfill_ca_def, 
+		     combinTheory.UPDATE_APPLY, cevict_def] >>
+      FULL_SIMP_TAC std_ss [rd_def, PA_def] 
+  ) >>
+  Cases_on `evpol ca pa'`
+  >| [(* evict NONE *)
+      RW_TAC std_ss [cevict_def]
+      ,
+      (* evict SOME x *)
+      FULL_SIMP_TAC std_ss [optionTheory.SOME_11, cevict_def] >>
+      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+     ]
+);
+
+
+val ctf_ca_wt_lem = store_thm("ctf_ca_wt_lem", ``
+!ca mv dop pa. wt dop /\ CA dop ==> 
+    ((ctf_ca ca mv dop) pa = if pa = PA dop 
+			     then SOME (VAL dop,T)
+			     else (if ~chit_ ca (PA dop) /\ 
+				      (evpol ca (PA dop) = SOME pa)
+				   then NONE
+			           else ca pa))
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [CA_lem] >> (
+      RW_TAC std_ss [PA_def, ctf_ca_def, cfill_ca_def, 
+		     combinTheory.UPDATE_APPLY, cevict_def] >>
+      FULL_SIMP_TAC std_ss [wt_def, PA_def, VAL_def] 
+  ) >>
+  Cases_on `evpol ca pa'`
+  >| [(* evict NONE *)
+      RW_TAC std_ss [cevict_def]
+      ,
+      (* evict SOME x *)
+      FULL_SIMP_TAC std_ss [optionTheory.SOME_11, cevict_def] >>
+      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+     ]
+);
+
+val ctf_ca_cl_lem = store_thm("ctf_ca_cl_lem", ``
+!ca mv dop pa. cl dop ==> ((ctf_ca ca mv dop) pa = if pa = PA dop 
+						   then NONE 
+						   else ca pa)
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [cl_lem] >>
+  RW_TAC std_ss [PA_def] >> (
+      RW_TAC std_ss [ctf_ca_def, combinTheory.UPDATE_APPLY]
+  )
+);
+
+val ctf_ca_hit_other_lem = store_thm("ctf_ca_hit_other_lem", ``
+!ca mv dop pa. CA dop /\ (chit_ ca (PA dop) \/ cl dop) /\ pa <> PA dop ==>
+    ((ctf_ca ca mv dop) pa = ca pa)
+``,
+  REPEAT GEN_TAC >>
+  ASSUME_TAC (dop_cases_lem2 |> SPEC ``dop:dop``) >>
+  REPEAT STRIP_TAC >> ( 
+      FULL_SIMP_TAC std_ss [] >> (
+          RW_TAC std_ss [ctf_ca_rd_lem, ctf_ca_wt_lem, ctf_ca_cl_lem]
+      )
+  )
+);
+
+val ctf_ca_evict_other_lem = store_thm("ctf_ca_evict_other_lem", ``
+!ca mv dop pa. CA dop /\ ~chit_ ca (PA dop) /\ ~cl dop /\ pa <> PA dop 
+            /\ (evpol ca (PA dop) <> SOME pa) ==>
+    ((ctf_ca ca mv dop) pa = ca pa)
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [not_cl_lem] >> (
+      RW_TAC std_ss [ctf_ca_rd_lem, ctf_ca_wt_lem]
+  )
+);
+
+val ctf_ca_evict_lem = store_thm("ctf_ca_evict_lem", ``
+!ca mv dop pa. CA dop /\ ~chit_ ca (PA dop) /\ ~cl dop /\ pa <> PA dop 
+            /\ (evpol ca (PA dop) = SOME pa) ==>
+    ((ctf_ca ca mv dop) pa = NONE)
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [not_cl_lem] >> (
+      RW_TAC std_ss [ctf_ca_rd_lem, ctf_ca_wt_lem]
+  )
+);
+
+val ctf_wb_not_cl_lem = store_thm("ctf_wb_not_cl_lem", ``
+!ca mv dop pa. CA dop /\ ~cl dop ==> 
+    (ctf_wb ca mv dop = if chit_ ca (PA dop) 
+			then NONE 
+                        else (if evpol ca (PA dop) = NONE
+			      then NONE 
+			      else (if cdirty_ ca (THE (evpol ca (PA dop)))
+				    then SOME(THE (evpol ca (PA dop)), 
+					      ccnt_ ca (THE(evpol ca (PA dop))))
+				    else NONE)))
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [not_cl_lem, rd_lem, wt_lem, CA_lem] >> (
+      RW_TAC std_ss [PA_def, ctf_wb_def] >>
+      FULL_SIMP_TAC std_ss [PA_def, levict_def] 
+  ) >> ( 
+      IMP_RES_TAC quantHeuristicsTheory.IS_SOME_EQ_NOT_NONE >>
+      IMP_RES_TAC optionTheory.IS_SOME_EXISTS >>
+      FULL_SIMP_TAC std_ss [optionTheory.THE_DEF] >>
+      RW_TAC std_ss [levict_def]
+  )
+);
+
 
 (* proof obligations on any cache model *)
 

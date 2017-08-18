@@ -50,8 +50,38 @@ val CA_def = Define `
 
 (* some useful lemmas *)
 
+val dop_cases_lem = store_thm("dop_cases_lem", ``
+!dop. rd dop \/ wt dop \/ cl dop
+``,
+  Cases >> ( RW_TAC std_ss [rd_def, wt_def, cl_def] )
+);
+
+val dop_cases_lem2 = store_thm("dop_cases_lem2", ``
+!dop. rd dop /\ ~wt dop /\ ~cl dop
+   \/ ~rd dop /\ wt dop /\ ~cl dop
+   \/ ~rd dop /\ ~wt dop /\ cl dop
+``,
+  Cases >> ( RW_TAC std_ss [rd_def, wt_def, cl_def] )
+);
+
+val not_rd_lem = store_thm("not_rd_lem", ``
+!dop. ~rd dop <=> (wt dop \/ cl dop)
+``,
+  Cases >> (
+      RW_TAC std_ss [wt_def, rd_def, cl_def]
+  )
+);
+
 val not_wt_lem = store_thm("not_wt_lem", ``
 !dop. ~wt dop <=> (rd dop \/ cl dop)
+``,
+  Cases >> (
+      RW_TAC std_ss [wt_def, rd_def, cl_def]
+  )
+);
+
+val not_cl_lem = store_thm("not_cl_lem", ``
+!dop. ~cl dop <=> (rd dop \/ wt dop)
 ``,
   Cases >> (
       RW_TAC std_ss [wt_def, rd_def, cl_def]
