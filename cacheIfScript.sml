@@ -250,8 +250,17 @@ val ctf_wb_not_cl_lem = store_thm("ctf_wb_not_cl_lem", ``
   )
 );
 
+val ctf_wb_cl_lem = store_thm("ctf_wb_cl_lem", ``
+!ca mv dop. cl dop ==> 
+    (ctf_wb ca mv dop = if cdirty_ ca (PA dop) 
+			then SOME (PA dop, ccnt_ ca (PA dop)) 
+                        else NONE)
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [cl_lem] >> 
+  RW_TAC std_ss [PA_def, ctf_wb_def] 
+);
 
-(* proof obligations on any cache model *)
 
 val chit_lem = store_thm("chit_lem", ``
 !ca pa. chit_ ca pa <=> ?w d. ca pa = SOME (w,d)
@@ -296,6 +305,20 @@ val cfill_chit_ = store_thm("cfill_chit_", ``
   )
 );
 
+(* proof obligations on any cache model *)
+
+val chit_oblg = store_thm("chit_oblg", ``
+!pa ca ca'. (ca pa = ca' pa) ==> (chit_ ca pa <=> chit_ ca' pa)
+``,
+  RW_TAC std_ss [chit_def]
+);
+
+val cdirty_oblg = store_thm("cdirty_oblg", ``
+!pa ca ca'. (ca pa = ca' pa) ==> (cdirty_ ca pa <=> cdirty_ ca' pa)
+``,
+  RW_TAC std_ss [cdirty_def]
+);
+
 val ctf_chit_oblg = store_thm("ctf_chit_oblg", ``
 !ca mv dop ca' y. CA dop /\ ~cl dop /\ ((ca',y) = ctf ca mv dop) ==>
     chit_ ca' (PA dop)
@@ -321,6 +344,40 @@ val ctf_chit_oblg = store_thm("ctf_chit_oblg", ``
 	  REWRITE_TAC [chit_def, combinTheory.UPDATE_APPLY, hit_def]
 	 ]
      ]
+);
+
+val ctf_cl_miss_oblg = store_thm("ctf_cl_miss_oblg", ``
+!ca mv dop ca' y. cl dop /\ ((ca',y) = ctf ca mv dop) ==>
+    ~chit_ ca' (PA dop)
+``,
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC cl_CA_lem >>
+  FULL_SIMP_TAC std_ss [ctf_lem] >>
+  RW_TAC std_ss [not_chit_lem] >>
+  RW_TAC std_ss [ctf_ca_cl_lem]
+);
+
+val ctf_cl_other_oblg = store_thm("ctf_cl_other_oblg", ``
+!ca mv dop ca' y pa. cl dop /\ ((ca',y) = ctf ca mv dop) /\ (pa <> PA dop) ==>
+    (ca' pa = ca pa)
+``,
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC cl_CA_lem >>
+  FULL_SIMP_TAC std_ss [ctf_lem] >>
+  RW_TAC std_ss [ctf_ca_cl_lem]
+);
+
+val ctf_cl_wb_oblg = store_thm("ctf_cl_wb_oblg", ``
+!ca mv dop ca' y pa. cl dop /\ ((ca',y) = ctf ca mv dop) ==>
+    (y = if cdirty_ ca (PA dop)
+	 then SOME (PA dop, ccnt_ ca (PA dop))
+	 else NONE)
+``,
+  RW_TAC std_ss [] >> (
+      IMP_RES_TAC cl_CA_lem >>
+      FULL_SIMP_TAC std_ss [ctf_lem] >>
+      RW_TAC std_ss [ctf_wb_cl_lem]
+  )
 );
 
 (* TODO: add useful lemmas about cache semantics *)

@@ -129,6 +129,12 @@ val CA_lem = store_thm("CA_lem", ``
   )
 );
 
+val cl_CA_lem = store_thm("cl_CA_lem", ``
+!dop. cl dop ==> CA dop
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [cl_lem, CA_def]
+);
 
 (*********** finish ************)
 
