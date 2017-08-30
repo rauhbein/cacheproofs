@@ -136,6 +136,26 @@ val cl_CA_lem = store_thm("cl_CA_lem", ``
   FULL_SIMP_TAC std_ss [cl_lem, CA_def]
 );
 
+val rd_CA_lem = store_thm("rd_CA_lem", ``
+!dop. rd dop /\ CA dop ==> ?pa. dop = RD pa T
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [rd_lem] >>
+  EXISTS_TAC ``pa:padr`` >>
+  RW_TAC std_ss [] >>
+  FULL_SIMP_TAC std_ss [CA_def]
+);
+
+val wt_CA_lem = store_thm("wt_CA_lem", ``
+!dop. wt dop /\ CA dop ==> ?pa v. dop = WT pa v T
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [wt_lem] >>
+  EXISTS_TAC ``pa:padr`` >>
+  RW_TAC std_ss [] >>
+  FULL_SIMP_TAC std_ss [CA_def]
+);
+
 (*********** finish ************)
 
 val _ = export_theory();
