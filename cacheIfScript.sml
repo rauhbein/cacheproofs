@@ -41,18 +41,6 @@ val chit_def = Define `chit_ (ca:cache_state) pa = hit (ca pa)`;
 
 val cdirty_def = Define `cdirty_ (ca:cache_state) pa = dirty (ca pa)`;
 
-val cdirty_chit_lem = store_thm("cdirty_chit_lem", ``
-!ca pa. cdirty_ ca pa ==> chit_ ca pa
-``,
-  RW_TAC std_ss [cdirty_def, chit_def, dirty_hit_lem]
-);
-
-val not_chit_not_cdirty_lem = store_thm("not_chit_not_cdirty_lem", ``
-!ca pa. ~chit_ ca pa ==> ~cdirty_ ca pa 
-``,
-  RW_TAC std_ss [cdirty_def, chit_def, not_hit_not_dirty_lem]
-);
-
 val not_cdirty_lem = store_thm("not_cdirty_lem", ``
 !ca pa. ~cdirty_ ca pa <=> ((?w. ca pa = SOME (w,F)) \/ (ca pa = NONE))
 ``,
@@ -348,10 +336,36 @@ val chit_oblg = store_thm("chit_oblg", ``
   RW_TAC std_ss [chit_def]
 );
 
+val miss_oblg = store_thm("miss_oblg", ``
+!ca pa. ~chit_ ca pa <=> (ca pa = NONE)
+``,
+  RW_TAC std_ss [chit_def] >>
+  Cases_on `ca pa` 
+  >| [(* ==> *)
+      RW_TAC std_ss [hit_def]
+      ,
+      `?w b. x = (w,b)` by ( RW_TAC std_ss [pairTheory.pair_CASES] ) >>
+      FULL_SIMP_TAC std_ss [hit_def]
+      ]
+);
+
+
 val cdirty_oblg = store_thm("cdirty_oblg", ``
 !pa ca ca'. (ca pa = ca' pa) ==> (cdirty_ ca pa <=> cdirty_ ca' pa)
 ``,
   RW_TAC std_ss [cdirty_def]
+);
+
+val cdirty_chit_oblg = store_thm("cdirty_chit_oblg", ``
+!ca pa. cdirty_ ca pa ==> chit_ ca pa
+``,
+  RW_TAC std_ss [cdirty_def, chit_def, dirty_hit_lem]
+);
+
+val not_chit_not_cdirty_oblg = store_thm("not_chit_not_cdirty_oblg", ``
+!ca pa. ~chit_ ca pa ==> ~cdirty_ ca pa 
+``,
+  RW_TAC std_ss [cdirty_def, chit_def, not_hit_not_dirty_lem]
 );
 
 val ctf_chit_oblg = store_thm("ctf_chit_oblg", ``
