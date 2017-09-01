@@ -357,6 +357,20 @@ val wb_lem = store_thm("wb_lem", ``
      ]
 );
 
+val wb_ca_lem = store_thm("wb_ca_lem", ``
+!ca m ca' y m'. ((ca,m) = wb (ca',y) m') ==> (ca = ca')
+``,
+  REPEAT STRIP_TAC >>  
+  Cases_on `y` 
+  >| [(* NONE *)
+      FULL_SIMP_TAC std_ss [wb_def]
+      ,
+      (* SOME x *)
+      `?pa w. x = (pa,w)` by ( RW_TAC std_ss [pairTheory.pair_CASES] ) >>
+      FULL_SIMP_TAC std_ss [wb_def]
+     ]  
+);
+
 (* cache-aware *)
 val mtfca_def = Define `
    (mtfca (ca,m) (RD pa T)   = wb (ctf ca (MVcl m) (RD pa T)) m)
@@ -372,9 +386,10 @@ val mtfca_cacheable = store_thm("mtfca_cacheable", ``
 !ca m dop. CA dop ==> (mtfca (ca,m) dop = wb (ctf ca (MVcl m) dop) m)
 ``,
   RW_TAC std_ss [CA_lem] >> (
-      FULL_SIMP_TAC std_ss [mtfca_def]
+      RW_TAC std_ss [mtfca_def]
   )
 );
+
 
 val cl_mem_unchanged = store_thm("cl_mem_unchanged", ``
 !m dop m'. ~wt dop /\ (mtfcl m dop = m') ==>
@@ -410,6 +425,9 @@ val ca_cl_reduction = store_thm("ca_cl_reduction", ``
   RW_TAC std_ss [MVcl_def, MVca_def]
 );
 
+val ctf_pat = ``(x,y) = ctf a b c``; 
+
+val SYM_CTF_TAC = PAT_X_ASSUM ctf_pat (fn thm => ASSUME_TAC (SYM thm));
 
 val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 !ca m dop ca' m'. CA dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
@@ -421,13 +439,11 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
   ) >>
   IMP_RES_TAC ctf_wb_cases >> ( FULL_SIMP_TAC std_ss [] )
   >| [RW_TAC (srw_ss()) [] >>
-      `ctf ca (MVcl m) dop = (ca'',NONE)` by ( RW_TAC std_ss [] ) >>
+      SYM_CTF_TAC >>
       FULL_SIMP_TAC std_ss [wb_def]
       ,
       RW_TAC (srw_ss()) [] >>
-      `ctf ca (MVcl m) dop = (ca'',SOME (pa',ccnt_ ca pa'))` by ( 
-          RW_TAC std_ss [] 
-      ) >>
+      SYM_CTF_TAC >>
       FULL_SIMP_TAC std_ss [wb_def] >>
       Cases_on `pa = pa'` >> (
           RW_TAC std_ss [combinTheory.UPDATE_APPLY]
