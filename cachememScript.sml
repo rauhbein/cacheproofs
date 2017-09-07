@@ -23,6 +23,12 @@ val chit_lem = store_thm("chit_lem", ``
   REWRITE_TAC [chit_oblg]
 );
 
+val ccnt_lem = store_thm("ccnt_lem", ``
+!pa ca ca'. (ca pa = ca' pa) ==> (ccnt_ ca pa = ccnt_ ca' pa)
+``,
+  REWRITE_TAC [ccnt_oblg]
+);
+
 val miss_lem = store_thm("miss_lem", ``
 !ca pa. ~chit_ ca pa <=> (ca pa = NONE)
 ``,
@@ -429,6 +435,10 @@ val ctf_pat = ``(x,y) = ctf a b c``;
 
 val SYM_CTF_TAC = PAT_X_ASSUM ctf_pat (fn thm => ASSUME_TAC (SYM thm));
 
+val ctf_pat2 = ``ctf a b c = (x,y)``; 
+
+val SYM_CTF_TAC2 = PAT_X_ASSUM ctf_pat2 (fn thm => ASSUME_TAC (SYM thm));
+
 val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 !ca m dop ca' m'. CA dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
     !pa. (m' pa = m pa) \/ (m' pa = ccnt_ ca pa)
@@ -450,6 +460,91 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
       )
      ]
 );
+
+val ca_cacheable_ca = store_thm("ca_cacheable_ca", ``
+!ca m dop ca' m'. CA dop /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    !pa. chit_ ca' pa /\ (ccnt_ ca' pa = ccnt_ ca pa) /\ (rd dop \/ pa <> PA dop)
+      \/ chit_ ca' pa /\ (ccnt_ ca' pa = m pa) /\ rd dop /\ (pa = PA dop)
+      \/ cdirty_ ca' pa /\ (ccnt_ ca' pa = VAL dop) /\ wt dop /\ (pa = PA dop)
+      \/ ~chit_ ca' pa /\ (cl dop \/ pa <> PA dop)
+``,
+  RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
+  `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
+      METIS_TAC [pairTheory.pair_CASES]
+  ) >>
+  SYM_CTF_TAC >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC wb_ca_lem >>
+  SYM_CTF_TAC2 >>
+  Cases_on `cl dop`
+  >| [(* clean *)
+      Cases_on `pa = PA dop` 
+      >| [(* PA dop *)
+	  IMP_RES_TAC ctf_cl_miss_lem >>
+          FULL_SIMP_TAC std_ss []
+	  ,
+	  (* other pa *)
+	  IMP_RES_TAC ctf_cl_other_lem >>
+	  RW_TAC std_ss [ccnt_lem]
+	 ]
+      ,
+      (* read or write *)
+      Cases_on `pa = PA dop` 
+      >| [(* PA dop *)
+	  IMP_RES_TAC ctf_chit_lem >>
+	  FULL_SIMP_TAC std_ss [not_cl_lem]
+	  >| [(* read *)
+	      Cases_on `chit_ ca (PA dop)`
+	      >| [(* hit *)
+		  IMP_RES_TAC ctf_rd_hit_lem >>
+	          RW_TAC std_ss [ccnt_lem]
+		  ,
+		  (* miss *)
+		  IMP_RES_TAC ctf_rd_miss_lem >>
+	          FULL_SIMP_TAC std_ss [MVcl_def]
+		 ]
+	      ,
+	      (* write *)
+	      IMP_RES_TAC ctf_wt_ccnt_lem >>
+	      IMP_RES_TAC ctf_wt_cdirty_lem >>
+	      RW_TAC std_ss []
+	     ]
+	  ,
+	  (* other pa *)
+	  IMP_RES_TAC ctf_not_cl_other_lem >>
+          Cases_on `evpol ca (PA dop) = SOME pa`
+	  >| [(* eviction -> no hit *)
+	      FULL_SIMP_TAC std_ss [] >>
+	      IMP_RES_TAC miss_lem >>
+	      RW_TAC std_ss []
+	      ,
+	      FULL_SIMP_TAC std_ss [] >>
+	      RW_TAC std_ss [ccnt_lem]
+	     ]
+	 ]
+     ]
+);
+
+val ca_cacheable_miss_lem = store_thm("ca_cacheable_miss_lem", ``
+!ca m dop ca' m' pa. CA dop /\ ((ca',m') = mtfca (ca,m) dop) /\ ~chit_ ca' pa
+        ==>
+    (cl dop \/ pa <> PA dop)
+``,
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC ca_cacheable_ca >>
+  PAT_X_ASSUM ``!pa. X`` (fn thm => ASSUME_TAC (ISPEC ``pa:padr`` thm)) >>
+  METIS_TAC [cdirty_chit_lem]
+);
+
+val ca_cacheable_hit_lem = store_thm("ca_cacheable_hit_lem", ``
+!ca m dop ca' m'. CA dop /\ ((ca',m') = mtfca (ca,m) dop) /\ ~cl dop 
+        ==> 
+    chit_ ca' (PA dop)
+``,
+  METIS_TAC [ca_cacheable_miss_lem]
+);
+
 
 (*********** finish ************)
 

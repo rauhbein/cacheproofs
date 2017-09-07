@@ -336,6 +336,12 @@ val chit_oblg = store_thm("chit_oblg", ``
   RW_TAC std_ss [chit_def]
 );
 
+val ccnt_oblg = store_thm("ccnt_oblg", ``
+!pa ca ca'. (ca pa = ca' pa) ==> (ccnt_ ca pa = ccnt_ ca' pa)
+``,
+  RW_TAC std_ss [ccnt_def]
+);
+
 val miss_oblg = store_thm("miss_oblg", ``
 !ca pa. ~chit_ ca pa <=> (ca pa = NONE)
 ``,
