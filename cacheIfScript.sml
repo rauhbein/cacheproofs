@@ -342,6 +342,17 @@ val ccnt_oblg = store_thm("ccnt_oblg", ``
   RW_TAC std_ss [ccnt_def]
 );
 
+val ccnt_not_eq_oblg = store_thm("ccnt_not_eq_oblg", ``
+!pa ca ca'. chit_ ca pa /\ chit_ ca' pa /\ (cdirty_ ca pa <=> cdirty_ ca' pa)
+         /\ (ca pa <> ca' pa) ==> 
+    (ccnt_ ca pa <> ccnt_ ca' pa)
+``,
+  RW_TAC std_ss [ccnt_def] >>
+  FULL_SIMP_TAC std_ss [chit_lem, cdirty_def] >>
+  RW_TAC std_ss [cnt_def] >>
+  REV_FULL_SIMP_TAC std_ss [dirty_def]
+);
+
 val miss_oblg = store_thm("miss_oblg", ``
 !ca pa. ~chit_ ca pa <=> (ca pa = NONE)
 ``,
