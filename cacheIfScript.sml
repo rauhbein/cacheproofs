@@ -514,6 +514,29 @@ val ctf_wt_ccnt_oblg = store_thm("ctf_wt_ccnt_oblg", ``
   RW_TAC std_ss [ctf_ca_wt_lem, ccnt_def, cnt_def]
 );
 
+val ctf_wb_not_cl_evpol_oblg = store_thm("ctf_wb_not_cl_evpol_oblg", ``
+!ca mv dop ca' pa v. CA dop /\ ~cl dop /\ ((ca',SOME(pa,v)) = ctf ca mv dop) ==>
+    (pa = THE (evpol ca (PA dop))) /\ (v = ccnt_ ca pa) /\ cdirty_ ca pa 
+``,
+  REPEAT STRIP_TAC >> (
+      REV_FULL_SIMP_TAC std_ss [ctf_lem, ctf_wb_not_cl_lem] >>
+      FULL_SIMP_TAC std_ss [] >>
+      REV_FULL_SIMP_TAC std_ss []
+  )
+);
+
+val ctf_wb_not_cl_evpol_some_oblg = store_thm("ctf_wb_not_cl_evpol_some_oblg", ``
+!ca mv dop ca' pa v. CA dop /\ ~cl dop /\ ((ca',SOME(pa,v)) = ctf ca mv dop) ==>
+    (evpol ca (PA dop) = SOME pa)
+``,
+  REPEAT STRIP_TAC >> 
+  REV_FULL_SIMP_TAC std_ss [ctf_lem, ctf_wb_not_cl_lem] >>
+  FULL_SIMP_TAC std_ss [GSYM quantHeuristicsTheory.IS_SOME_EQ_NOT_NONE] >>
+  FULL_SIMP_TAC std_ss [optionTheory.IS_SOME_EXISTS] >>
+  METIS_TAC [optionTheory.THE_DEF]
+);
+
+
 val evpol_oblg = save_thm("evpol_oblg", evpol_spec);
 
 (*********** finish ************)

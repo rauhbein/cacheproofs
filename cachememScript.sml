@@ -144,6 +144,20 @@ val ctf_wt_ccnt_lem = store_thm("ctf_wt_ccnt_lem", ``
   REWRITE_TAC [ctf_wt_ccnt_oblg]
 );
 
+val ctf_wb_not_cl_evpol_lem = store_thm("ctf_wb_evpol_lem", ``
+!ca mv dop ca' pa v. CA dop /\ ~cl dop /\ ((ca',SOME(pa,v)) = ctf ca mv dop) ==>
+    (pa = THE (evpol ca (PA dop))) /\ (v = ccnt_ ca pa) /\ cdirty_ ca pa
+``,
+  REWRITE_TAC [ctf_wb_not_cl_evpol_oblg]
+);
+
+val ctf_wb_not_cl_evpol_some_lem = store_thm("ctf_wb_not_cl_evpol_some_lem", ``
+!ca mv dop ca' pa v. CA dop /\ ~cl dop /\ ((ca',SOME(pa,v)) = ctf ca mv dop) ==>
+    (evpol ca (PA dop) = SOME pa)
+``,
+  REWRITE_TAC [ctf_wb_not_cl_evpol_some_oblg]
+);
+
 val evpol_lem = store_thm("evpol_lem", ``
 !ca pa. evpol ca pa <> SOME pa
 ``,
@@ -603,6 +617,69 @@ val mem_cacheable_other_lem = store_thm("mem_cacheable_other_lem", ``
       FULL_SIMP_TAC std_ss [] >> 
       FULL_SIMP_TAC std_ss []
   )
+);
+
+val mem_cacheable_read_lem = store_thm("mem_cacheable_read_lem", ``
+!ca m dop ca' m'. CA dop /\ rd dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
+    (m' (PA dop) = m (PA dop))
+``,
+  RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
+  `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
+      METIS_TAC [pairTheory.pair_CASES]
+  ) >>
+  SYM_CTF_TAC >>
+  Cases_on `y`
+  >| [(* NONE *)
+      FULL_SIMP_TAC std_ss [wb_def]
+      ,
+      (* SOME (pa,v) *)
+      `?pa v. x = (pa,v)` by (
+          METIS_TAC [pairTheory.pair_CASES]
+      ) >>
+      FULL_SIMP_TAC std_ss [wb_def] >>
+      SYM_CTF_TAC2 >>
+      `~cl dop` by ( METIS_TAC [not_cl_lem] ) >>
+      IMP_RES_TAC ctf_wb_not_cl_evpol_lem >>
+      IMP_RES_TAC ctf_wb_not_cl_evpol_some_lem >>
+      `pa <> PA dop` by ( 
+          METIS_TAC [evpol_lem, optionTheory.THE_DEF] 
+      ) >>
+      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+     ]
+);
+
+val ca_cacheable_read_lem = store_thm("ca_cacheable_read_lem", ``
+!ca m dop ca' m'. CA dop /\ rd dop /\ ((ca',m') = mtfca (ca,m) dop)
+	       /\ (ca' (PA dop) <> ca (PA dop)) 
+        ==>
+    (ccnt_ ca' (PA dop) = m (PA dop)) /\ ~chit_ ca (PA dop)
+``,
+  REPEAT GEN_TAC >>
+  MATCH_MP_TAC (
+      prove(``(X ==> (B ==> A) /\ B) ==> (X ==> A /\ B)``, PROVE_TAC [])
+  ) >>
+  REPEAT STRIP_TAC >> (
+      IMP_RES_TAC mtfca_cacheable >> 
+      PAT_X_ASSUM ``!m ca. X`` (
+          fn thm => ASSUME_TAC (ISPECL [``m:mem_state``, 
+					``ca:cache_state``] thm)
+      ) >>
+      `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
+          METIS_TAC [pairTheory.pair_CASES]
+      )
+  )
+  >| [(* ccnt_ *)
+      IMP_RES_TAC ctf_rd_miss_lem >>
+      SYM_CTF_TAC >>
+      FULL_SIMP_TAC std_ss [wb_def, wb_lem] >>
+      RW_TAC std_ss [MVcl_def]
+      ,
+      (* SOME (pa,v) *)
+      IMP_RES_TAC ctf_rd_hit_lem >> 
+      SYM_CTF_TAC >>
+      FULL_SIMP_TAC std_ss [wb_def, wb_lem] >>
+      REV_FULL_SIMP_TAC std_ss []
+     ]
 );
 
 
