@@ -340,6 +340,8 @@ val ctf_wb_dirty_lem = store_thm("ctf_wb_dirty_lem", ``
      ]
 );
 
+
+
 (* memory state and memory view *)
 
 val _ = Parse.type_abbrev("mem_state", ``:padr -> word``);
@@ -348,6 +350,19 @@ val _ = Parse.type_abbrev("mem_state", ``:padr -> word``);
 val MVcl_def = Define `MVcl (m:mem_state) = 
 \(c:bool) pa. m pa
 `;
+
+val MVcl_lem = store_thm("MVcl_lem", ``
+!m m'. (MVcl m = MVcl m') <=> (m = m')
+``,
+  RW_TAC std_ss [MVcl_def, boolTheory.ETA_AX] >>
+  EQ_TAC 
+  >| [(* ==> *)
+      METIS_TAC []
+      ,
+      (* <== *)
+      RW_TAC std_ss []
+     ]
+);
 
 (* cache-aware memory view *)
 val MVca_def = Define `MVca ca m = 
@@ -440,7 +455,7 @@ val mtfca_cacheable = store_thm("mtfca_cacheable", ``
 
 
 val cl_mem_unchanged = store_thm("cl_mem_unchanged", ``
-!m dop m'. ~wt dop /\ (mtfcl m dop = m') ==>
+!m dop m'. ~wt dop /\ (m' = mtfcl m dop) ==>
 (MVcl m = MVcl m')
 ``,
   RW_TAC std_ss [not_wt_lem, rd_lem, cl_lem] >> (
@@ -459,7 +474,7 @@ val cl_write_semantics = store_thm("cl_write_semantics", ``
 ); 
 
 val ca_uncacheable = store_thm("ca_uncacheable", ``
-!ca m dop ca' m'. ~CA dop /\ (mtfca (ca,m) dop = (ca',m')) ==>
+!ca m dop ca' m'. ~CA dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
    (ca' = ca) /\ (m' = mtfcl m dop)
 ``,
   RW_TAC std_ss [not_CA_lem] >> (
@@ -682,6 +697,87 @@ val ca_cacheable_read_lem = store_thm("ca_cacheable_read_lem", ``
      ]
 );
 
+val ca_cacheable_write_lem = store_thm("ca_cacheable_write_lem", ``
+!ca m dop ca' m'. CA dop /\ wt dop /\ ((ca',m') = mtfca (ca,m) dop)
+	       /\ (ca' (PA dop) <> ca (PA dop)) 
+        ==>
+    cdirty_ ca' (PA dop)
+``,
+  RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
+  `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
+      METIS_TAC [pairTheory.pair_CASES]
+  ) >>
+  IMP_RES_TAC ctf_wt_cdirty_lem >>
+  SYM_CTF_TAC >>
+  FULL_SIMP_TAC std_ss [wb_lem]
+);
+
+val mem_cacheable_not_cl_lem = store_thm("mem_cacheable_not_cl_lem", ``
+!ca m dop ca' m'. CA dop /\ ~cl dop /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    (m' (PA dop) = m (PA dop))
+``,
+  RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
+  `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
+      METIS_TAC [pairTheory.pair_CASES]
+  ) >>
+  IMP_RES_TAC ctf_not_cl_wb_lem >>
+  SYM_CTF_TAC >>
+  FULL_SIMP_TAC std_ss [wb_lem] >>
+  Cases_on `evpol ca (PA dop) = NONE`
+  >| [(* NONE *)
+      FULL_SIMP_TAC std_ss [wb_mem_def]
+      ,
+      (* not NONE *)
+      Cases_on `cdirty_ ca (THE (evpol ca (PA dop)))`
+      >| [(* dirty *)
+	  FULL_SIMP_TAC std_ss [GSYM quantHeuristicsTheory.IS_SOME_EQ_NOT_NONE,
+				optionTheory.IS_SOME_EXISTS, wb_mem_def] >>
+	  Cases_on `x <> PA dop` 
+	  >| [(* not PA dop *)
+	      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+	      ,
+	      (* PA dop *)
+	      FULL_SIMP_TAC std_ss [] >>
+	      METIS_TAC [evpol_lem]
+	     ]
+	  ,
+	  FULL_SIMP_TAC std_ss [wb_mem_def]
+	 ]
+     ]	  
+);
+
+val uncacheable_unchanged_lem = store_thm("uncacheable_unchanged_lem", ``
+!ca m dop ca' m'. ~CA dop /\ ~wt dop /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    (ca' = ca) /\ (m' = m)
+``,
+  REPEAT STRIP_TAC >> ( IMP_RES_TAC ca_uncacheable ) >>
+  IMP_RES_TAC cl_mem_unchanged >>
+  IMP_RES_TAC MVcl_lem >>
+  FULL_SIMP_TAC std_ss []
+);
+
+val mem_uncacheable_unchanged_lem = store_thm("mem_uncacheable_unchanged_lem", ``
+!ca m dop ca' m'. ~CA dop /\ ~wt dop /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    (m' (PA dop) = m (PA dop))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC uncacheable_unchanged_lem >>
+  ASM_REWRITE_TAC []
+);
+
+val mem_uncacheable_write_lem = store_thm("mem_uncacheable_write_lem", ``
+!ca m dop ca' m'. wt dop /\ ((ca',m') = mtfca (ca,m) dop) 
+	       /\ (m' (PA dop) <> m (PA dop))
+        ==>
+    ~CA dop
+``,
+  REPEAT STRIP_TAC >>
+  `~cl dop` by ( METIS_TAC [not_cl_lem] ) >>
+  IMP_RES_TAC mem_cacheable_not_cl_lem  
+);
 
 (*********** finish ************)
 
