@@ -156,6 +156,9 @@ val wt_CA_lem = store_thm("wt_CA_lem", ``
   FULL_SIMP_TAC std_ss [CA_def]
 );
 
+(* core requests to memory *)
+
+val _ = Datatype `corereq = DREQ dop | FREQ padr | NOREQ`;
 
 (*********** finish ************)
 

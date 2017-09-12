@@ -87,10 +87,14 @@ val Mon_exists = prove (``
 val Mon_spec = new_specification ("Mon_spec",
   ["Mon_"], Mon_exists);
 
-(* transition relation *)
+(* transition relations, TODO: replace with specs, when requirements known *)
 
-val _ = new_constant("core_trans", 
- 		     ``:core_state # mem_view # mode # dop # core_state -> bool``
+val _ = new_constant("core_req", 
+		     ``:core_state # mode # corereq # core_state -> bool``
+);
+
+val _ = new_constant("core_rcv", 
+		     ``:core_state # mode # word # core_state -> bool``
 );
 
 (* Proof obligations on components, exported to main theory *)
