@@ -244,7 +244,8 @@ val ctf_wb_not_cl_lem = store_thm("ctf_wb_not_cl_lem", ``
 !ca mv dop pa. CA dop /\ ~cl dop ==> 
     (ctf_wb ca mv dop = if evpol ca (PA dop) = NONE
 			then NONE 
-			else (if cdirty_ ca (THE (evpol ca (PA dop)))
+			else (if cdirty_ ca (THE (evpol ca (PA dop))) /\
+                                 THE (evpol ca (PA dop)) <> PA dop
 			      then SOME(THE (evpol ca (PA dop)), 
 					ccnt_ ca (THE(evpol ca (PA dop))))
 			      else NONE))
@@ -262,6 +263,8 @@ val ctf_wb_not_cl_lem = store_thm("ctf_wb_not_cl_lem", ``
       IMP_RES_TAC optionTheory.IS_SOME_EXISTS >>
       FULL_SIMP_TAC std_ss [optionTheory.THE_DEF] >>
       RW_TAC std_ss [levict_def]
+  ) >> (
+      METIS_TAC [evpol_spec]
   )
 );
 
@@ -328,7 +331,7 @@ val cfill_chit_ = store_thm("cfill_chit_", ``
   )
 );
 
-(* proof obligations on any cache model *)
+(* proof obligations on the cache model, imported by generalized model *)
 
 val chit_oblg = store_thm("chit_oblg", ``
 !pa ca ca'. (ca pa = ca' pa) ==> (chit_ ca pa <=> chit_ ca' pa)
@@ -460,10 +463,11 @@ val ctf_not_cl_wb_oblg = store_thm("ctf_not_cl_wb_oblg", ``
 !ca mv dop ca' y. CA dop /\ ~cl dop /\ ((ca',y) = ctf ca mv dop) ==>
     (y = if evpol ca (PA dop) = NONE
 	 then NONE
-	 else (if cdirty_ ca (THE (evpol ca (PA dop))) 
+	 else (if cdirty_ ca (THE (evpol ca (PA dop))) /\
+	          THE (evpol ca (PA dop)) <> PA dop 
 	       then SOME (THE (evpol ca (PA dop)),
 			  ccnt_ ca (THE (evpol ca (PA dop))))
-	       else NONE)) 
+	       else NONE))
 ``,
   REPEAT STRIP_TAC >>
   REV_FULL_SIMP_TAC std_ss [ctf_lem] >>

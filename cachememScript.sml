@@ -8,6 +8,12 @@ open cacheIfTheory;
 
 val _ = new_theory "cachemem";
 
+(* assumptions on the cache model:
+- at most one write back per access 
+- read/written addresses are not evicted / guaranteed hit in post state
+- word granularity
+*)
+
 (* helper functions *)
 
 val EQ_NOT_EQ = store_thm("EQ_NOT_EQ", ``(A = B) <=> (~A = ~B)``, PROVE_TAC []);
@@ -101,24 +107,34 @@ val ctf_not_cl_other_lem = store_thm("ctf_not_cl_other_lem", ``
   REWRITE_TAC [ctf_not_cl_other_oblg]
 );
 
-
 val ctf_not_cl_wb_lem = store_thm("ctf_not_cl_wb_lem", ``
 !ca mv dop ca' y. CA dop /\ ~cl dop /\ ((ca',y) = ctf ca mv dop) ==>
-    (y = if evpol ca (PA dop) = NONE
-	 then NONE
-	 else (if cdirty_ ca (THE (evpol ca (PA dop))) 
-	       then SOME (THE (evpol ca (PA dop)),
-			  ccnt_ ca (THE (evpol ca (PA dop))))
-	       else NONE)) 
+    ((y = if evpol ca (PA dop) = NONE
+	  then NONE
+	  else (if cdirty_ ca (THE (evpol ca (PA dop))) /\
+	  	   THE (evpol ca (PA dop)) <> PA dop
+		then SOME (THE (evpol ca (PA dop)),
+			   ccnt_ ca (THE (evpol ca (PA dop))))
+		else NONE)) 
+(* WT case *)
+  \/ (y = if wt dop 
+	  then SOME (PA dop, VAL dop)
+	  else NONE))
 ``,
-  REWRITE_TAC [ctf_not_cl_wb_oblg]
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC ctf_not_cl_wb_oblg >>
+  ASM_REWRITE_TAC []
 );
 
 val ctf_wt_cdirty_lem = store_thm("ctf_wt_cdirty_lem", ``
 !ca mv dop ca' y. CA dop /\ wt dop /\ ((ca',y) = ctf ca mv dop) ==>
-    cdirty_ ca' (PA dop)
+    (cdirty_ ca' (PA dop) 
+(* WT case *)
+  \/ ~cdirty_ ca' (PA dop) /\ (y = SOME (PA dop, VAL dop)))
 ``,
-  REWRITE_TAC [ctf_wt_cdirty_oblg]
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC ctf_wt_cdirty_oblg >>
+  ASM_REWRITE_TAC []
 );
 
 val ctf_rd_hit_lem = store_thm("ctf_rd_hit_lem", ``
@@ -146,16 +162,24 @@ val ctf_wt_ccnt_lem = store_thm("ctf_wt_ccnt_lem", ``
 
 val ctf_wb_not_cl_evpol_lem = store_thm("ctf_wb_evpol_lem", ``
 !ca mv dop ca' pa v. CA dop /\ ~cl dop /\ ((ca',SOME(pa,v)) = ctf ca mv dop) ==>
-    (pa = THE (evpol ca (PA dop))) /\ (v = ccnt_ ca pa) /\ cdirty_ ca pa
+    ((pa = THE (evpol ca (PA dop))) /\ (v = ccnt_ ca pa) /\ cdirty_ ca pa
+(* WT case *)
+  \/ wt dop /\ (pa = PA dop) /\ (v = VAL dop) /\ ~cdirty_ ca pa)
 ``,
-  REWRITE_TAC [ctf_wb_not_cl_evpol_oblg]
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC ctf_wb_not_cl_evpol_oblg >>
+  ASM_REWRITE_TAC []
 );
 
 val ctf_wb_not_cl_evpol_some_lem = store_thm("ctf_wb_not_cl_evpol_some_lem", ``
 !ca mv dop ca' pa v. CA dop /\ ~cl dop /\ ((ca',SOME(pa,v)) = ctf ca mv dop) ==>
-    (evpol ca (PA dop) = SOME pa)
+    ((evpol ca (PA dop) = SOME pa)
+(* WT case *)
+  \/ wt dop /\ (pa = PA dop))
 ``,
-  REWRITE_TAC [ctf_wb_not_cl_evpol_some_oblg]
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC ctf_wb_not_cl_evpol_some_oblg >>
+  ASM_REWRITE_TAC []
 );
 
 val evpol_lem = store_thm("evpol_lem", ``
@@ -163,7 +187,6 @@ val evpol_lem = store_thm("evpol_lem", ``
 ``,
   REWRITE_TAC [evpol_oblg]
 );
-
 
 (* some derived lemmas *)
 
@@ -184,7 +207,11 @@ val ctf_ca_cases_other = store_thm("ctf_ca_cases_other", ``
 
 val ctf_wb_cases = store_thm("ctf_wb_cases", ``
 !ca mv dop ca' y. CA dop /\ ((ca',y) = ctf ca mv dop) ==>
-    ((y = NONE) \/ ?pa. y = SOME(pa, ccnt_ ca pa))
+    (   (y = NONE) 
+     \/ (?pa. (y = SOME(pa, ccnt_ ca pa)) /\ (if cl dop 
+					      then pa = PA dop
+					      else pa <> PA dop))
+     \/ wt dop /\ (y = SOME (PA dop, VAL dop)))
 ``,
   REPEAT STRIP_TAC >>
   Cases_on `cl dop` 
@@ -192,6 +219,7 @@ val ctf_wb_cases = store_thm("ctf_wb_cases", ``
       Cases_on `cdirty_ ca (PA dop)`
       >| [(* dirty *)
 	  DISJ2_TAC >>
+	  DISJ1_TAC >>
           EXISTS_TAC ``PA dop`` >>
 	  IMP_RES_TAC ctf_cl_wb_lem >>
 	  ASM_REWRITE_TAC []
@@ -203,9 +231,13 @@ val ctf_wb_cases = store_thm("ctf_wb_cases", ``
 	 ]
       ,
       (* not cl *)
-      METIS_TAC [ctf_not_cl_wb_lem]
+      IMP_RES_TAC ctf_not_cl_wb_lem >> (
+          METIS_TAC []
+      )
      ]
 );
+
+
 
 val ctf_chit_evpol_lem = store_thm("ctf_chit_evpol_lem", ``
 !ca mv dop ca' y pa. CA dop /\ ~cl dop /\ ((ca',y) = ctf ca mv dop) 
@@ -322,7 +354,7 @@ val ctf_cl_cdirty_other_lem = store_thm("ctf_cl_cdirty_other_lem", ``
 
 val ctf_wb_dirty_lem = store_thm("ctf_wb_dirty_lem", ``
 !ca mv dop ca' y pa v. CA dop /\ ((ca',SOME(pa,v)) = ctf ca mv dop) ==>
-    cdirty_ ca pa
+    (cdirty_ ca pa \/ wt dop /\ (pa = PA dop))
 ``,
   REPEAT STRIP_TAC >>
   Cases_on `cl dop` 
@@ -333,14 +365,14 @@ val ctf_wb_dirty_lem = store_thm("ctf_wb_dirty_lem", ``
       )
       ,
       (* read or write *)
-      Cases_on `pa = THE (evpol ca (PA dop))` >> (
-          IMP_RES_TAC ctf_not_cl_wb_lem >>
-	  REV_FULL_SIMP_TAC std_ss []
+      IMP_RES_TAC ctf_not_cl_wb_lem >> ( 
+          Cases_on `pa = THE (evpol ca (PA dop))` >> (
+	      REV_FULL_SIMP_TAC std_ss [] >>
+	      METIS_TAC []
+	  )
       )
      ]
 );
-
-
 
 (* memory state and memory view *)
 
@@ -443,7 +475,7 @@ val mtfca_def = Define `
 /\ (mtfca (ca,m) _           = (ca,m))
 `;
 
-(* TODO: add some useful lemmas *)
+(* some useful lemmas *)
 
 val mtfca_cacheable = store_thm("mtfca_cacheable", ``
 !ca m dop. CA dop ==> (mtfca (ca,m) dop = wb (ctf ca (MVcl m) dop) m)
@@ -498,26 +530,80 @@ val SYM_CTF_TAC2 = PAT_X_ASSUM ctf_pat2 (fn thm => ASSUME_TAC (SYM thm));
 
 val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 !ca m dop ca' m'. CA dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
-    !pa. (m' pa = m pa) \/ cdirty_ ca pa /\ (m' pa = ccnt_ ca pa)
+    !pa. (m' pa = m pa) 
+      \/ cdirty_ ca pa /\ (m' pa = ccnt_ ca pa) /\ 
+	 (if cl dop then pa = PA dop else pa <> PA dop)
+(* WT case *)
+      \/ wt dop /\ (m' pa = ccnt_ ca' pa) /\ (pa = PA dop)
 ``,
   RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
   `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
       METIS_TAC [pairTheory.pair_CASES]
   ) >>
-  IMP_RES_TAC ctf_wb_cases >> ( FULL_SIMP_TAC std_ss [] )
-  >| [(* wb NONE *)
-      RW_TAC (srw_ss()) [] >>
-      SYM_CTF_TAC >>
-      FULL_SIMP_TAC std_ss [wb_def]
+  Cases_on `cl dop`
+  >| [(* clean *)
+      `~wt dop` by ( METIS_TAC [dop_cases_lem2] ) >>
+      IMP_RES_TAC ctf_wb_cases >> ( FULL_SIMP_TAC std_ss [] )
+      >| [(* wb NONE *)
+	  RW_TAC (srw_ss()) [] >>
+          SYM_CTF_TAC >>
+	  FULL_SIMP_TAC std_ss [wb_def]
+	  ,
+	  (* wb SOME (pa',v) *) 
+	  RW_TAC std_ss [] >>
+	  IMP_RES_TAC ctf_wb_dirty_lem >> 
+          SYM_CTF_TAC >>
+	  FULL_SIMP_TAC std_ss [wb_def] >>
+	  REV_FULL_SIMP_TAC std_ss [] >>
+	  Cases_on `pa = pa'` >> (
+              RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+	  )
+	 ]
       ,
-      (* wb SOME (pa',v) *) 
-      RW_TAC (srw_ss()) [] >>
-      IMP_RES_TAC ctf_wb_dirty_lem >>
-      SYM_CTF_TAC >>
-      FULL_SIMP_TAC std_ss [wb_def] >>
-      Cases_on `pa = pa'` >> (
-          RW_TAC std_ss [combinTheory.UPDATE_APPLY]
-      )
+      (* read or write *)
+      Cases_on `wt dop`
+      >| [(* write *)
+	  RW_TAC std_ss [] >>
+	  IMP_RES_TAC ctf_wt_ccnt_lem >>
+          IMP_RES_TAC ctf_wb_cases >> ( FULL_SIMP_TAC std_ss [] ) >- (
+	      (* wb NONE *)
+	      RW_TAC (srw_ss()) [] >>
+	      SYM_CTF_TAC >>
+	      FULL_SIMP_TAC std_ss [wb_def]
+	  ) >> (
+	      (* wb SOME (pa',v) *) 
+              IMP_RES_TAC ctf_wb_dirty_lem >> (
+	          PAT_X_ASSUM ``(x, SOME (y,z)) = ctf a b c`` 
+                              (fn thm => ASSUME_TAC (SYM thm)) >>
+	          FULL_SIMP_TAC std_ss [wb_def] >>
+	          REV_FULL_SIMP_TAC std_ss [] >>
+		  Cases_on `pa = pa'` >> (
+                      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+		  ) >>
+		  Cases_on `pa = PA dop` >> (
+		      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+		  )
+	      )
+	  )
+	  ,
+	  (* read *) 
+	  IMP_RES_TAC ctf_wb_cases >> ( FULL_SIMP_TAC std_ss [] )
+	  >| [(* wb NONE *)
+	      RW_TAC (srw_ss()) [] >>
+	      SYM_CTF_TAC >>
+	      FULL_SIMP_TAC std_ss [wb_def]
+	      ,
+	      (* wb SOME (pa',v) *) 
+	      RW_TAC std_ss [] >>
+	      IMP_RES_TAC ctf_wb_dirty_lem >> 
+              SYM_CTF_TAC >>
+	      FULL_SIMP_TAC std_ss [wb_def] >>
+	      REV_FULL_SIMP_TAC std_ss [] >>
+	      Cases_on `pa = pa'` >> (
+                  RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+	      )
+	     ]
+	 ]
      ]
 );
 
@@ -527,7 +613,7 @@ val ca_cacheable_ca = store_thm("ca_cacheable_ca", ``
     !pa. chit_ ca pa /\ chit_ ca' pa /\ (ccnt_ ca' pa = ccnt_ ca pa) /\ 
 	 (cdirty_ ca pa <=> cdirty_ ca' pa) /\ (rd dop \/ pa <> PA dop)
       \/ chit_ ca' pa /\ (ccnt_ ca' pa = m pa) /\ rd dop /\ (pa = PA dop)
-      \/ cdirty_ ca' pa /\ (ccnt_ ca' pa = VAL dop) /\ wt dop /\ (pa = PA dop)
+      \/ chit_ ca' pa /\ (ccnt_ ca' pa = VAL dop) /\ wt dop /\ (pa = PA dop)
       \/ ~chit_ ca' pa /\ (cl dop \/ pa <> PA dop)
 ``,
   RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
@@ -653,7 +739,7 @@ val mem_cacheable_read_lem = store_thm("mem_cacheable_read_lem", ``
       ) >>
       FULL_SIMP_TAC std_ss [wb_def] >>
       SYM_CTF_TAC2 >>
-      `~cl dop` by ( METIS_TAC [not_cl_lem] ) >>
+      `~cl dop /\ ~wt dop` by ( METIS_TAC [dop_cases_lem2] ) >>
       IMP_RES_TAC ctf_wb_not_cl_evpol_lem >>
       IMP_RES_TAC ctf_wb_not_cl_evpol_some_lem >>
       `pa <> PA dop` by ( 
@@ -701,50 +787,42 @@ val ca_cacheable_write_lem = store_thm("ca_cacheable_write_lem", ``
 !ca m dop ca' m'. CA dop /\ wt dop /\ ((ca',m') = mtfca (ca,m) dop)
 	       /\ (ca' (PA dop) <> ca (PA dop)) 
         ==>
-    cdirty_ ca' (PA dop)
+    (cdirty_ ca' (PA dop) 
+(* WT case *)
+  \/ ~cdirty_ ca' (PA dop) /\ (ccnt_ ca' (PA dop) = m' (PA dop)))
 ``,
   RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
   `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
       METIS_TAC [pairTheory.pair_CASES]
   ) >>
-  IMP_RES_TAC ctf_wt_cdirty_lem >>
-  SYM_CTF_TAC >>
-  FULL_SIMP_TAC std_ss [wb_lem]
+  IMP_RES_TAC ctf_wt_ccnt_lem >> 
+  IMP_RES_TAC ctf_wt_cdirty_lem >> (
+      SYM_CTF_TAC >>
+      FULL_SIMP_TAC std_ss [wb_lem, wb_mem_def]
+  ) >>
+  RW_TAC std_ss [combinTheory.UPDATE_APPLY]
 );
 
 val mem_cacheable_not_cl_lem = store_thm("mem_cacheable_not_cl_lem", ``
 !ca m dop ca' m'. CA dop /\ ~cl dop /\ ((ca',m') = mtfca (ca,m) dop)
         ==>
-    (m' (PA dop) = m (PA dop))
+    ((m' (PA dop) = m (PA dop)) \/ (ccnt_ ca' (PA dop) = m' (PA dop)))
 ``,
   RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>
   `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
       METIS_TAC [pairTheory.pair_CASES]
   ) >>
-  IMP_RES_TAC ctf_not_cl_wb_lem >>
-  SYM_CTF_TAC >>
-  FULL_SIMP_TAC std_ss [wb_lem] >>
-  Cases_on `evpol ca (PA dop) = NONE`
-  >| [(* NONE *)
-      FULL_SIMP_TAC std_ss [wb_mem_def]
-      ,
-      (* not NONE *)
-      Cases_on `cdirty_ ca (THE (evpol ca (PA dop)))`
-      >| [(* dirty *)
-	  FULL_SIMP_TAC std_ss [GSYM quantHeuristicsTheory.IS_SOME_EQ_NOT_NONE,
-				optionTheory.IS_SOME_EXISTS, wb_mem_def] >>
-	  Cases_on `x <> PA dop` 
-	  >| [(* not PA dop *)
-	      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
-	      ,
-	      (* PA dop *)
-	      FULL_SIMP_TAC std_ss [] >>
-	      METIS_TAC [evpol_lem]
-	     ]
-	  ,
-	  FULL_SIMP_TAC std_ss [wb_mem_def]
-	 ]
-     ]	  
+  IMP_RES_TAC ctf_wb_cases >> ( FULL_SIMP_TAC std_ss [] ) >> (
+      RW_TAC (srw_ss()) [] >>
+      SYM_CTF_TAC >>
+      FULL_SIMP_TAC std_ss [wb_def] >>
+      REV_FULL_SIMP_TAC std_ss [] >>
+      RW_TAC std_ss [combinTheory.UPDATE_APPLY]
+  ) >> 
+  (* WT case *)
+  SYM_CTF_TAC2 >>
+  IMP_RES_TAC ctf_wt_ccnt_lem >>
+  ASM_REWRITE_TAC []
 );
 
 val uncacheable_unchanged_lem = store_thm("uncacheable_unchanged_lem", ``
@@ -772,12 +850,23 @@ val mem_uncacheable_write_lem = store_thm("mem_uncacheable_write_lem", ``
 !ca m dop ca' m'. wt dop /\ ((ca',m') = mtfca (ca,m) dop) 
 	       /\ (m' (PA dop) <> m (PA dop))
         ==>
-    ~CA dop
+    (~CA dop \/ (ccnt_ ca' (PA dop) = m' (PA dop)))
 ``,
   REPEAT STRIP_TAC >>
   `~cl dop` by ( METIS_TAC [not_cl_lem] ) >>
+  RW_TAC std_ss [GSYM IMP_DISJ_THM] >>
   IMP_RES_TAC mem_cacheable_not_cl_lem  
 );
+
+(* TODO: 
+- define coherency 
+- show cl_mem_unchanged for MVca and CA dop *)
+
+(* Coherency *)
+
+val coh_def = Define `coh ca m pa = (ccnt_ ca pa <> m pa) ==> cdirty_ ca pa`;
+
+val Coh_def = Define `Coh ca m (Rs:padr set) = !pa. pa IN Rs ==> coh ca m pa`;
 
 (*********** finish ************)
 
