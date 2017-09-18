@@ -107,6 +107,8 @@ val ctf_not_cl_other_lem = store_thm("ctf_not_cl_other_lem", ``
   REWRITE_TAC [ctf_not_cl_other_oblg]
 );
 
+val clean_inv = Define `clean_inv ca = !pa. ~cdirty_ ca pa`;
+
 val ctf_not_cl_wb_lem = store_thm("ctf_not_cl_wb_lem", ``
 !ca mv dop ca' y. CA dop /\ ~cl dop /\ ((ca',y) = ctf ca mv dop) ==>
     ((y = if evpol ca (PA dop) = NONE
@@ -119,7 +121,7 @@ val ctf_not_cl_wb_lem = store_thm("ctf_not_cl_wb_lem", ``
 (* WT case *)
   \/ (y = if wt dop 
 	  then SOME (PA dop, VAL dop)
-	  else NONE))
+	  else NONE) /\ clean_inv ca)
 ``,
   REPEAT STRIP_TAC >>
   IMP_RES_TAC ctf_not_cl_wb_oblg >>
@@ -205,13 +207,20 @@ val ctf_ca_cases_other = store_thm("ctf_ca_cases_other", ``
      ]
 );
 
+val wb_NONE_cases_def = Define `wb_NONE_cases ca dop = 
+    clean_inv ca /\ ~wt dop 
+ \/ (evpol ca (PA dop) = NONE)
+ \/ (~cdirty_ ca (THE (evpol ca (PA dop))))
+ \/ cl dop /\ (~cdirty_ ca (PA dop))
+`;
+
 val ctf_wb_cases = store_thm("ctf_wb_cases", ``
 !ca mv dop ca' y. CA dop /\ ((ca',y) = ctf ca mv dop) ==>
-    (   (y = NONE) 
+    (   (y = NONE) /\ wb_NONE_cases ca dop
      \/ (?pa. (y = SOME(pa, ccnt_ ca pa)) /\ (if cl dop 
 					      then pa = PA dop
 					      else pa <> PA dop))
-     \/ wt dop /\ (y = SOME (PA dop, VAL dop)))
+     \/ wt dop /\ (y = SOME (PA dop, VAL dop)) /\ clean_inv ca)
 ``,
   REPEAT STRIP_TAC >>
   Cases_on `cl dop` 
@@ -227,17 +236,33 @@ val ctf_wb_cases = store_thm("ctf_wb_cases", ``
 	  (* clean *) 
 	  DISJ1_TAC >>
 	  IMP_RES_TAC ctf_cl_wb_lem >>
-	  ASM_REWRITE_TAC []
+	  ASM_REWRITE_TAC [wb_NONE_cases_def]
 	 ]
       ,
       (* not cl *)
       IMP_RES_TAC ctf_not_cl_wb_lem >> (
-          METIS_TAC []
-      )
+          TRY ( METIS_TAC [wb_NONE_cases_def] )
+      ) >>
+      Cases_on `evpol ca (PA dop) = NONE`
+      >| [(* NONE *)
+	  FULL_SIMP_TAC std_ss [wb_NONE_cases_def]
+	  ,
+	  (* SOME pa *) 
+	  `THE (evpol ca (PA dop)) <> PA dop` by (
+	      METIS_TAC [quantHeuristicsTheory.IS_SOME_EQ_NOT_NONE,
+			 optionTheory.IS_SOME_EXISTS, 
+			 optionTheory.THE_DEF,
+			 evpol_lem]
+	  ) >>
+	  Cases_on `cdirty_ ca (THE (evpol ca (PA dop)))`
+	  >| [(* dirty *)
+	      FULL_SIMP_TAC std_ss []
+	      ,
+	      FULL_SIMP_TAC std_ss [wb_NONE_cases_def]
+	     ]
+	 ]
      ]
 );
-
-
 
 val ctf_chit_evpol_lem = store_thm("ctf_chit_evpol_lem", ``
 !ca mv dop ca' y pa. CA dop /\ ~cl dop /\ ((ca',y) = ctf ca mv dop) 
@@ -522,6 +547,16 @@ val cl_write_semantics = store_thm("cl_write_semantics", ``
       RW_TAC std_ss [combinTheory.APPLY_UPDATE_THM]
   )
 ); 
+
+val cl_other_unchanged_lem = store_thm("cl_other_unchanged_lem", ``
+!m m' dop pa. (m' = mtfcl m dop) /\ (pa <> PA dop)  ==>
+    (m' pa = m pa)
+``,
+  Cases_on `dop` >> (
+      RW_TAC std_ss [mtfcl_def, combinTheory.APPLY_UPDATE_THM, PA_def]
+  )
+); 
+
 
 val ca_uncacheable = store_thm("ca_uncacheable", ``
 !ca m dop ca' m'. ~CA dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
@@ -829,6 +864,40 @@ val mem_cacheable_cl_miss_lem = store_thm("mem_cacheable_cl_miss_lem", ``
   PAT_X_ASSUM ``!pa. X`` ( fn thm => ASSUME_TAC ( SPEC ``PA dop`` thm) ) >>
   REV_FULL_SIMP_TAC std_ss []  
 );
+
+val mem_cacheable_not_cl_dirty_lem = 
+store_thm("mem_cacheable_not_cl_dirty_lem", ``
+!ca m dop ca' m' pa. CA dop /\ ~cl dop /\ ((ca',m') = mtfca (ca,m) dop) 
+                  /\ (pa <> PA dop) /\ cdirty_ ca pa /\ ~chit_ ca' pa
+        ==>
+    (m' pa = ccnt_ ca pa)
+``,
+  RW_TAC std_ss [] >> 
+  REV_FULL_SIMP_TAC std_ss [mtfca_cacheable] >>
+  `?ca'' y. (ca'',y) = ctf ca (MVcl m) dop` by (
+      METIS_TAC [pairTheory.pair_CASES]
+  ) >>
+  IMP_RES_TAC cdirty_chit_lem >>
+  `evpol ca (PA dop) = SOME pa` by ( 
+      IMP_RES_TAC ctf_not_cl_chit_lem >>
+      SYM_CTF_TAC >>
+      FULL_SIMP_TAC std_ss [wb_lem] >>
+      METIS_TAC [] 
+  ) >>
+  IMP_RES_TAC ctf_wb_cases >> (
+      FULL_SIMP_TAC std_ss [wb_NONE_cases_def, clean_inv] >>
+      TRY ( METIS_TAC [optionTheory.NOT_SOME_NONE,
+		       optionTheory.THE_DEF] )
+  ) >>
+  RW_TAC std_ss [] >>
+  REV_FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC ctf_wb_not_cl_evpol_lem >>
+  FULL_SIMP_TAC std_ss [optionTheory.THE_DEF] >>
+  SYM_CTF_TAC >>
+  FULL_SIMP_TAC std_ss [wb_lem, wb_mem_def] >>
+  REWRITE_TAC [combinTheory.UPDATE_APPLY]
+);
+
 
 (* deriveability lemmas *)
 
@@ -1218,6 +1287,71 @@ val ca_unchanged_lem = store_thm("ca_unchanged_lem", ``
 	 ]     
      ]
 );
+
+fun ASM_SYM_TAC pat = PAT_X_ASSUM pat (fn thm => ASSUME_TAC (GSYM thm));
+
+val ca_other_unchanged_lem = store_thm("ca_other_unchanged_lem", ``
+!ca m dop ca' m' pa. coh ca m pa /\ (pa <> PA dop)
+		  /\ ((ca',m') = mtfca (ca,m) dop) 
+        ==>
+    (MVca ca' m' T pa = MVca ca m T pa)
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `cl dop`
+  >| [(* clean *)
+      IMP_RES_TAC cacheable_cl_other_lem >>
+      RW_TAC std_ss [MVca_def, ccnt_lem] >> (
+          METIS_TAC [chit_lem]
+      )
+      ,
+      (* not clean *)
+      Cases_on `CA dop`
+      >| [(* cacheable *)
+	  IMP_RES_TAC ca_cacheable_mem >>
+	  PAT_X_ASSUM ``!pa. X`` ( 
+	      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+	  ) >>
+	  REV_FULL_SIMP_TAC std_ss []
+	  >| [(* mem_unchanged *)
+	      IMP_RES_TAC ca_cacheable_ca >>
+	      PAT_X_ASSUM ``!pa. X`` ( 
+	          fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+	      ) >>
+	      REV_FULL_SIMP_TAC std_ss []
+	      >| [(* hit and hit' *)
+		  RW_TAC std_ss [MVca_def]
+		  ,
+		  (* hit and miss' *)
+		  RW_TAC std_ss [MVca_def] >>
+		  CCONTR_TAC >>
+		  ASM_SYM_TAC ``m pa <> ccnt_ ca pa`` >>
+		  IMP_RES_TAC coh_hit_lem >>
+		  IMP_RES_TAC mem_cacheable_not_cl_dirty_lem >>
+		  METIS_TAC []
+		 ]
+	      ,
+	      IMP_RES_TAC ca_cacheable_ca >>
+	      PAT_X_ASSUM ``!pa. X`` ( 
+	          fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+	      ) >>
+	      REV_FULL_SIMP_TAC std_ss []
+	      >| [(* hit and hit' *)
+		  RW_TAC std_ss [MVca_def]
+		  ,
+		  (* miss' *)
+		  RW_TAC std_ss [MVca_def] >>
+		  IMP_RES_TAC cdirty_chit_lem
+		 ]
+	     ]
+	  ,
+	  (* uncacheable *)
+	  IMP_RES_TAC ca_uncacheable >>
+	  IMP_RES_TAC cl_other_unchanged_lem >>
+	  RW_TAC std_ss [MVca_def]
+	 ]
+     ]
+);
+
 
 (*********** finish ************)
 
