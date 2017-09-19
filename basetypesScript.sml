@@ -160,6 +160,40 @@ val wt_CA_lem = store_thm("wt_CA_lem", ``
 
 val _ = Datatype `corereq = DREQ dop | FREQ padr | NOREQ`;
 
+val Adr_def = Define `
+   (Adr (DREQ dop) = PA dop)
+/\ (Adr (FREQ pa) = pa)
+`;
+
+val Freq_def = Define `
+   (Freq (FREQ pa) = T)
+/\ (Freq _ = F)
+`;
+
+val Rreq_def = Define `
+   (Rreq (DREQ dop) = rd dop)
+/\ (Rreq _ = F)
+`;
+
+val Wreq_def = Define `
+   (Wreq (DREQ dop) = wt dop)
+/\ (Wreq _ = F)
+`;
+
+val Creq_def = Define `
+   (Creq (DREQ dop) = cl dop)
+/\ (Creq _ = F)
+`;
+
+val not_Wreq_lem = store_thm("not_Wreq_lem", ``
+!req. (Freq req \/ Rreq req \/ Creq req \/ (req = NOREQ)) ==> ~Wreq req
+``,
+  Cases >> (
+      RW_TAC std_ss [Freq_def, Rreq_def, Wreq_def, Creq_def] >>
+      METIS_TAC [dop_cases_lem2]
+  )
+);
+
 (*********** finish ************)
 
 val _ = export_theory();

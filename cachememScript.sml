@@ -150,7 +150,9 @@ val ctf_rd_hit_lem = store_thm("ctf_rd_hit_lem", ``
 val ctf_rd_miss_lem = store_thm("ctf_rd_miss_lem", ``
 !ca mv dop ca' y. CA dop /\ rd dop /\ ~chit_ ca (PA dop) 
 	       /\ ((ca',y) = ctf ca mv dop) ==>
-    (ccnt_ ca' (PA dop) = mv T (PA dop)) /\ ~cdirty_ ca' (PA dop)
+    chit_ ca' (PA dop) 
+ /\ (ccnt_ ca' (PA dop) = mv T (PA dop))
+ /\ ~cdirty_ ca' (PA dop)
 ``,
   REWRITE_TAC [ctf_rd_miss_oblg]
 );
@@ -960,11 +962,15 @@ val ca_cacheable_read_lem = store_thm("ca_cacheable_read_lem", ``
 !ca m dop ca' m'. CA dop /\ rd dop /\ ((ca',m') = mtfca (ca,m) dop)
 	       /\ (ca' (PA dop) <> ca (PA dop)) 
         ==>
-    (ccnt_ ca' (PA dop) = m (PA dop)) /\ ~chit_ ca (PA dop)
+    chit_ ca' (PA dop) 
+ /\ ~cdirty_ ca' (PA dop)
+ /\ (ccnt_ ca' (PA dop) = m (PA dop))
+ /\ ~chit_ ca (PA dop)
 ``,
   REPEAT GEN_TAC >>
   MATCH_MP_TAC (
-      prove(``(X ==> (B ==> A) /\ B) ==> (X ==> A /\ B)``, PROVE_TAC [])
+      prove(``(X ==> (D ==> A) /\ (D ==> B) /\ (D ==> C) /\ D) ==> 
+	      (X ==> A /\ B /\ C /\ D)``, PROVE_TAC [])
   ) >>
   REPEAT STRIP_TAC >> (
       IMP_RES_TAC mtfca_cacheable >> 
@@ -976,7 +982,20 @@ val ca_cacheable_read_lem = store_thm("ca_cacheable_read_lem", ``
           METIS_TAC [pairTheory.pair_CASES]
       )
   )
-  >| [(* ccnt_ *)
+  >| [(* chit_'*)
+      IMP_RES_TAC ctf_rd_miss_lem >>
+      SYM_CTF_TAC >>
+      FULL_SIMP_TAC std_ss [wb_def, wb_lem] >>
+      RW_TAC std_ss [MVcl_def]
+      ,
+      (* clean *)
+      IMP_RES_TAC ctf_rd_miss_lem >>
+      SYM_CTF_TAC >>
+      FULL_SIMP_TAC std_ss [wb_def, wb_lem] >>
+      RW_TAC std_ss [MVcl_def] >>
+      REV_FULL_SIMP_TAC std_ss []
+      ,
+      (* ccnt_ *)
       IMP_RES_TAC ctf_rd_miss_lem >>
       SYM_CTF_TAC >>
       FULL_SIMP_TAC std_ss [wb_def, wb_lem] >>

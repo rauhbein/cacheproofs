@@ -496,16 +496,18 @@ val ctf_rd_hit_oblg = store_thm("ctf_rd_hit_oblg", ``
 val ctf_rd_miss_oblg = store_thm("ctf_rd_miss_oblg", ``
 !ca mv dop ca' y. CA dop /\ rd dop /\ ~chit_ ca (PA dop) 
 	       /\ ((ca',y) = ctf ca mv dop) ==>
-    (ccnt_ ca' (PA dop) = mv T (PA dop)) /\ ~cdirty_ ca' (PA dop)
+    chit_ ca' (PA dop) 
+ /\ (ccnt_ ca' (PA dop) = mv T (PA dop))
+ /\ ~cdirty_ ca' (PA dop)
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >> STRIP_TAC >>
   REV_FULL_SIMP_TAC std_ss [ctf_lem] 
-  >| [(* ccnt *)
-      RW_TAC std_ss [ccnt_def, cnt_def, ctf_ca_rd_lem]
+  >| [(* chit *)
+      RW_TAC std_ss [chit_def, hit_def, ctf_ca_rd_lem]
       ,
-      (* not dirty *)
-      RW_TAC std_ss [not_cdirty_lem, ctf_ca_rd_lem]
+      (* ccnt and clean *)
+      RW_TAC std_ss [ccnt_def, cnt_def, ctf_ca_rd_lem, not_cdirty_lem]
      ]      
 );
 
