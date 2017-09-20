@@ -617,9 +617,26 @@ val imv_dmvcl_oblg = store_thm("imv_dmv_oblg", ``
 		 dirty_def, dmvcl_def, MVcl_def, MVca_def]
 );
 
+val imv_fetch_oblg = store_thm("imv_fetch_oblg", ``
+!ms pa ms' req. icoh ms pa /\ Freq req /\ (ms' = msca_trans ms req)
+        ==>
+    (imv ms' T pa = imv ms T pa)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC not_Wreq_lem >>
+  IMP_RES_TAC icoh_preserve_oblg >>
+  REV_FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC Freq_lem >> 
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC msca_FREQ_lem >>
+  RW_TAC std_ss [imv_def, MVca_def] >> (
+      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, dirty_def]
+  )
+);
 
-(* val Invic_imv_oblg = store_thm("Invic_imv_oblg", `` *)
-(* !ms req ms' pa. Invic ms /\ icoh ms pa /\ (ms' = msca_trans ms req) *)
+
+(* val imv_preserve_oblg = store_thm("imv_preserve_oblg", `` *)
+(* !ms req ms' pa. icoh ms pa /\ (ms' = msca_trans ms req) *)
 (* 	     /\ (Wreq req ==> (pa <> Adr req)) *)
 (*         ==> *)
 (*     (imv ms' T pa = imv ms T pa) *)

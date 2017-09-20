@@ -185,6 +185,14 @@ val Creq_def = Define `
 /\ (Creq _ = F)
 `;
 
+val Freq_lem = store_thm("Freq_lem", ``
+!req. Freq req ==> ?pa. req = FREQ pa
+``,
+  Cases >> (
+      RW_TAC std_ss [Freq_def]
+  )
+);
+
 val not_Wreq_lem = store_thm("not_Wreq_lem", ``
 !req. (Freq req \/ Rreq req \/ Creq req \/ (req = NOREQ)) ==> ~Wreq req
 ``,
