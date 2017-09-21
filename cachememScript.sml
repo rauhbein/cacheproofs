@@ -530,7 +530,6 @@ val mtfca_cacheable = store_thm("mtfca_cacheable", ``
   )
 );
 
-
 val cl_mem_unchanged = store_thm("cl_mem_unchanged", ``
 !m dop m'. ~wt dop /\ (m' = mtfcl m dop) ==>
 (MVcl m = MVcl m')
@@ -558,7 +557,6 @@ val cl_other_unchanged_lem = store_thm("cl_other_unchanged_lem", ``
       RW_TAC std_ss [mtfcl_def, combinTheory.APPLY_UPDATE_THM, PA_def]
   )
 ); 
-
 
 val ca_uncacheable = store_thm("ca_uncacheable", ``
 !ca m dop ca' m'. ~CA dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
@@ -1263,6 +1261,46 @@ val coh_ca_trans_lem = store_thm("coh_ca_trans_lem", ``
      ]
 );
 
+val coh_other_lem = store_thm("coh_other_lem", ``
+!ca m dop ca' m' pa. coh ca m pa /\ ((ca',m') = mtfca (ca,m) dop) /\ pa <> PA dop
+        ==>
+    coh ca' m' pa
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `CA dop`  
+  >| [(* cacheable *)
+      IMP_RES_TAC coh_ca_trans_lem
+      ,
+      (* uncacheable *)
+      IMP_RES_TAC ca_uncacheable >>
+      IMP_RES_TAC cl_other_unchanged_lem >>
+      FULL_SIMP_TAC std_ss [coh_def]
+     ]
+);
+
+val coh_not_write_lem = store_thm("coh_not_write_lem", ``
+!ca m dop ca' m' pa. coh ca m pa /\ ~wt dop /\ ((ca',m') = mtfca (ca,m) dop) 
+        ==>
+    coh ca' m' pa
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `CA dop`  
+  >| [(* cacheable *)
+      IMP_RES_TAC coh_ca_trans_lem
+      ,
+      (* uncacheable *)
+      IMP_RES_TAC ca_uncacheable >>
+      `MVcl m' T pa = MVcl m T pa` by (
+          IMP_RES_TAC cl_mem_unchanged >>
+	  FULL_SIMP_TAC std_ss []
+      ) >>
+      FULL_SIMP_TAC std_ss [MVcl_def, coh_def]
+     ]
+);
+
+
+(* cacheable memory view *)
+
 val ca_unchanged_lem = store_thm("ca_unchanged_lem", ``
 !ca m dop ca' m'. CA dop /\ ~wt dop /\ coh ca m (PA dop)
 	       /\ ((ca',m') = mtfca (ca,m) dop)
@@ -1368,6 +1406,50 @@ val ca_other_unchanged_lem = store_thm("ca_other_unchanged_lem", ``
 	  IMP_RES_TAC cl_other_unchanged_lem >>
 	  RW_TAC std_ss [MVca_def]
 	 ]
+     ]
+);
+
+val ca_uncacheable_unchanged_lem = store_thm("ca_uncacheable_unchanged_lem", ``
+!ca m dop ca' m'. ~CA dop /\ ~wt dop /\ coh ca m (PA dop)
+	       /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    (MVca ca' m' T (PA dop) = MVca ca m T (PA dop))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC ca_uncacheable >>
+  `MVcl m' T (PA dop) = MVcl m T (PA dop)` by (
+      IMP_RES_TAC cl_mem_unchanged >>
+      FULL_SIMP_TAC std_ss []
+  ) >>
+  FULL_SIMP_TAC std_ss [MVcl_def, MVca_def] >>
+  RW_TAC std_ss []
+);
+
+val mvca_unchanged_lem = store_thm("mvca_unchanged_lem", ``
+!ca m dop ca' m' pa. (~wt dop \/ pa <> PA dop) /\ coh ca m pa
+		  /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    (MVca ca' m' T pa = MVca ca m T pa)
+``,
+  REPEAT GEN_TAC >>				    
+  MATCH_MP_TAC ( 
+      prove(``((A /\ ~B \/ B) /\ C /\ D ==> E) ==>
+	      (A \/ B) /\ C /\ D ==> E``, PROVE_TAC [])
+  ) >>
+  REPEAT STRIP_TAC
+  >| [(* not write, PA dop *)
+      FULL_SIMP_TAC std_ss [] >>
+      REV_FULL_SIMP_TAC std_ss [] >>
+      Cases_on `CA dop`
+      >| [(* cacheable *)
+	  IMP_RES_TAC ca_unchanged_lem
+	  ,
+	  (* uncacheable *)
+	  IMP_RES_TAC ca_uncacheable_unchanged_lem
+	 ]
+      ,
+      (* other pa *)
+      IMP_RES_TAC ca_other_unchanged_lem
      ]
 );
 

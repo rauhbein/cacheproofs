@@ -170,6 +170,11 @@ val Freq_def = Define `
 /\ (Freq _ = F)
 `;
 
+val Dreq_def = Define `
+   (Dreq (DREQ dop) = T)
+/\ (Dreq _ = F)
+`;
+
 val Rreq_def = Define `
    (Rreq (DREQ dop) = rd dop)
 /\ (Rreq _ = F)
@@ -193,6 +198,14 @@ val Freq_lem = store_thm("Freq_lem", ``
   )
 );
 
+val Dreq_lem = store_thm("Dreq_lem", ``
+!req. Dreq req ==> ?dop. req = DREQ dop
+``,
+  Cases >> (
+      RW_TAC std_ss [Dreq_def]
+  )
+);
+
 val not_Wreq_lem = store_thm("not_Wreq_lem", ``
 !req. (Freq req \/ Rreq req \/ Creq req \/ (req = NOREQ)) ==> ~Wreq req
 ``,
@@ -201,6 +214,29 @@ val not_Wreq_lem = store_thm("not_Wreq_lem", ``
       METIS_TAC [dop_cases_lem2]
   )
 );
+
+val req_cases_lem = store_thm("req_cases_lem", ``
+!req. Freq req /\ ~Dreq req /\ req <> NOREQ
+   \/ ~Freq req /\ Dreq req /\ req <> NOREQ
+   \/ ~Freq req /\ ~Dreq req /\ (req = NOREQ)
+``,
+  Cases >> (
+      RW_TAC std_ss [Freq_def, Dreq_def]
+  )
+);
+
+val Dreq_cases_lem = store_thm("Dreq_cases_lem", ``
+!req. Dreq req ==> 
+      Rreq req /\ ~Wreq req /\ ~Creq req
+   \/ ~Rreq req /\ Wreq req /\ ~Creq req
+   \/ ~Rreq req /\ ~Wreq req /\ Creq req
+``,
+  GEN_TAC >> STRIP_TAC >>
+  IMP_RES_TAC Dreq_lem >>
+  ASSUME_TAC ( SPEC ``dop:dop`` dop_cases_lem2 ) >>
+  RW_TAC std_ss [Rreq_def, Wreq_def, Creq_def]
+);
+
 
 (*********** finish ************)
 

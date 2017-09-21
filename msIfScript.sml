@@ -324,31 +324,45 @@ val dcoh_ca_trans_oblg = store_thm("dcoh_ca_trans_oblg", ``
   IMP_RES_TAC coh_ca_trans_lem
 );
 
-val dc_unchanged_oblg = store_thm("dc_unchanged_oblg", ``
-!ms dop ms'. CA dop /\ ~wt dop /\ dcoh ms (PA dop)
-	  /\ (ms' = msca_trans ms (DREQ dop))
+val dcoh_other_lem = store_thm("dcoh_other_lem", ``
+!ms dop ms' pa. dcoh ms pa /\ (ms' = msca_trans ms (DREQ dop)) /\ pa <> PA dop
         ==>
-    (dmvca ms' T (PA dop) = dmvca ms T (PA dop))
+    dcoh ms' pa
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   IMP_RES_TAC msca_DREQ_lem >>
-  FULL_SIMP_TAC std_ss [dcoh_def, dmvca_def] >>
-  IMP_RES_TAC ca_unchanged_lem
+  FULL_SIMP_TAC std_ss [dcoh_def] >>
+  IMP_RES_TAC coh_other_lem
+);
+
+val dcoh_not_write_lem = store_thm("dcoh_not_write_lem", ``
+!ms dop ms' pa. dcoh ms pa /\ ~wt dop /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    dcoh ms' pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC msca_DREQ_lem >>
+  FULL_SIMP_TAC std_ss [dcoh_def] >>
+  IMP_RES_TAC coh_not_write_lem
 );
 
 
-val dc_other_unchanged_oblg = store_thm("dc_other_unchanged_oblg", ``
-!ms dop ms' pa. dcoh ms pa /\ (pa <> PA dop)
+(* cacheable memory view *)
+
+val dmv_unchanged_oblg = store_thm("dmv_unchanged_oblg", ``
+!ms dop ms' pa. (~wt dop \/ pa <> PA dop) /\ dcoh ms pa
 	     /\ (ms' = msca_trans ms (DREQ dop))
         ==>
     (dmvca ms' T pa = dmvca ms T pa)
 ``,
   REPEAT GEN_TAC >>
-  STRIP_TAC >>
-  IMP_RES_TAC msca_DREQ_lem >>
-  FULL_SIMP_TAC std_ss [dcoh_def, dmvca_def] >>
-  IMP_RES_TAC ca_other_unchanged_lem
+  STRIP_TAC >> (
+      IMP_RES_TAC msca_DREQ_lem >>
+      FULL_SIMP_TAC std_ss [dcoh_def, dmvca_def] >>
+      IMP_RES_TAC mvca_unchanged_lem 
+  )
 );
 
 (* instruction cache *)
@@ -610,7 +624,7 @@ val imv_dmv_oblg = store_thm("imv_dmv_oblg", ``
   RW_TAC std_ss []
 );
 
-val imv_dmvcl_oblg = store_thm("imv_dmv_oblg", ``
+val imv_dmvcl_oblg = store_thm("imv_dmvcl_oblg", ``
 !ms pa c. icoh ms pa ==> (imv ms T pa = dmvcl ms c pa)
 ``,
   RW_TAC std_ss [icoh_def, ihit_def, icnt_def, imv_def, M_def,
@@ -634,22 +648,65 @@ val imv_fetch_oblg = store_thm("imv_fetch_oblg", ``
   )
 );
 
+val imv_dreq_oblg = store_thm("imv_dreq_oblg", ``
+!ms pa ms' req. icoh ms pa /\ dcoh ms pa /\ Dreq req 
+	     /\ (ms' = msca_trans ms req)
+	     /\ (Wreq req ==> (pa <> Adr req))
+        ==>
+    (imv ms' T pa = imv ms T pa)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC icoh_preserve_oblg >>
+  IMP_RES_TAC Dreq_lem >>
+  Cases_on `Wreq req`
+  >| [(* write *)
+      RES_TAC >>
+      FULL_SIMP_TAC std_ss [] >>
+      REV_FULL_SIMP_TAC std_ss [Adr_def] >>
+      IMP_RES_TAC dcoh_other_lem >>
+      `dmvca ms' T pa = dmvca ms T pa` by (
+          IMP_RES_TAC dmv_unchanged_oblg
+      ) >>
+      REV_FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC imv_dmv_oblg >>
+      RW_TAC std_ss []
+      ,
+      (* read or clean *)
+      FULL_SIMP_TAC std_ss [] >>
+      REV_FULL_SIMP_TAC std_ss [] >>
+      `~wt dop` by ( FULL_SIMP_TAC std_ss [Wreq_def] ) >>
+      `dmvca ms' T pa = dmvca ms T pa` by (
+          IMP_RES_TAC dmv_unchanged_oblg
+      ) >>
+      IMP_RES_TAC dcoh_not_write_lem >>
+      REV_FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC imv_dmv_oblg >>
+      RW_TAC std_ss []
+     ]      
+);
 
-(* val imv_preserve_oblg = store_thm("imv_preserve_oblg", `` *)
-(* !ms req ms' pa. icoh ms pa /\ (ms' = msca_trans ms req) *)
-(* 	     /\ (Wreq req ==> (pa <> Adr req)) *)
-(*         ==> *)
-(*     (imv ms' T pa = imv ms T pa) *)
-(* ``, *)
-(*   REPEAT STRIP_TAC >> *)
-(*   Cases_on `req` *)
-(*   >| [(* DREQ *) *)
-(*       , *)
-(*       (* FREQ *) *)
-(*       , *)
-(*       (* NOREQ *) *)
-(*      ] *)
-(* ); *)
+
+val imv_preserve_oblg = store_thm("imv_preserve_oblg", ``
+!ms req ms' pa. icoh ms pa /\ dcoh ms pa /\ (ms' = msca_trans ms req)
+	     /\ (Wreq req ==> (pa <> Adr req))
+        ==>
+    (imv ms' T pa = imv ms T pa)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``req:corereq`` req_cases_lem ) >>
+  FULL_SIMP_TAC std_ss []
+  >| [(* FREQ *)
+      IMP_RES_TAC imv_fetch_oblg >>
+      REV_FULL_SIMP_TAC std_ss []
+      ,
+      (* DREQ *)
+      IMP_RES_TAC imv_dreq_oblg >>
+      REV_FULL_SIMP_TAC std_ss []
+      ,
+      (* NOREQ *)
+      REWRITE_TAC [msca_trans_def]
+     ]
+);
 
 (*********** finish ************)
 
