@@ -120,7 +120,7 @@ val MD_oblg = store_thm("MD_oblg", ``
   METIS_TAC [Mmu_MD_spec]
 );
 
-val Mon_oblg = store_thm("MD_oblg", ``
+val Mon_oblg = store_thm("Mon_oblg", ``
 !c mv pa m ac.
   (?va ca. Mmu_ (c,mv,va,m,ac) = SOME (pa,ca)) <=> Mon_ (c,mv,MEM pa,m,ac)
 ``,

@@ -185,7 +185,7 @@ val M_cacheable_other_oblg = store_thm("M_cacheable_other_oblg", ``
   ASM_REWRITE_TAC []
 );
 
-val M_cacheable_read_oblg = store_thm("mem_cacheable_read_oblg", ``
+val M_cacheable_read_oblg = store_thm("M_cacheable_read_oblg", ``
 !ms dop ms'. CA dop /\ rd dop /\ (ms' = msca_trans ms (DREQ dop)) ==>
     (M ms' (PA dop) = M ms (PA dop))
 ``,
@@ -648,7 +648,7 @@ val imv_fetch_oblg = store_thm("imv_fetch_oblg", ``
   )
 );
 
-val imv_dreq_oblg = store_thm("imv_dreq_oblg", ``
+val imv_dreq_lem = store_thm("imv_dreq_lem", ``
 !ms pa ms' req. icoh ms pa /\ dcoh ms pa /\ Dreq req 
 	     /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
@@ -700,7 +700,7 @@ val imv_preserve_oblg = store_thm("imv_preserve_oblg", ``
       REV_FULL_SIMP_TAC std_ss []
       ,
       (* DREQ *)
-      IMP_RES_TAC imv_dreq_oblg >>
+      IMP_RES_TAC imv_dreq_lem >>
       REV_FULL_SIMP_TAC std_ss []
       ,
       (* NOREQ *)
