@@ -13,7 +13,7 @@ val _ = Datatype `vadr = VADR bool[30]`;
 
 val _ = Datatype `mode = PRIV | USER`;
 
-val _ = Datatype `acc = R | W`;
+val _ = Datatype `acc = R | W | EX`;
 
 val _ = Parse.type_abbrev("mem_view", ``:bool -> padr -> word``);
 
@@ -194,6 +194,11 @@ val CAreq_def = Define `
    (CAreq (DREQ dop) = CA dop)
 /\ (CAreq (FREQ pa) = T)
 /\ (CAreq NOREQ = F)
+`;
+
+val Acc_def = Define `
+   (Acc (DREQ dop) = if wt dop then W else R)
+/\ (Acc (FREQ pa) = EX)
 `;
 
 val Freq_lem = store_thm("Freq_lem", ``

@@ -213,7 +213,7 @@ val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
    (!s M dop cs' s'. 
 	rd dop 
      /\ (M = Mode s.cs)
-     /\ core_req (s.cs, M, DREQ dop, cs') 
+     /\ core_req (s.cs, M, dmvca s.ms, DREQ dop, cs') 
      /\ (s'.ms = msca_trans s.ms (DREQ dop))
      /\ core_rcv (cs', M, dmvca s.ms (CA dop) (PA dop), s'.cs)
     ==>
@@ -221,20 +221,20 @@ val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
 /\ (!s M dop s'. 
 	~rd dop 
      /\ (M = Mode s.cs)
-     /\ core_req (s.cs, M, DREQ dop, s'.cs) 
+     /\ core_req (s.cs, M, dmvca s.ms, DREQ dop, s'.cs) 
      /\ (s'.ms = msca_trans s.ms (DREQ dop))
     ==>
     hw_trans s M (DREQ dop) s')
 /\ (!s M pa cs' s'. 
         (M = Mode s.cs)
-     /\ core_req (s.cs, M, FREQ pa, cs') 
+     /\ core_req (s.cs, M, dmvca s.ms, FREQ pa, cs') 
      /\ (s'.ms = msca_trans s.ms (FREQ pa))
      /\ core_rcv (cs', M, imv s.ms T pa, s'.cs)
     ==>
     hw_trans s M (FREQ pa) s')
 /\ (!s M s'. 
         (M = Mode s.cs)
-     /\ core_req (s.cs, M, NOREQ, s'.cs)
+     /\ core_req (s.cs, M, dmvca s.ms, NOREQ, s'.cs)
      /\ (s'.ms = s.ms)
     ==>
     hw_trans s M NOREQ s')
@@ -257,7 +257,7 @@ hw_trans_mode_not_eq_lem |> SPEC_ALL
 
 val hw_trans_fetch_lem = store_thm("hw_trans_fetch_lem", ``
 !s M req s'. Freq req /\ hw_trans s M req s' ==>
-?cs'. core_req (s.cs, M, req, cs') 
+?cs'. core_req (s.cs, M, dmvca s.ms, req, cs') 
    /\ (s'.ms = msca_trans s.ms req)
    /\ core_rcv (cs', M, imv s.ms T (Adr req), s'.cs)
 ``,
@@ -286,7 +286,7 @@ val hw_trans_data_lem = store_thm("hw_trans_data_lem", ``
 
 val hw_trans_read_lem = store_thm("hw_trans_read_lem", ``
 !s M req s'. Rreq req /\ hw_trans s M req s' ==>
-?cs'. core_req (s.cs, M, req, cs') 
+?cs'. core_req (s.cs, M, dmvca s.ms, req, cs') 
    /\ (s'.ms = msca_trans s.ms req)
    /\ core_rcv (cs', M, dmvca s.ms (CAreq req) (Adr req), s'.cs)
 ``,
@@ -303,7 +303,7 @@ val hw_trans_read_lem = store_thm("hw_trans_read_lem", ``
 
 val hw_trans_write_lem = store_thm("hw_trans_write_lem", ``
 !s M req s'. Wreq req /\ hw_trans s M req s' ==>
-    core_req (s.cs, M, req, s'.cs) 
+    core_req (s.cs, M, dmvca s.ms, req, s'.cs) 
  /\ (s'.ms = msca_trans s.ms req)
 ``,
   REPEAT GEN_TAC >>
@@ -319,7 +319,7 @@ val hw_trans_write_lem = store_thm("hw_trans_write_lem", ``
 
 val hw_trans_clean_lem = store_thm("hw_trans_clean_lem", ``
 !s M req s'. Creq req /\ hw_trans s M req s' ==>
-    core_req (s.cs, M, req, s'.cs) 
+    core_req (s.cs, M, dmvca s.ms, req, s'.cs) 
  /\ (s'.ms = msca_trans s.ms req)
 ``,
   REPEAT GEN_TAC >>
@@ -335,7 +335,7 @@ val hw_trans_clean_lem = store_thm("hw_trans_clean_lem", ``
 
 val hw_trans_noreq_lem = store_thm("hw_trans_noreq_lem", ``
 !s M s'. hw_trans s M NOREQ s' ==>
-    core_req (s.cs, M, NOREQ, s'.cs) /\ (s'.ms = s.ms)
+    core_req (s.cs, M, dmvca s.ms, NOREQ, s'.cs) /\ (s'.ms = s.ms)
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
