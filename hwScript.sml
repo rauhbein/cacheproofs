@@ -32,11 +32,11 @@ val MD_lem = store_thm("MD_lem", ``
   REWRITE_TAC [MD_oblg]
 );
 
-val Mon_lem = store_thm("Mon_lem", ``
+val Mon_mem_lem = store_thm("Mon_mem_lem", ``
 !c mv pa m ac.
   (?va ca. Mmu_ (c,mv,va,m,ac) = SOME (pa,ca)) <=> Mon_ (c,mv,MEM pa,m,ac)
 ``,
-  REWRITE_TAC [Mon_oblg]
+  REWRITE_TAC [Mon_mem_oblg]
 );
 
 val M_dmvcl_lem = store_thm("M_dmvcl_lem", ``

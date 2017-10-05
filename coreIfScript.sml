@@ -255,11 +255,42 @@ val MD_oblg = store_thm("MD_oblg", ``
   METIS_TAC [Mmu_MD_spec]
 );
 
-val Mon_oblg = store_thm("Mon_oblg", ``
+val Mon_mem_oblg = store_thm("Mon_mem_oblg", ``
 !c mv pa m ac.
   (?va ca. Mmu_ (c,mv,va,m,ac) = SOME (pa,ca)) <=> Mon_ (c,mv,MEM pa,m,ac)
 ``,
   METIS_TAC [Mon_spec]
+);
+
+val Mon_reg_oblg = store_thm("Mon_reg_oblg", ``
+!c mv r mv' m ac. reg_res r ==> 
+    (Mon_ (c,mv,r,m,ac) <=> Mon_ (c,mv',r,m,ac))
+``,
+  METIS_TAC [Mon_spec]
+);
+
+val core_req_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
+!c mv req r c'. reg_res r /\ r IN MD_ (c,mv) 
+	     /\ core_req (c,USER,mv,req,c') ==>
+    (CV c mv r = CV c' mv r)
+``,
+  REPEAT STRIP_TAC >>
+  `~Mon_ (c,mv,r,USER,W)` by (   METIS_TAC [Mon_spec] ) >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_Mon_reg_po
+);
+
+val core_rcv_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
+!c w mv r c'. reg_res r /\ r IN MD_ (c,mv) 
+	     /\ core_rcv (c,USER,w,c') ==>
+    (CV c mv r = CV c' mv r)
+``,
+  REPEAT STRIP_TAC >>
+  `~Mon_ (c,mv,r,USER,W)` by (   METIS_TAC [Mon_spec] ) >>
+  ASSUME_TAC core_rcv_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC rcv_Mon_reg_po
 );
 
 
