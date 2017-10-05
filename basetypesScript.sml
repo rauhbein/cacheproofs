@@ -190,6 +190,12 @@ val Creq_def = Define `
 /\ (Creq _ = F)
 `;
 
+val CAreq_def = Define `
+   (CAreq (DREQ dop) = CA dop)
+/\ (CAreq (FREQ pa) = T)
+/\ (CAreq NOREQ = F)
+`;
+
 val Freq_lem = store_thm("Freq_lem", ``
 !req. Freq req ==> ?pa. req = FREQ pa
 ``,
@@ -203,6 +209,30 @@ val Dreq_lem = store_thm("Dreq_lem", ``
 ``,
   Cases >> (
       RW_TAC std_ss [Dreq_def]
+  )
+);
+
+val Rreq_lem = store_thm("Rreq_lem", ``
+!req. Rreq req ==> ?dop. (req = DREQ dop) /\ rd dop
+``,
+  Cases >> (
+      RW_TAC std_ss [Rreq_def, rd_def]
+  )
+);
+
+val Wreq_lem = store_thm("Wreq_lem", ``
+!req. Wreq req ==> ?dop. (req = DREQ dop) /\ wt dop
+``,
+  Cases >> (
+      RW_TAC std_ss [Wreq_def, wt_def]
+  )
+);
+
+val Creq_lem = store_thm("Creq_lem", ``
+!req. Creq req ==> ?dop. (req = DREQ dop) /\ cl dop
+``,
+  Cases >> (
+      RW_TAC std_ss [Creq_def, cl_def]
   )
 );
 
