@@ -147,7 +147,7 @@ val core_exentry_po = Define `core_exentry_po trans =
 (* mem request -> Mon obeyed *)
 val core_Mon_mem_po = Define `core_Mon_mem_po trans = 
 !c M mv req c'. trans (c,M,mv,req,c') /\ (req <> NOREQ) ==> 
-    Mon_(c,mv,MEM (Adr req),M,Acc req)
+    (?va. Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req))
 `;
 
 (* reg unchanged if no Mon permission *)
@@ -162,6 +162,11 @@ val core_MD_mv_po = Define `core_MD_mv_po trans =
     (trans (c,M,mv,req,c') <=> trans (c,M,mv',req,c'))
 `;
 
+(* user transitions do not modify coregs *)
+val core_user_coreg_po = Define `core_user_coreg_po trans = 
+!c mv req c'. trans (c,USER,mv,req,c') ==> (c'.coreg = c.coreg)
+`;
+
 val dummy_cr_def = Define `
 dummy_cr (c:core_state,M:mode,mv:mem_view,req:corereq,c':core_state) = 
 (c = c') /\ (req = NOREQ) /\ (Mode c = M)
@@ -174,6 +179,7 @@ val core_req_exists = prove (``
  /\ core_Mon_mem_po trans
  /\ core_Mon_reg_po trans
  /\ core_MD_mv_po trans
+ /\ core_user_coreg_po trans
 ``,
   EXISTS_TAC ``dummy_cr`` >>
   REPEAT STRIP_TAC 
@@ -192,6 +198,9 @@ val core_req_exists = prove (``
       ,
       (* MD dependency *)
       RW_TAC std_ss [core_MD_mv_po, dummy_cr_def]
+      ,
+      (* coreg unchanged *)
+      RW_TAC std_ss [core_user_coreg_po, dummy_cr_def]
      ]
 );  
 
@@ -210,6 +219,11 @@ val rcv_Mon_reg_po = Define `rcv_Mon_reg_po trans =
     (CV c mv r = CV c' mv r)
 `;
 
+val rcv_user_coreg_po = Define `rcv_user_coreg_po trans = 
+!c w c'. trans (c,USER,w,c') ==> (c'.coreg = c.coreg)
+`;
+
+
 val dummy_rcv_def = Define `
 dummy_rcv (c:core_state,M:mode,w:word,c':core_state) = 
 (c = c') /\ (Mode c = M)
@@ -219,6 +233,7 @@ val core_rcv_exists = prove (``
 ?(trans:core_state # mode # word # core_state -> bool).
     rcv_mode_po trans
  /\ rcv_Mon_reg_po trans
+ /\ rcv_user_coreg_po trans
 ``,
   EXISTS_TAC ``dummy_rcv`` >>
   REPEAT STRIP_TAC 
@@ -227,6 +242,9 @@ val core_rcv_exists = prove (``
       ,
       (* reg monitor *)
       RW_TAC std_ss [rcv_Mon_reg_po, dummy_rcv_def]
+      ,
+      (* coregs *)
+      RW_TAC std_ss [rcv_user_coreg_po, dummy_rcv_def]
      ]
 );  
 
@@ -293,14 +311,16 @@ val core_rcv_user_MD_reg_oblg = store_thm("core_rcv_user_MD_reg_oblg", ``
   IMP_RES_TAC rcv_Mon_reg_po
 );
 
-val core_req_mem_req_oblg = store_thm("core_req_mem_req_oblg", ``
+val core_req_mmu_oblg = store_thm("core_req_mmu_oblg", ``
 !c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
-    Mon_(c,mv,MEM (Adr req),M,Acc req)
+    ?va. Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req)
 ``,
   REPEAT STRIP_TAC >>
   ASSUME_TAC core_req_spec >>
   FULL_SIMP_TAC std_ss [] >>
-  IMP_RES_TAC core_Mon_mem_po
+  IMP_RES_TAC core_Mon_mem_po >>
+  HINT_EXISTS_TAC >>
+  ASM_REWRITE_TAC []
 );
 
 val core_req_exentry_oblg = store_thm("core_req_exentry_oblg", ``
@@ -344,6 +364,25 @@ val core_req_MD_mv_oblg = store_thm("core_req_MD_mv_oblg", ``
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC core_MD_mv_po  
 );
+
+val core_req_user_coreg_oblg = store_thm("core_req_user_coreg_oblg", ``
+!c mv req c'. core_req (c,USER,mv,req,c') ==> (c'.coreg = c.coreg)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_user_coreg_po  
+);
+
+val core_rcv_user_coreg_oblg = store_thm("core_rcv_user_coreg_oblg", ``
+!c w c'. core_rcv (c,USER,w,c') ==> (c'.coreg = c.coreg)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_rcv_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC rcv_user_coreg_po 
+);
+
 
 
 (*********** finish ************)

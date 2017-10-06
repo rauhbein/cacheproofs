@@ -61,11 +61,11 @@ val core_rcv_user_MD_reg_lem = store_thm("core_req_user_MD_reg_lem", ``
   REWRITE_TAC [core_rcv_user_MD_reg_oblg]
 );
 
-val core_req_mem_req_lem = store_thm("core_req_mem_req_lem", ``
+val core_req_mmu_lem = store_thm("core_req_mmu_lem", ``
 !c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
-    Mon_(c,mv,MEM (Adr req),M,Acc req)
+    ?va. Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req)
 ``,
-  REWRITE_TAC [core_req_mem_req_oblg]
+  REWRITE_TAC [core_req_mmu_oblg]
 );
 
 val core_req_exentry_lem = store_thm("core_req_exentry_lem", ``
@@ -97,6 +97,18 @@ val core_req_MD_mv_lem = store_thm("core_req_MD_mv_lem", ``
   REWRITE_TAC [core_req_MD_mv_oblg]
 );
 
+val core_req_user_coreg_lem = store_thm("core_req_user_coreg_lem", ``
+!c mv req c'. core_req (c,USER,mv,req,c') ==> (c'.coreg = c.coreg)
+``,
+  REWRITE_TAC [core_req_user_coreg_oblg]
+);
+
+val core_rcv_user_coreg_lem = store_thm("core_rcv_user_coreg_lem", ``
+!c w c'. core_rcv (c,USER,w,c') ==> (c'.coreg = c.coreg)
+``,
+  REWRITE_TAC [core_rcv_user_coreg_oblg]
+);
+
 val M_dmvcl_lem = store_thm("M_dmvcl_lem", ``
 !ms pa c. M ms pa = dmvcl ms c pa
 ``,
@@ -106,7 +118,7 @@ val M_dmvcl_lem = store_thm("M_dmvcl_lem", ``
 val dc_cacheable_other_lem = store_thm("dc_cacheable_other_lem", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
              /\ (dw ms' pa <> dw ms pa) ==> 
-    ~dhit ms' pa
+    ~dhit ms' pa  /\ (dirty ms pa ==> (M ms' pa = dcnt ms pa))
 ``,
   REWRITE_TAC [dc_cacheable_other_oblg]
 );
@@ -278,6 +290,15 @@ val Mon__lem = store_thm("Mon__lem", ``
      ]
 );
 
+val core_req_mem_req_lem = store_thm("core_req_mem_req_lem", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
+    Mon_(c,mv,MEM (Adr req),M,Acc req)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC core_req_mmu_lem >>
+  IMP_RES_TAC Mon__mem_lem
+);
+
 
 (******* HW semantics ********)
 
@@ -288,6 +309,7 @@ val _ = Datatype `hw_state = <|
 
 val MD_def = Define `MD s = MD_ (s.cs, dmvca s.ms)`;
 val Mon_def = Define `Mon s r m ac = Mon_ (s.cs, dmvca s.ms, r, m, ac)`;
+val Mmu_def = Define `Mmu s va m ac = Mmu_ (s.cs, dmvca s.ms, va, m, ac)`;
 val Cv_def = Define `Cv s r = CV s.cs (dmvca s.ms) r`;
 val mode_def = Define `mode s = Mode s.cs`;
 val exentry_def = Define `exentry s = exentry_ s.cs`;
@@ -508,6 +530,35 @@ val hw_trans_switch_lem = store_thm("hw_trans_switch_lem", ``
       FULL_SIMP_TAC std_ss [mode_def]
      ]
 );
+
+(****** Deriveability *******) 
+
+val drvbl_non_def = Define `drvbl_non s s' pa = 
+   (M s'.ms pa <> M s.ms pa ==> dirty s.ms pa /\ (M s'.ms pa = dcnt s.ms pa))
+/\ (dw s'.ms pa <> dw s.ms pa ==> 
+        (~dhit s'.ms pa /\ (dirty s.ms pa ==> (M s'.ms pa = dcnt s.ms pa))))
+`;
+
+val drvbl_rd_def = Define `drvbl_rd s s' pa = 
+   Mon s (MEM pa) USER R 
+/\ (M s'.ms pa = M s.ms pa)
+/\ (dw s'.ms pa <> dw s.ms pa ==> ~dhit s.ms pa /\ (dcnt s'.ms pa = M s.ms pa))
+`;
+
+val drvbl_wt_def = Define `drvbl_wt s s' pa = 
+   Mon s (MEM pa) USER W 
+/\ (dw s'.ms pa <> dw s.ms pa ==> 
+        (dirty s'.ms pa \/ 
+	 ~dirty s'.ms pa /\ (M s'.ms pa = dcnt s'.ms pa))) (* WT case *)
+/\ (M s'.ms pa <> M s.ms pa ==> 
+        (~dirty s.ms pa ==> ((?va. Mmu s va USER W = SOME (pa,F))
+			     \/ (M s'.ms pa = dcnt s'.ms pa)))) (* WT case *)
+`;
+
+val drvbl_def = Define `drvbl s s' pa = 
+   (s'.cs.coreg = s.cs.coreg)
+/\ (!pa. drvbl_non s s' pa \/ drvbl_rd s s' pa \/ drvbl_wt s s' pa)
+`;
 
 (*********** finish ************)
 

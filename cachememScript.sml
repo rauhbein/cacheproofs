@@ -904,14 +904,29 @@ store_thm("mem_cacheable_not_cl_dirty_lem", ``
 val ca_cacheable_other_lem = store_thm("ca_cacheable_other_lem", ``
 !ca m dop ca' m' pa. CA dop /\ ((ca',m') = mtfca (ca,m) dop) /\ (pa <> PA dop)
                   /\ (ca' pa <> ca pa) ==> 
-    ~chit_ ca' pa
+    ~chit_ ca' pa /\ (cdirty_ ca pa ==> (m' pa = ccnt_ ca pa))
 ``,
-  RW_TAC std_ss [] >>
-  IMP_RES_TAC ca_cacheable_ca >>
-  PAT_X_ASSUM ``!pa. X`` (fn thm => ASSUME_TAC (ISPEC ``pa:padr`` thm)) >>
-  FULL_SIMP_TAC std_ss [] >> (
-      METIS_TAC [ccnt_not_eq_lem]
-  )
+  REPEAT GEN_TAC >> 
+  MATCH_MP_TAC ( 
+      prove(``(A ==> B /\ (B ==> C)) ==> (A ==> B /\ C)``, PROVE_TAC [])
+  ) >>
+  RW_TAC std_ss [] 
+  >| [(* miss *)
+      IMP_RES_TAC ca_cacheable_ca >>
+      PAT_X_ASSUM ``!pa. X`` (fn thm => ASSUME_TAC (ISPEC ``pa:padr`` thm)) >>
+      FULL_SIMP_TAC std_ss [] >> (
+          METIS_TAC [ccnt_not_eq_lem]
+      )
+      ,
+      (* dirty *)
+      Cases_on `cl dop` 
+      >| [(* cl *)
+	  IMP_RES_TAC cacheable_cl_other_lem
+	  ,
+	  (* not cl *)
+	  IMP_RES_TAC mem_cacheable_not_cl_dirty_lem
+	 ]
+     ]
 );
 
 val mem_cacheable_other_lem = store_thm("mem_cacheable_other_lem", ``

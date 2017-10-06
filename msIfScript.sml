@@ -157,19 +157,21 @@ val msca_NOREQ_lem = store_thm("msca_NOREQ_lem", ``
   RW_TAC std_ss [msca_trans_def]
 );
 
-
 (* deriveability obligations *)
+
+(* TODO: add that memory is updated *)
 
 val dc_cacheable_other_oblg = store_thm("dc_cacheable_other_oblg", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
              /\ (dw ms' pa <> dw ms pa) ==> 
-    ~dhit ms' pa
+    ~dhit ms' pa  /\ (dirty ms pa ==> (M ms' pa = dcnt ms pa))
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   IMP_RES_TAC msca_DREQ_lem >>
-  FULL_SIMP_TAC std_ss [dw_def, dhit_def] >>
-  IMP_RES_TAC ca_cacheable_other_lem
+  FULL_SIMP_TAC std_ss [dw_def, dhit_def, dirty_def, dcnt_def, M_def] >>
+  IMP_RES_TAC ca_cacheable_other_lem >>
+  ASM_REWRITE_TAC []
 );
 
 val M_cacheable_other_oblg = store_thm("M_cacheable_other_oblg", ``
