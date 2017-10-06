@@ -272,6 +272,11 @@ val Dreq_cases_lem = store_thm("Dreq_cases_lem", ``
   RW_TAC std_ss [Rreq_def, Wreq_def, Creq_def]
 );
 
+val not_NOREQ_lem = store_thm("not_NOREQ_lem", ``
+!req. req <> NOREQ ==> Dreq req \/ Freq req
+``,
+  METIS_TAC [req_cases_lem]
+);
 
 (*********** finish ************)
 

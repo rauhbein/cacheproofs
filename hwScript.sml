@@ -25,18 +25,76 @@ val Mmu_lem = store_thm("Mmu_lem", ``
   REWRITE_TAC [Mmu_oblg]
 );
 
-val MD_lem = store_thm("MD_lem", ``
+val MD__lem = store_thm("MD_lem", ``
 !c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
 	      (MD_(c,mv) = MD_(c',mv'))
 ``,
   REWRITE_TAC [MD_oblg]
 );
 
-val Mon_mem_lem = store_thm("Mon_mem_lem", ``
+val Mon__mem_lem = store_thm("Mon__mem_lem", ``
 !c mv pa m ac.
   (?va ca. Mmu_ (c,mv,va,m,ac) = SOME (pa,ca)) <=> Mon_ (c,mv,MEM pa,m,ac)
 ``,
   REWRITE_TAC [Mon_mem_oblg]
+);
+
+val Mon__reg_lem = store_thm("Mon__reg_lem", ``
+!c mv r c' mv' m ac. reg_res r ==> (Mon_ (c,mv,r,m,ac) <=> Mon_ (c',mv',r,m,ac))
+``,
+  REWRITE_TAC [Mon_reg_oblg]
+);
+
+val core_req_user_MD_reg_lem = store_thm("core_req_user_MD_reg_lem", ``
+!c mv req r c'. reg_res r /\ r IN MD_ (c,mv) 
+	     /\ core_req (c,USER,mv,req,c') ==>
+    (CV c mv r = CV c' mv r)
+``,
+  REWRITE_TAC [core_req_user_MD_reg_oblg]
+);
+
+val core_rcv_user_MD_reg_lem = store_thm("core_req_user_MD_reg_lem", ``
+!c w mv r c'. reg_res r /\ r IN MD_ (c,mv) 
+	   /\ core_rcv (c,USER,w,c') ==>
+    (CV c mv r = CV c' mv r)
+``,
+  REWRITE_TAC [core_rcv_user_MD_reg_oblg]
+);
+
+val core_req_mem_req_lem = store_thm("core_req_mem_req_lem", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
+    Mon_(c,mv,MEM (Adr req),M,Acc req)
+``,
+  REWRITE_TAC [core_req_mem_req_oblg]
+);
+
+val core_req_exentry_lem = store_thm("core_req_exentry_lem", ``
+!c mv req c'. core_req (c,USER,mv,req,c') /\ (Mode c' = PRIV) ==> 
+    exentry_ c'
+``,
+  REWRITE_TAC [core_req_exentry_oblg]
+);
+
+val core_req_mode_lem = store_thm("core_req_mode_lem", ``
+!c mv req c'. core_req (c,USER,mv,req,c') /\ req <> NOREQ ==> 
+    Mode c' <> PRIV
+``,
+  REWRITE_TAC [core_req_mode_oblg]
+);
+
+val core_rcv_mode_lem = store_thm("core_rcv_mode_lem", ``
+!c M w c'. core_rcv (c,M,w,c') ==> (Mode c' = Mode c)
+``,
+  REWRITE_TAC [core_rcv_mode_oblg]
+);
+
+val core_req_MD_mv_lem = store_thm("core_req_MD_mv_lem", ``
+!c M mv mv' req c'. core_req (c,M,mv,req,c') 
+		 /\ (!r. r IN MD_ (c,mv) ==> (CV c mv r = CV c mv' r))
+        ==> 
+    core_req(c,M,mv',req,c')
+``,
+  REWRITE_TAC [core_req_MD_mv_oblg]
 );
 
 val M_dmvcl_lem = store_thm("M_dmvcl_lem", ``
@@ -202,12 +260,45 @@ val imv_preserve_lem = store_thm("imv_preserve_lem", ``
   REWRITE_TAC [imv_preserve_oblg]
 );
 
+(******* some derived lemmas *******)
+
+val Mon__lem = store_thm("Mon__lem", ``
+!c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
+	      (!r m ac. Mon_(c,mv,r,m,ac) <=> Mon_(c',mv',r,m,ac))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Mmu_lem >>
+  Cases_on `reg_res r`
+  >| [(* register resource *)
+      METIS_TAC [Mon__reg_lem] 
+      ,
+      (* memory resource *)
+      `?pa. r = MEM pa` by METIS_TAC [res_cases] >>
+      RW_TAC std_ss [GSYM Mon__mem_lem]
+     ]
+);
+
+
 (******* HW semantics ********)
 
 val _ = Datatype `hw_state = <| 
     cs  : core_state;
     ms  : memsys_state
 |>`;
+
+val MD_def = Define `MD s = MD_ (s.cs, dmvca s.ms)`;
+val Mon_def = Define `Mon s r m ac = Mon_ (s.cs, dmvca s.ms, r, m, ac)`;
+val Cv_def = Define `Cv s r = CV s.cs (dmvca s.ms) r`;
+val mode_def = Define `mode s = Mode s.cs`;
+val exentry_def = Define `exentry s = exentry_ s.cs`;
+
+val Mon_lem = store_thm("Mon_lem", ``
+!s s'. (!r. r IN MD s ==> (Cv s r = Cv s' r)) ==>
+       (!r m ac. Mon s r m ac <=> Mon s' r m ac)
+``,
+  RW_TAC std_ss [MD_def, Mon_def, Cv_def] >>
+  RW_TAC std_ss [Mon__lem]
+);
 
 val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
    (!s M dop cs' s'. 
@@ -344,6 +435,79 @@ val hw_trans_noreq_lem = store_thm("hw_trans_noreq_lem", ``
   )
 );
 
+(* lift core lemmas *)
+
+val hw_trans_mon_lem = store_thm("hw_trans_mon_lem", ``
+!s M req s'. req <> NOREQ /\ hw_trans s M req s' ==>
+    Mon s (MEM (Adr req)) M (Acc req)
+``,
+  RW_TAC std_ss [Mon_def] >>
+  IMP_RES_TAC not_NOREQ_lem 
+  >| [(* Dreq *)
+      IMP_RES_TAC Dreq_cases_lem
+      >| [(* read *)
+	  IMP_RES_TAC hw_trans_read_lem
+	  ,
+	  (* write *)
+	  IMP_RES_TAC hw_trans_write_lem
+	  ,
+	  (* clean *)
+	  IMP_RES_TAC hw_trans_clean_lem 
+	 ] >> (
+          IMP_RES_TAC core_req_mem_req_lem
+      )
+      ,
+      (* Freq *)
+      IMP_RES_TAC hw_trans_fetch_lem >> 
+      IMP_RES_TAC core_req_mem_req_lem
+     ]
+);
+
+val hw_trans_mode_lem = store_thm("hw_trans_mode_lem", ``
+!s req s'. req <> NOREQ /\ hw_trans s USER req s' ==>
+    (mode s' <> PRIV)
+``,
+  RW_TAC std_ss [mode_def] >>
+  IMP_RES_TAC not_NOREQ_lem 
+  >| [(* Dreq *)
+      IMP_RES_TAC Dreq_cases_lem
+      >| [(* read *)
+	  IMP_RES_TAC hw_trans_read_lem
+	  ,
+	  (* write *)
+	  IMP_RES_TAC hw_trans_write_lem
+	  ,
+	  (* clean *)
+	  IMP_RES_TAC hw_trans_clean_lem 
+	 ] >> (
+          IMP_RES_TAC core_req_mode_lem >>
+          IMP_RES_TAC core_rcv_mode_lem >>
+          FULL_SIMP_TAC std_ss []
+      )
+      ,
+      (* Freq *)
+      IMP_RES_TAC hw_trans_fetch_lem >> 
+      IMP_RES_TAC core_req_mode_lem >>
+      IMP_RES_TAC core_rcv_mode_lem >>
+      FULL_SIMP_TAC std_ss []
+     ]
+);
+
+val hw_trans_switch_lem = store_thm("hw_trans_switch_lem", ``
+!s req s'. hw_trans s USER req s' /\ (mode s' = PRIV) ==> exentry s'
+``,
+  RW_TAC std_ss [mode_def, exentry_def] >>
+  Cases_on `req = NOREQ`
+  >| [(* NOREQ *)
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC hw_trans_noreq_lem >>
+      IMP_RES_TAC core_req_exentry_lem
+      ,
+      (* memory request *)
+      IMP_RES_TAC hw_trans_mode_lem >> 
+      FULL_SIMP_TAC std_ss [mode_def]
+     ]
+);
 
 (*********** finish ************)
 

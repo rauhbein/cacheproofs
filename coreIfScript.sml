@@ -102,13 +102,14 @@ val Mon_exists = prove (``
 !c mv ac. 
    (!pa m. (?va ca. Mmu_(c,mv,va,m,ac) = SOME(pa,ca)) <=> Mon(c,mv,MEM pa,m,ac))
 /\ (!r. reg_res r /\ r IN MD_ (c,mv) ==> ~Mon(c,mv,r,USER,ac))
-/\ (!r mv' m. reg_res r ==> (Mon(c,mv,r,m,ac) = Mon(c,mv',r,m,ac)))
+/\ (!r c' mv' m. reg_res r ==> (Mon(c,mv,r,m,ac) = Mon(c',mv',r,m,ac)))
 ``,
   EXISTS_TAC ``dummyMon`` >>
-  RW_TAC std_ss [dummyMon_def] >>
-  Cases_on `r` >> (
-      FULL_SIMP_TAC std_ss [reg_res_def] >>
-      RW_TAC std_ss [dummyMon_def]
+  RW_TAC std_ss [dummyMon_def] >> (
+      Cases_on `r` >> (
+          FULL_SIMP_TAC std_ss [reg_res_def] >>
+          RW_TAC std_ss [dummyMon_def]
+      )
   )  
 );  
 
@@ -263,8 +264,7 @@ val Mon_mem_oblg = store_thm("Mon_mem_oblg", ``
 );
 
 val Mon_reg_oblg = store_thm("Mon_reg_oblg", ``
-!c mv r mv' m ac. reg_res r ==> 
-    (Mon_ (c,mv,r,m,ac) <=> Mon_ (c,mv',r,m,ac))
+!c mv r c' mv' m ac. reg_res r ==> (Mon_ (c,mv,r,m,ac) <=> Mon_ (c',mv',r,m,ac))
 ``,
   METIS_TAC [Mon_spec]
 );
@@ -281,9 +281,9 @@ val core_req_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
   IMP_RES_TAC core_Mon_reg_po
 );
 
-val core_rcv_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
+val core_rcv_user_MD_reg_oblg = store_thm("core_rcv_user_MD_reg_oblg", ``
 !c w mv r c'. reg_res r /\ r IN MD_ (c,mv) 
-	     /\ core_rcv (c,USER,w,c') ==>
+	   /\ core_rcv (c,USER,w,c') ==>
     (CV c mv r = CV c' mv r)
 ``,
   REPEAT STRIP_TAC >>
@@ -291,6 +291,58 @@ val core_rcv_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
   ASSUME_TAC core_rcv_spec >>
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC rcv_Mon_reg_po
+);
+
+val core_req_mem_req_oblg = store_thm("core_req_mem_req_oblg", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
+    Mon_(c,mv,MEM (Adr req),M,Acc req)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_Mon_mem_po
+);
+
+val core_req_exentry_oblg = store_thm("core_req_exentry_oblg", ``
+!c mv req c'. core_req (c,USER,mv,req,c') /\ (Mode c' = PRIV) ==> 
+    exentry_ c'
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_exentry_po
+);
+
+val core_req_mode_oblg = store_thm("core_req_mode_oblg", ``
+!c mv req c'. core_req (c,USER,mv,req,c') /\ req <> NOREQ ==> 
+    Mode c' <> PRIV
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_exentry_po  
+);
+
+val core_rcv_mode_oblg = store_thm("core_rcv_mode_oblg", ``
+!c M w c'. core_rcv (c,M,w,c') ==> (Mode c' = Mode c)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_rcv_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC rcv_mode_po >>
+  ASM_REWRITE_TAC []
+);
+
+val core_req_MD_mv_oblg = store_thm("core_req_MD_mv_oblg", ``
+!c M mv mv' req c'. core_req (c,M,mv,req,c') 
+		 /\ (!r. r IN MD_ (c,mv) ==> (CV c mv r = CV c mv' r))
+        ==> 
+    core_req(c,M,mv',req,c')
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_MD_mv_po  
 );
 
 
