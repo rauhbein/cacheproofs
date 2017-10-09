@@ -109,6 +109,14 @@ val core_rcv_user_coreg_lem = store_thm("core_rcv_user_coreg_lem", ``
   REWRITE_TAC [core_rcv_user_coreg_oblg]
 );
 
+val msca_FREQ_unchanged_lem = store_thm("msca_FREQ_unchanged_lem", ``
+!ms pa ms'. (ms' = msca_trans ms (FREQ pa)) 
+    ==>
+!pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa)
+``,
+  REWRITE_TAC [msca_FREQ_unchanged_oblg]
+);
+
 val M_dmvcl_lem = store_thm("M_dmvcl_lem", ``
 !ms pa c. M ms pa = dmvcl ms c pa
 ``,
@@ -168,6 +176,26 @@ val M_cacheable_not_cl_lem = store_thm("M_cacheable_not_cl_lem", ``
   REWRITE_TAC [M_cacheable_not_cl_oblg]
 );
 
+val dc_cacheable_cl_lem = store_thm("dc_cacheable_cl_lem", ``
+!ms dop ms'. CA dop /\ cl dop /\ (ms' = msca_trans ms (DREQ dop))
+	  /\ (dw ms' (PA dop) <> dw ms (PA dop)) 
+        ==>
+    ~dhit ms' (PA dop) 
+ /\ (dirty ms (PA dop) ==> (M ms' (PA dop) = dcnt ms (PA dop)))
+``,
+  REWRITE_TAC [dc_cacheable_cl_oblg]
+);
+
+val M_cacheable_cl_lem = store_thm("M_cacheable_cl_lem", ``
+!ms dop ms'. CA dop /\ cl dop /\ (ms' = msca_trans ms (DREQ dop))
+	  /\ (M ms' (PA dop) <> M ms (PA dop)) 
+        ==>
+    dirty ms (PA dop) /\ (M ms' (PA dop) = dcnt ms (PA dop))
+``,
+  REWRITE_TAC [M_cacheable_cl_oblg]
+);
+
+
 (* uncacheable accesses *)
 
 val ms_uncacheable_unchanged_lem = store_thm("ms_uncacheable_unchanged_lem", ``
@@ -184,6 +212,22 @@ val M_uncacheable_unchanged_lem = store_thm("M_uncacheable_unchanged_lem", ``
     (M ms' (PA dop) = M ms (PA dop))
 ``,
   REWRITE_TAC [M_uncacheable_unchanged_oblg]
+);
+
+val dc_uncacheable_unchanged_lem = store_thm("dc_uncacheable_unchanged_lem", ``
+!ms dop ms'. ~CA dop /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    (dw ms' = dw ms)
+``,
+  REWRITE_TAC [dc_uncacheable_unchanged_oblg]
+);
+
+val M_uncacheable_others_lem = store_thm("M_uncacheable_others_lem", ``
+!ms dop ms' pa. ~CA dop /\ (pa <> PA dop) /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    (M ms' pa = M ms pa)
+``,
+  REWRITE_TAC [M_uncacheable_others_oblg]
 );
 
 val M_uncacheable_write_lem = store_thm("M_uncacheable_write_lem", ``
@@ -397,6 +441,21 @@ val hw_trans_data_lem = store_thm("hw_trans_data_lem", ``
   )
 );
 
+val hw_trans_core_req_lem = store_thm("hw_trans_core_req_lem", ``
+!s M req s'. Dreq req /\ hw_trans s M req s' ==> 
+    ?cs'. core_req (s.cs, M, dmvca s.ms, req, cs') 
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Dreq_lem >>
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC hw_trans_cases >> (
+      FULL_SIMP_TAC std_ss [corereq_distinct] >>
+      REV_FULL_SIMP_TAC std_ss [] >>
+      HINT_EXISTS_TAC >>
+      RW_TAC std_ss []
+  )
+);
+
 val hw_trans_read_lem = store_thm("hw_trans_read_lem", ``
 !s M req s'. Rreq req /\ hw_trans s M req s' ==>
 ?cs'. core_req (s.cs, M, dmvca s.ms, req, cs') 
@@ -457,6 +516,27 @@ val hw_trans_noreq_lem = store_thm("hw_trans_noreq_lem", ``
   )
 );
 
+val hw_trans_not_Dreq_lem = store_thm("hw_trans_not_Dreq_lem", ``
+!s m req s'. ~Dreq req /\ hw_trans s m req s' ==>
+    !pa. (dw s'.ms pa = dw s.ms pa) /\ (M s'.ms pa = M s.ms pa)
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  `Freq req \/ (req = NOREQ)` by ( METIS_TAC [req_cases_lem] ) 
+  >| [(* fetch *)
+      IMP_RES_TAC hw_trans_fetch_lem >>
+      IMP_RES_TAC Freq_lem >>
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC msca_FREQ_unchanged_lem >>
+      REV_FULL_SIMP_TAC std_ss []
+      ,
+      (* NOREQ *)
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC hw_trans_noreq_lem >>
+      FULL_SIMP_TAC std_ss [] 
+     ]
+);
+
 (* lift core lemmas *)
 
 val hw_trans_mon_lem = store_thm("hw_trans_mon_lem", ``
@@ -483,6 +563,19 @@ val hw_trans_mon_lem = store_thm("hw_trans_mon_lem", ``
       IMP_RES_TAC hw_trans_fetch_lem >> 
       IMP_RES_TAC core_req_mem_req_lem
      ]
+);
+
+val hw_trans_CA_lem = store_thm("hw_trans_CA_lem", ``
+!s M req s'. Dreq req /\ ~CAreq req /\ hw_trans s M req s' ==>
+    ?va. Mmu s va M (Acc req) = SOME (Adr req, F)
+``,
+  RW_TAC std_ss [Mmu_def] >>
+  `req <> NOREQ` by ( METIS_TAC [req_cases_lem] ) >>
+  IMP_RES_TAC hw_trans_core_req_lem >>
+  IMP_RES_TAC core_req_mmu_lem >>
+  REV_FULL_SIMP_TAC std_ss [] >>
+  HINT_EXISTS_TAC >>
+  RW_TAC std_ss []
 );
 
 val hw_trans_mode_lem = store_thm("hw_trans_mode_lem", ``
@@ -531,6 +624,43 @@ val hw_trans_switch_lem = store_thm("hw_trans_switch_lem", ``
      ]
 );
 
+val hw_trans_coreg_lem = store_thm("hw_trans_coreg_lem", ``
+!s req s'. hw_trans s USER req s' ==> (s'.cs.coreg = s.cs.coreg)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``req:corereq`` req_cases_lem ) >> 
+  FULL_SIMP_TAC std_ss []
+  >| [(* fetch *)
+      IMP_RES_TAC hw_trans_fetch_lem >>
+      IMP_RES_TAC core_req_user_coreg_lem >>
+      IMP_RES_TAC core_rcv_user_coreg_lem >>
+      RW_TAC std_ss []
+      ,
+      (* Dreq *)
+      IMP_RES_TAC Dreq_cases_lem 
+      >| [(* read *)
+	  IMP_RES_TAC hw_trans_read_lem >>
+	  IMP_RES_TAC core_req_user_coreg_lem >>
+	  IMP_RES_TAC core_rcv_user_coreg_lem >>
+	  RW_TAC std_ss []
+	  ,
+	  (* write *)
+	  IMP_RES_TAC hw_trans_write_lem >>
+	  IMP_RES_TAC core_req_user_coreg_lem
+	  ,
+	  (* clean *)
+	  IMP_RES_TAC hw_trans_clean_lem >>
+	  IMP_RES_TAC core_req_user_coreg_lem
+	 ]
+      ,
+      (* NOREQ *)
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC hw_trans_noreq_lem >>
+      IMP_RES_TAC core_req_user_coreg_lem
+     ]
+);
+
+
 (****** Deriveability *******) 
 
 val drvbl_non_def = Define `drvbl_non s s' pa = 
@@ -555,10 +685,165 @@ val drvbl_wt_def = Define `drvbl_wt s s' pa =
 			     \/ (M s'.ms pa = dcnt s'.ms pa)))) (* WT case *)
 `;
 
-val drvbl_def = Define `drvbl s s' pa = 
+val drvbl_def = Define `drvbl s s' = 
    (s'.cs.coreg = s.cs.coreg)
 /\ (!pa. drvbl_non s s' pa \/ drvbl_rd s s' pa \/ drvbl_wt s s' pa)
 `;
+
+(* deriveability lemmas *)
+
+val drvbl_unchanged_lem = store_thm("drvbl_unchanged_lem", ``
+!s s'. (!pa. (dw s'.ms pa = dw s.ms pa) /\ (M s'.ms pa = M s.ms pa))
+    /\ (s'.cs. coreg = s.cs.coreg)
+    ==>
+drvbl s s'
+``,
+  RW_TAC std_ss [drvbl_def] >>
+  DISJ1_TAC >>
+  RW_TAC std_ss [drvbl_non_def]
+);
+   
+val drvbl_lem = store_thm("drvbl_lem", ``
+!s req s'. hw_trans s USER req s' ==> drvbl s s'
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC hw_trans_coreg_lem >>
+  Cases_on `Dreq req`
+  >| [(* Dreq *)
+      IMP_RES_TAC Dreq_lem >>
+      `req <> NOREQ` by ( METIS_TAC [req_cases_lem] ) >>
+      IMP_RES_TAC hw_trans_mon_lem >>
+      FULL_SIMP_TAC std_ss [] >>
+      RW_TAC std_ss [drvbl_def] >>
+      IMP_RES_TAC hw_trans_data_lem >>
+      Cases_on `CA dop` 
+      >| [(* CA dop *)
+	  Cases_on `pa = PA dop`
+	  >| [(* PA dop *)
+	      ASSUME_TAC ( SPEC ``dop:dop`` dop_cases_lem2 ) >>
+	      FULL_SIMP_TAC std_ss []
+	      >| [(* read *)
+		  DISJ2_TAC >>
+		  DISJ1_TAC >>
+		  FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
+		  REWRITE_TAC [drvbl_rd_def] >>
+		  STRIP_TAC >- ( 
+		      (* Monitor permission *)
+		      ASM_REWRITE_TAC [] ) >>
+		  STRIP_TAC >- ( 		  
+		      (* mem unchanged *)
+		      IMP_RES_TAC M_cacheable_read_lem ) >>
+		  STRIP_TAC >> (
+		      (* miss and cache fill *)
+		      IMP_RES_TAC dc_cacheable_read_lem >>
+		      ASM_REWRITE_TAC []
+		  )
+		  ,
+		  (* write *)
+		  DISJ2_TAC >>
+		  DISJ2_TAC >>
+		  FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
+		  REWRITE_TAC [drvbl_wt_def] >>
+		  STRIP_TAC >- ( 
+		      (* Monitor permission *)
+		      ASM_REWRITE_TAC [] ) >>
+		  STRIP_TAC >- ( 		  
+		      (* dirty or WT *)
+		      STRIP_TAC >>
+		      IMP_RES_TAC dc_cacheable_write_lem >> (
+		          ASM_REWRITE_TAC []
+		      )
+		  ) >>
+		  STRIP_TAC >> (
+		      (* clean write = WT *)
+		      STRIP_TAC >>
+		      DISJ2_TAC >>
+		      IMP_RES_TAC M_cacheable_not_cl_lem >>
+		      ASM_REWRITE_TAC []
+		  )
+		  ,
+		  (* clean *)
+		  DISJ1_TAC >>
+		  REWRITE_TAC [drvbl_non_def] >>
+		  STRIP_TAC >- ( 		  
+		      (* dirty write back *)
+		      STRIP_TAC >>
+		      IMP_RES_TAC M_cacheable_cl_lem >>
+ 	              ASM_REWRITE_TAC []
+		  ) >>
+		  STRIP_TAC >> (
+		      (* miss and dirty write back *)
+		      IMP_RES_TAC dc_cacheable_cl_lem >>
+		      ASM_REWRITE_TAC []
+		  )
+		 ]
+	      ,
+	      (* others *)
+	      DISJ1_TAC >>
+	      REWRITE_TAC [drvbl_non_def] >>
+	      STRIP_TAC
+	      >| [(* mem changed *)
+		  STRIP_TAC >>
+		  IMP_RES_TAC M_cacheable_other_lem >>
+		  ASM_REWRITE_TAC []
+		  ,
+		  (* cache changed *)
+		  STRIP_TAC >>
+		  IMP_RES_TAC dc_cacheable_other_lem >>
+		  ASM_REWRITE_TAC []
+		 ]
+	     ]
+	  ,
+	  (* uncacheable *)
+	  IMP_RES_TAC dc_uncacheable_unchanged_lem >>
+	  Cases_on `wt dop`
+	  >| [(* write *)
+	      Cases_on `pa = PA dop`
+	      >| [(* PA dop *)
+		  Cases_on `M s'.ms pa = M s.ms pa`
+		  >| [(* mem unchanged *)
+		      DISJ1_TAC >>
+		      RW_TAC std_ss [drvbl_non_def]
+		      ,
+		      (* mem changed *)
+		      RW_TAC std_ss [] >>
+		      DISJ2_TAC >>
+		      DISJ2_TAC >>
+		      RW_TAC std_ss [drvbl_wt_def]
+		      >| [(* Monitor permission *)
+			  FULL_SIMP_TAC std_ss [Acc_def, Adr_def]
+			  ,
+			  (* uncacheable alias *)
+			  `~CAreq (DREQ dop)` by ( 
+			      FULL_SIMP_TAC std_ss [CAreq_def]
+			  ) >>
+			  IMP_RES_TAC hw_trans_CA_lem >>
+			  DISJ1_TAC >>
+			  REV_FULL_SIMP_TAC std_ss [Acc_def, Adr_def] >>
+			  HINT_EXISTS_TAC >>
+			  RW_TAC std_ss []
+			 ]
+		     ]
+		  ,
+		  (* others *)
+		  IMP_RES_TAC M_uncacheable_others_lem >>
+		  DISJ1_TAC >>
+		  RW_TAC std_ss [drvbl_non_def]
+		 ]
+	      ,
+	      (* not write *)
+	      IMP_RES_TAC ms_uncacheable_unchanged_lem >>
+	      DISJ1_TAC >>
+	      RW_TAC std_ss [drvbl_non_def]
+	     ]
+	 ]
+      ,
+      (* not Dreq *)
+      IMP_RES_TAC hw_trans_not_Dreq_lem >>
+      IMP_RES_TAC drvbl_unchanged_lem >>
+      FULL_SIMP_TAC std_ss []
+     ]
+);
 
 (*********** finish ************)
 

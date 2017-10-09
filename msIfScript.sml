@@ -157,9 +157,21 @@ val msca_NOREQ_lem = store_thm("msca_NOREQ_lem", ``
   RW_TAC std_ss [msca_trans_def]
 );
 
-(* deriveability obligations *)
+(* some obligations *)
 
-(* TODO: add that memory is updated *)
+val msca_FREQ_unchanged_oblg = store_thm("msca_FREQ_unchanged_oblg", ``
+!ms pa ms'. (ms' = msca_trans ms (FREQ pa)) 
+    ==>
+!pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa)
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  GEN_TAC >>
+  IMP_RES_TAC msca_FREQ_lem >>
+  RW_TAC std_ss [dw_def, M_def]
+);
+
+(* deriveability obligations *)
 
 val dc_cacheable_other_oblg = store_thm("dc_cacheable_other_oblg", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
@@ -245,6 +257,47 @@ val M_cacheable_not_cl_oblg = store_thm("M_cacheable_not_cl_oblg", ``
   )
 );
 
+val dc_cacheable_cl_oblg = store_thm("dc_cacheable_cl_oblg", ``
+!ms dop ms'. CA dop /\ cl dop /\ (ms' = msca_trans ms (DREQ dop))
+	  /\ (dw ms' (PA dop) <> dw ms (PA dop)) 
+        ==>
+    ~dhit ms' (PA dop) 
+ /\ (dirty ms (PA dop) ==> (M ms' (PA dop) = dcnt ms (PA dop)))
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC msca_DREQ_lem >>
+  FULL_SIMP_TAC std_ss [dcnt_def, M_def, dirty_def, dhit_def] >>
+  STRIP_TAC
+  >| [(* miss *)
+      IMP_RES_TAC cacheable_cl_lem
+      ,
+      (* dirty write back *)
+      STRIP_TAC >>
+      IMP_RES_TAC mem_cacheable_cl_dirty_lem
+     ]
+);
+
+val M_cacheable_cl_oblg = store_thm("M_cacheable_cl_oblg", ``
+!ms dop ms'. CA dop /\ cl dop /\ (ms' = msca_trans ms (DREQ dop))
+	  /\ (M ms' (PA dop) <> M ms (PA dop)) 
+        ==>
+    dirty ms (PA dop) /\ (M ms' (PA dop) = dcnt ms (PA dop))
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC msca_DREQ_lem >>
+  FULL_SIMP_TAC std_ss [dcnt_def, M_def, dirty_def, dhit_def] >>
+  IMP_RES_TAC ca_cacheable_mem >>
+  PAT_X_ASSUM ``!pa. X`` (
+      fn thm => ASSUME_TAC ( SPEC ``PA dop`` thm )
+  ) >>
+  IMP_RES_TAC not_wt_lem >>
+  FULL_SIMP_TAC std_ss [] >>
+  REV_FULL_SIMP_TAC std_ss []
+);
+
+
 (* uncacheable accesses *)
 
 val ms_uncacheable_unchanged_oblg = store_thm("ms_uncacheable_unchanged_oblg", ``
@@ -262,6 +315,20 @@ val ms_uncacheable_unchanged_oblg = store_thm("ms_uncacheable_unchanged_oblg", `
   )
 );
 
+val dc_uncacheable_unchanged_oblg = store_thm("dc_uncacheable_unchanged_oblg", ``
+!ms dop ms'. ~CA dop /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    (dw ms' = dw ms)
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC msca_DREQ_lem >>
+  RW_TAC std_ss [FUN_EQ_THM] >> 
+  FULL_SIMP_TAC std_ss [dw_def] >>
+  IMP_RES_TAC ca_uncacheable >> 
+  ASM_REWRITE_TAC []
+);
+
 val M_uncacheable_unchanged_oblg = store_thm("M_uncacheable_unchanged_oblg", ``
 !ms dop ms'. ~CA dop /\ ~wt dop /\ (ms' = msca_trans ms (DREQ dop))
         ==>
@@ -273,6 +340,20 @@ val M_uncacheable_unchanged_oblg = store_thm("M_uncacheable_unchanged_oblg", ``
   FULL_SIMP_TAC std_ss [M_def] >>
   IMP_RES_TAC mem_uncacheable_unchanged_lem
 );
+
+val M_uncacheable_others_oblg = store_thm("M_uncacheable_others_oblg", ``
+!ms dop ms' pa. ~CA dop /\ (pa <> PA dop) /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    (M ms' pa = M ms pa)
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC msca_DREQ_lem >>
+  FULL_SIMP_TAC std_ss [M_def] >>
+  IMP_RES_TAC ca_uncacheable >> 
+  IMP_RES_TAC cl_other_unchanged_lem
+);
+
 
 val M_uncacheable_write_oblg = store_thm("M_uncacheable_write_oblg", ``
 !ms dop ms'. wt dop /\ (ms' = msca_trans ms (DREQ dop))
