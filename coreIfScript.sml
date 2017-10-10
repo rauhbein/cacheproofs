@@ -79,14 +79,18 @@ val Pc_def = Define `Pc c = c.reg PC`;
 val Mmu_MD_exists = prove (``
 ?(Mmu:core_state # mem_view # vadr # mode # acc -> (padr # bool) option) 
  (MD:core_state # mem_view -> resource set).
-!c c' mv mv'. (!r. r IN MD(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	      (MD(c,mv) = MD(c',mv')) /\
-	      (!va m ac. Mmu(c,mv,va,m,ac) = Mmu(c',mv',va,m,ac))
+!c c' mv mv'. ((!r. r IN MD(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
+	       (MD(c,mv) = MD(c',mv')) /\	
+	       (!va m ac. Mmu(c,mv,va,m,ac) = Mmu(c',mv',va,m,ac)))
+           /\ (!r. reg_res r ==> (r IN MD(c,mv) <=> r IN MD(c',mv'))) 
+           /\ (!r. reg_res r /\ r IN MD(c,mv) /\ (c.coreg = c'.coreg) ==> 
+	          (CV c mv r = CV c' mv' r)) 
 ``,
   EXISTS_TAC ``\(c,mv,va,m,ac):core_state # mem_view # vadr # mode # acc.
 		NONE:(padr # bool) option`` >>
   EXISTS_TAC ``\ (c,mv):core_state # mem_view. EMPTY:resource set`` >>
-  RW_TAC std_ss []
+  RW_TAC std_ss [] >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.NOT_IN_EMPTY]
 );  
 
 val Mmu_MD_spec = new_specification ("Mmu_MD_spec",
@@ -270,6 +274,19 @@ val Mmu_oblg = store_thm("Mmu_oblg", ``
 val MD_oblg = store_thm("MD_oblg", ``
 !c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
 	      (MD_(c,mv) = MD_(c',mv'))
+``,
+  METIS_TAC [Mmu_MD_spec]
+);
+
+val MD_reg_oblg = store_thm("MD_reg_oblg", ``
+!c c' mv mv' r. reg_res r ==> (r IN MD_(c,mv) <=> r IN MD_(c',mv')) 
+``,
+  METIS_TAC [Mmu_MD_spec]
+);
+
+val MD_coreg_oblg = store_thm("MD_coreg_oblg", ``
+!c c' mv mv' r. reg_res r /\ r IN MD_(c,mv) /\ (c.coreg = c'.coreg) ==> 
+    (CV c mv r = CV c' mv' r) 
 ``,
   METIS_TAC [Mmu_MD_spec]
 );

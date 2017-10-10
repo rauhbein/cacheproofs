@@ -194,6 +194,14 @@ val evpol_lem = store_thm("evpol_lem", ``
 
 (* some derived lemmas *)
 
+val double_not_chit_lem = store_thm("double_not_chit_lem", ``
+!ca ca' pa. ~chit_ ca pa /\ ~chit_ ca' pa ==> (ca pa = ca' pa)
+``,
+  REPEAT STRIP_TAC >> 
+  IMP_RES_TAC not_chit_lem >>
+  RW_TAC std_ss []
+);
+
 val ctf_ca_cases_other = store_thm("ctf_ca_cases_other", ``
 !ca mv dop ca' y pa. CA dop /\ ((ca',y) = ctf ca mv dop) /\ (pa <> PA dop) ==>
     ((ca' pa = NONE) \/ (ca' pa = ca pa))

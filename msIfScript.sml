@@ -56,6 +56,50 @@ val M_dmvcl_oblg = store_thm("M_dmvcl_oblg", ``
   RW_TAC std_ss [M_def, dmvcl_def, MVcl_def]
 );
 
+val dmvca_hit_oblg = store_thm("dmvca_hit_oblg", ``
+!ms pa. dhit ms pa ==> (dmvca ms T pa = dcnt ms pa)
+``,
+  RW_TAC std_ss [dhit_def, dmvca_def, dcnt_def, MVca_def] 
+);
+
+val dmvca_miss_oblg = store_thm("dmvca_miss_oblg", ``
+!ms pa. ~dhit ms pa ==> (dmvca ms T pa = M ms pa)
+``,
+  RW_TAC std_ss [dhit_def, dmvca_def, M_def, MVca_def] 
+);
+
+val dhit_oblg = store_thm("dhit_oblg", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) ==> (dhit ms' pa <=> dhit ms pa)
+``,
+  RW_TAC std_ss [dhit_def, dw_def, chit_lem]
+);
+
+val double_not_dhit_oblg = store_thm("double_not_dhit_oblg", ``
+!ms ms' pa. (~dhit ms' pa /\ ~dhit ms pa) ==> (dw ms' pa = dw ms pa)
+``,
+  RW_TAC std_ss [dhit_def, dw_def] >>
+  IMP_RES_TAC double_not_chit_lem
+);
+
+val dirty_oblg = store_thm("dirty_oblg", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) ==> (dirty ms' pa <=> dirty ms pa)
+``,
+  RW_TAC std_ss [dirty_def, dw_def, cdirty_lem]
+);
+
+val dcnt_oblg = store_thm("dcnt_oblg", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) ==> (dcnt ms' pa = dcnt ms pa)
+``,
+  RW_TAC std_ss [dcnt_def, dw_def, ccnt_lem]
+);
+
+val dirty_hit_oblg = store_thm("dirty_hit_oblg", ``
+!ms pa. dirty ms pa ==> dhit ms pa
+``,
+  RW_TAC std_ss [dirty_def, dhit_def, cdirty_chit_lem]
+);
+		    
+
 (* transition system *)
 
 val ms_dupd_def = Define `
@@ -375,12 +419,26 @@ val M_uncacheable_write_oblg = store_thm("M_uncacheable_write_oblg", ``
 val dcoh_def = Define `dcoh ms pa = coh ms.dc ms.mem pa`;
 val dCoh_def = Define `dCoh ms (Rs:padr set) = Coh ms.dc ms.mem Rs`;
 
+val dCoh_oblg = store_thm("dCoh_oblg", ``
+!ms Rs pa. dCoh ms Rs /\ pa IN Rs ==> dcoh ms pa
+``,
+  RW_TAC std_ss [dCoh_def, dcoh_def, Coh_def]
+);
+
 val dCoh_alt_oblg = store_thm("dCoh_alt_oblg", ``
 !ms Rs. dCoh ms Rs 
             <=> 
         !pa. pa IN Rs ==> ((dmvca ms) T pa = (dmvalt ms) T pa)
 ``,
   REWRITE_TAC [dCoh_def, dmvca_def, dmvalt_def, Coh_alt_lem]
+);
+
+val dcoh_clean_oblg = store_thm("dcoh_clean_oblg", ``
+!ms pa. dcoh ms pa /\ dhit ms pa /\ ~dirty ms pa ==> (M ms pa = dcnt ms pa)
+``,
+  RW_TAC std_ss [dcoh_def, dhit_def, dirty_def, M_def, dcnt_def] >>
+  IMP_RES_TAC coh_clean_lem >>
+  ASM_REWRITE_TAC []
 );
 
 val dcoh_write_oblg = store_thm("dcoh_write_oblg", ``
@@ -446,6 +504,15 @@ val dmv_unchanged_oblg = store_thm("dmv_unchanged_oblg", ``
       FULL_SIMP_TAC std_ss [dcoh_def, dmvca_def] >>
       IMP_RES_TAC mvca_unchanged_lem 
   )
+);
+
+val dmvca_oblg = store_thm("dmvca_oblg", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa) ==>
+    (dmvca ms' T pa = dmvca ms T pa)
+``,
+  RW_TAC std_ss [dw_def, M_def, dmvca_def] >>
+  MATCH_MP_TAC MVca_lem >>
+  ASM_REWRITE_TAC []
 );
 
 (* instruction cache *)

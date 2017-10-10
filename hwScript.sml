@@ -32,6 +32,19 @@ val MD__lem = store_thm("MD_lem", ``
   REWRITE_TAC [MD_oblg]
 );
 
+val MD__reg_lem = store_thm("MD__reg_lem", ``
+!c c' mv mv' r. reg_res r ==> (r IN MD_(c,mv) <=> r IN MD_(c',mv')) 
+``,
+  REWRITE_TAC [MD_reg_oblg]
+);
+
+val MD__coreg_lem = store_thm("MD__coreg_lem", ``
+!c c' mv mv' r. reg_res r /\ r IN MD_(c,mv) /\ (c.coreg = c'.coreg) ==> 
+    (CV c mv r = CV c' mv' r) 
+``,
+  REWRITE_TAC [MD_coreg_oblg]
+);
+
 val Mon__mem_lem = store_thm("Mon__mem_lem", ``
 !c mv pa m ac.
   (?va ca. Mmu_ (c,mv,va,m,ac) = SOME (pa,ca)) <=> Mon_ (c,mv,MEM pa,m,ac)
@@ -53,7 +66,7 @@ val core_req_user_MD_reg_lem = store_thm("core_req_user_MD_reg_lem", ``
   REWRITE_TAC [core_req_user_MD_reg_oblg]
 );
 
-val core_rcv_user_MD_reg_lem = store_thm("core_req_user_MD_reg_lem", ``
+val core_rcv_user_MD_reg_lem = store_thm("core_rcv_user_MD_reg_lem", ``
 !c w mv r c'. reg_res r /\ r IN MD_ (c,mv) 
 	   /\ core_rcv (c,USER,w,c') ==>
     (CV c mv r = CV c' mv r)
@@ -121,6 +134,48 @@ val M_dmvcl_lem = store_thm("M_dmvcl_lem", ``
 !ms pa c. M ms pa = dmvcl ms c pa
 ``,
   REWRITE_TAC [M_dmvcl_oblg]
+);
+
+val dmvca_hit_lem = store_thm("dmvca_hit_lem", ``
+!ms pa. dhit ms pa ==> (dmvca ms T pa = dcnt ms pa)
+``,
+  REWRITE_TAC [dmvca_hit_oblg] 
+);
+
+val dmvca_miss_lem = store_thm("dmvca_miss_lem", ``
+!ms pa. ~dhit ms pa ==> (dmvca ms T pa = M ms pa)
+``,
+  REWRITE_TAC [dmvca_miss_oblg] 
+);
+
+val dhit_lem = store_thm("dhit_lem", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) ==> (dhit ms' pa <=> dhit ms pa)
+``,
+  REWRITE_TAC [dhit_oblg]
+);
+
+val double_not_dhit_lem = store_thm("double_not_dhit_lem", ``
+!ms ms' pa. (~dhit ms' pa /\ ~dhit ms pa) ==> (dw ms' pa = dw ms pa)
+``,
+  REWRITE_TAC [double_not_dhit_oblg]
+);
+
+val dirty_lem = store_thm("dirty_lem", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) ==> (dirty ms' pa <=> dirty ms pa)
+``,
+  REWRITE_TAC [dirty_oblg]
+);
+
+val dcnt_lem = store_thm("dcnt_lem", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) ==> (dcnt ms' pa = dcnt ms pa)
+``,
+  REWRITE_TAC [dcnt_oblg]
+);
+
+val dirty_hit_lem = store_thm("dirty_hit_lem", ``
+!ms pa. dirty ms pa ==> dhit ms pa
+``,
+  REWRITE_TAC [dirty_hit_oblg]
 );
 
 val dc_cacheable_other_lem = store_thm("dc_cacheable_other_lem", ``
@@ -239,12 +294,24 @@ val M_uncacheable_write_lem = store_thm("M_uncacheable_write_lem", ``
   REWRITE_TAC [M_uncacheable_write_oblg]
 );
 
+val dCoh_lem = store_thm("dCoh_lem", ``
+!ms Rs pa. dCoh ms Rs /\ pa IN Rs ==> dcoh ms pa
+``,
+  REWRITE_TAC [dCoh_oblg]
+);
+
 val dCoh_alt_lem = store_thm("dCoh_alt_lem", ``
 !ms Rs. dCoh ms Rs 
             <=> 
         !pa. pa IN Rs ==> ((dmvca ms) T pa = (dmvalt ms) T pa)
 ``,
   REWRITE_TAC [dCoh_alt_oblg]
+);
+
+val dcoh_clean_lem = store_thm("dcoh_clean_lem", ``
+!ms pa. dcoh ms pa /\ dhit ms pa /\ ~dirty ms pa ==> (M ms pa = dcnt ms pa)
+``,
+  REWRITE_TAC [dcoh_clean_oblg]
 );
 
 val dcoh_write_lem = store_thm("dcoh_write_lem", ``
@@ -270,6 +337,13 @@ val dmv_unchanged_lem = store_thm("dmv_unchanged_lem", ``
     (dmvca ms' T pa = dmvca ms T pa)
 ``,
   REWRITE_TAC [dmv_unchanged_oblg]
+);
+
+val dmvca_lem = store_thm("dmvca_lem", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa) ==>
+    (dmvca ms' T pa = dmvca ms T pa)
+``,
+  REWRITE_TAC [dmvca_oblg]
 );
 
 val Invic_preserve_lem = store_thm("Invic_preserve_lem", ``
@@ -442,12 +516,10 @@ val hw_trans_data_lem = store_thm("hw_trans_data_lem", ``
 );
 
 val hw_trans_core_req_lem = store_thm("hw_trans_core_req_lem", ``
-!s M req s'. Dreq req /\ hw_trans s M req s' ==> 
+!s M req s'. hw_trans s M req s' ==> 
     ?cs'. core_req (s.cs, M, dmvca s.ms, req, cs') 
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC Dreq_lem >>
-  RW_TAC std_ss [] >>
   IMP_RES_TAC hw_trans_cases >> (
       FULL_SIMP_TAC std_ss [corereq_distinct] >>
       REV_FULL_SIMP_TAC std_ss [] >>
@@ -660,6 +732,135 @@ val hw_trans_coreg_lem = store_thm("hw_trans_coreg_lem", ``
      ]
 );
 
+val hw_trans_dmv_lem = store_thm("hw_trans_dmv_lem", ``
+!s m req s' pa. (~Wreq req \/ pa <> Adr req) /\ dcoh s.ms pa 
+	     /\ hw_trans s m req s'
+         ==>
+    (dmvca s'.ms T pa = dmvca s.ms T pa)
+``,
+  REPEAT GEN_TAC >>
+  Cases_on `Dreq req`
+  >| [(* Dreq *)
+      STRIP_TAC >> (
+	  IMP_RES_TAC Dreq_lem >>
+	  FULL_SIMP_TAC std_ss [Wreq_def, Adr_def] >>
+	  IMP_RES_TAC hw_trans_data_lem >>
+	  IMP_RES_TAC dmv_unchanged_lem 
+      )
+      ,
+      (* other *) 
+      STRIP_TAC >> (
+          IMP_RES_TAC hw_trans_not_Dreq_lem >>
+	  MATCH_MP_TAC dmvca_lem >>
+	  ASM_REWRITE_TAC []
+      )
+     ]
+);
+
+val hw_trans_dmv_set_lem = store_thm("hw_trans_dmv_set_lem", ``
+!s m req s' As. (~Wreq req \/ Adr req NOTIN As) /\ dCoh s.ms As
+	     /\ hw_trans s m req s'
+         ==>
+    (!pa. pa IN As ==> (dmvca s'.ms T pa = dmvca s.ms T pa))
+``,
+  RW_TAC std_ss [] >> ( IMP_RES_TAC dCoh_lem ) 
+  >| [(* not write *)
+      IMP_RES_TAC hw_trans_dmv_lem
+      ,
+      (* address not in Rs *)
+      `pa <> Adr req` by (
+          CCONTR_TAC >>
+          FULL_SIMP_TAC std_ss []
+      ) >>
+      IMP_RES_TAC hw_trans_dmv_lem
+     ]
+);
+
+val hw_trans_mon_write_lem = store_thm("hw_trans_mon_write_lem", ``
+!s m req s' pa. hw_trans s m req s' /\ ~Mon s (MEM pa) m W 
+        ==>
+    (~Wreq req \/ pa <> Adr req)
+``,
+  REPEAT STRIP_TAC >>
+  REWRITE_TAC [GSYM IMP_DISJ_THM] >>
+  STRIP_TAC >>
+  IMP_RES_TAC Wreq_lem >>
+  `req <> NOREQ` by ( FULL_SIMP_TAC std_ss [corereq_distinct] ) >>
+  IMP_RES_TAC hw_trans_mon_lem >>
+  CCONTR_TAC >>
+  FULL_SIMP_TAC std_ss [Adr_def] >>
+  REV_FULL_SIMP_TAC std_ss [Adr_def, Acc_def]
+);
+
+val hw_trans_mon_write_set_lem = store_thm("hw_trans_mon_write_set_lem", ``
+!s m req s' As. hw_trans s m req s' /\ (!pa. pa IN As ==> ~Mon s (MEM pa) m W)
+        ==>
+    (~Wreq req \/ Adr req NOTIN As)
+``,
+  REPEAT STRIP_TAC >>
+  REWRITE_TAC [GSYM IMP_DISJ_THM] >>
+  STRIP_TAC >>
+  CCONTR_TAC >>
+  FULL_SIMP_TAC std_ss [Adr_def] >>
+  RES_TAC >>
+  IMP_RES_TAC hw_trans_mon_write_lem >>
+  FULL_SIMP_TAC std_ss []
+);
+
+val hw_trans_user_MD_lem = store_thm("hw_trans_user_MD_lem", ``
+!s req s' r. hw_trans s USER req s' /\ reg_res r /\ r IN MD s
+        ==>
+    (Cv s' r = Cv s r)
+``,
+  RW_TAC std_ss [MD_def, Cv_def] >>
+  ASSUME_TAC ( SPEC ``req:corereq`` req_cases_lem ) >> 
+  FULL_SIMP_TAC std_ss []
+  >| [(* fetch *)
+      IMP_RES_TAC hw_trans_fetch_lem >>
+      IMP_RES_TAC core_req_user_MD_reg_lem >>
+      `CV cs' (dmvca s.ms) r = CV cs' (dmvca s'.ms) r` by (
+          FULL_SIMP_TAC std_ss [CV_reg_lem]
+      ) >>
+      `r IN MD_ (cs',dmvca s'.ms)` by (
+          IMP_RES_TAC MD__reg_lem >>
+	  FULL_SIMP_TAC std_ss []
+      ) >>
+      IMP_RES_TAC core_rcv_user_MD_reg_lem >>
+      RW_TAC std_ss []
+      ,
+      (* Dreq *)
+      IMP_RES_TAC Dreq_cases_lem 
+      >| [(* read *)
+	  IMP_RES_TAC hw_trans_read_lem >>
+	  IMP_RES_TAC core_req_user_MD_reg_lem >>
+          `CV cs' (dmvca s.ms) r = CV cs' (dmvca s'.ms) r` by (
+              FULL_SIMP_TAC std_ss [CV_reg_lem]
+	  ) >>
+          `r IN MD_ (cs',dmvca s'.ms)` by (
+              IMP_RES_TAC MD__reg_lem >>
+	      FULL_SIMP_TAC std_ss []
+	  ) >>
+	  IMP_RES_TAC core_rcv_user_MD_reg_lem >>
+	  RW_TAC std_ss []
+	  ,
+	  (* write *)
+	  IMP_RES_TAC hw_trans_write_lem >>
+	  IMP_RES_TAC core_req_user_MD_reg_lem >>
+          FULL_SIMP_TAC std_ss [CV_reg_lem]
+	  ,
+	  (* clean *)
+	  IMP_RES_TAC hw_trans_clean_lem >>
+	  IMP_RES_TAC core_req_user_MD_reg_lem >>
+          FULL_SIMP_TAC std_ss [CV_reg_lem]
+	 ]
+      ,
+      (* NOREQ *)
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC hw_trans_noreq_lem >>
+      IMP_RES_TAC core_req_user_MD_reg_lem >>
+      FULL_SIMP_TAC std_ss [CV_reg_lem]
+     ]
+);
 
 (****** Deriveability *******) 
 
@@ -844,6 +1045,188 @@ val drvbl_lem = store_thm("drvbl_lem", ``
       FULL_SIMP_TAC std_ss []
      ]
 );
+
+(********** MMU safety ************)
+
+val safe_def = Define `safe s = 
+!s'. drvbl s s' ==> !m r ac. Mon s m r ac <=> Mon s' m r ac
+`;
+
+(* some lemmas *)
+
+val Cv_reg_eq = Define `Cv_reg_eq s s' Rs = 
+!r. r IN Rs /\ reg_res r ==> (Cv s' r = Cv s r)
+`;
+
+val Cv_dmv_eq = Define `Cv_dmv_eq s s' Rs = 
+!pa. MEM pa IN Rs ==> (dmvca s'.ms T pa = dmvca s.ms T pa)
+`;
+
+val Cv_lem = store_thm("Cv_lem", ``
+!Rs s s'. Cv_reg_eq s s' Rs /\ Cv_dmv_eq s s' Rs ==>
+    (!r. r IN Rs ==> (Cv s r = Cv s' r))
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``r:resource`` res_cases ) >>
+  FULL_SIMP_TAC std_ss [] 
+  >| [(* memory resource *)
+      IMP_RES_TAC Cv_dmv_eq >>
+      RW_TAC std_ss [Cv_def, CV_def]
+      ,
+      (* reg resource *)
+      IMP_RES_TAC Cv_reg_eq >>
+      ASM_REWRITE_TAC []
+     ]
+);
+
+val dCoh_protect_lem = store_thm("dCoh_protect_lem", ``
+!s m req s' Rs. hw_trans s m req s' 
+	     /\ (!pa. MEM pa IN Rs ==> ~Mon s (MEM pa) m W)
+	     /\ dCoh s.ms {pa | MEM pa IN Rs}
+        ==>
+    Cv_dmv_eq s s' Rs
+``,
+  RW_TAC std_ss [Cv_dmv_eq] >>
+  RES_TAC >>
+  `pa IN {pa | MEM pa IN Rs}` by (
+      RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+  ) >>
+  IMP_RES_TAC dCoh_lem >>
+  IMP_RES_TAC hw_trans_mon_write_lem >> (
+      IMP_RES_TAC hw_trans_dmv_lem
+  )
+);
+
+val Mon_protect_lem = store_thm("Mon_protect_lem", ``
+!s req s'. hw_trans s USER req s' 
+	/\ (!pa. MEM pa IN MD s ==> ~Mon s (MEM pa) USER W)
+	/\ dCoh s.ms {pa | MEM pa IN MD s}
+        ==>
+    !m r ac. Mon s m r ac <=> Mon s' m r ac
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  MATCH_MP_TAC Mon_lem >>
+  MATCH_MP_TAC Cv_lem >>
+  STRIP_TAC
+  >| [(* register resources of MD *)
+      RW_TAC std_ss [Cv_reg_eq] >>
+      IMP_RES_TAC hw_trans_user_MD_lem >>
+      ASM_REWRITE_TAC []
+      ,
+      (* memory resources of MD *)
+      MATCH_MP_TAC dCoh_protect_lem >>
+      METIS_TAC []
+     ]
+);
+
+val drvbl_MD_reg_lem = store_thm("drvbl_MD_reg_lem", ``
+!s s'. drvbl s s' ==> Cv_reg_eq s s' (MD s)
+``,
+  RW_TAC std_ss [Cv_reg_eq, MD_def, Cv_def] >>
+  `s.cs.coreg = s'.cs.coreg` by ( METIS_TAC [drvbl_def] ) >>
+  IMP_RES_TAC MD__coreg_lem >>
+  RW_TAC std_ss []
+);
+
+val drvbl_MD_mem_lem = store_thm("drvbl_MD_mem_lem", ``
+!s s'. drvbl s s' 	
+    /\ (!pa. MEM pa IN MD s ==> ~Mon s (MEM pa) USER W)
+    /\ dCoh s.ms {pa | MEM pa IN MD s}
+        ==> 
+    Cv_dmv_eq s s' (MD s)
+``,
+  RW_TAC std_ss [Cv_dmv_eq, Cv_def] >>
+  RES_TAC >>
+  FULL_SIMP_TAC std_ss [drvbl_def] >>
+  PAT_X_ASSUM ``!pa. X \/ Y \/ Z`` (
+      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+  ) >>
+  FULL_SIMP_TAC std_ss [drvbl_non_def, drvbl_rd_def, drvbl_wt_def]
+  >| [(* eviction *)
+      Cases_on `dw s'.ms pa = dw s.ms pa`
+      >| [(* cache unchanged *)
+	  Cases_on `M s'.ms pa = M s.ms pa`
+	  >| [(* memory unchanged *)
+	      IMP_RES_TAC dmvca_lem
+	      ,
+	      (* memory changed *)
+	      RES_TAC >>
+	      IMP_RES_TAC dirty_hit_lem >>
+	      IMP_RES_TAC dhit_lem >>
+	      IMP_RES_TAC dcnt_lem >>
+	      RW_TAC std_ss [dmvca_hit_lem]
+	     ]
+	  ,
+	  (* cache changed *)
+	  RES_TAC >>
+	  Cases_on `dirty s.ms pa`
+	  >| [(* dirty write back *)
+	      RES_TAC >>
+	      IMP_RES_TAC dirty_hit_lem >>
+	      RW_TAC std_ss [dmvca_hit_lem, dmvca_miss_lem]
+	      ,
+	      (* clean / no write back -> use coherency *)
+	      `M s'.ms pa = M s.ms pa` by (
+	          CCONTR_TAC >>
+		  FULL_SIMP_TAC std_ss []
+	      ) >>
+	      `dhit s.ms pa` by ( 
+	          CCONTR_TAC >>
+		  FULL_SIMP_TAC std_ss [double_not_dhit_lem]
+	      ) >>
+	      RW_TAC std_ss [dmvca_hit_lem, dmvca_miss_lem] >>
+	      `pa IN {pa | MEM pa IN MD s}` by (
+	          RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+	      ) >>
+	      IMP_RES_TAC dCoh_lem >>
+	      IMP_RES_TAC dcoh_clean_lem
+	     ]
+	 ]
+      ,
+      (* read *)
+      Cases_on `dw s'.ms pa = dw s.ms pa`
+      >| [(* cache and memory unchanged *)
+	  IMP_RES_TAC dmvca_lem
+	  ,
+	  (* only cache changed *)
+	  RES_TAC >>
+	  `dhit s'.ms pa` by ( 
+	      CCONTR_TAC >>
+	      FULL_SIMP_TAC std_ss [double_not_dhit_lem]
+	  ) >>
+	  RW_TAC std_ss [dmvca_hit_lem, dmvca_miss_lem]
+	 ]
+      ,
+      (* write -> not possible *)
+      FULL_SIMP_TAC std_ss []
+     ]
+);
+
+
+val drvbl_MD_unchanged_lem = store_thm("drvbl_MD_unchanged_lem", ``
+!s s'. drvbl s s' 	
+    /\ (!pa. MEM pa IN MD s ==> ~Mon s (MEM pa) USER W)
+    /\ dCoh s.ms {pa | MEM pa IN MD s}
+        ==> 
+    (!r. r IN MD s ==> (Cv s r = Cv s' r))
+``,
+  REPEAT GEN_TAC >> STRIP_TAC >>
+  MATCH_MP_TAC Cv_lem >>
+  RW_TAC std_ss [drvbl_MD_reg_lem, drvbl_MD_mem_lem]
+);
+
+val Mon_Coh_safe_lem = store_thm("Mon_Coh_safe_lem", ``
+!s. (!pa. MEM pa IN MD s ==> ~Mon s (MEM pa) USER W)
+ /\ dCoh s.ms {pa | MEM pa IN MD s}
+        ==>
+    safe s
+``,
+  RW_TAC std_ss [safe_def] >>
+  MATCH_MP_TAC Mon_lem >>
+  RW_TAC std_ss [drvbl_MD_unchanged_lem]
+);
+
 
 (*********** finish ************)
 
