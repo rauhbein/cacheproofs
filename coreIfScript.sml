@@ -83,8 +83,7 @@ val Mmu_MD_exists = prove (``
 	       (MD(c,mv) = MD(c',mv')) /\	
 	       (!va m ac. Mmu(c,mv,va,m,ac) = Mmu(c',mv',va,m,ac)))
            /\ (!r. reg_res r ==> (r IN MD(c,mv) <=> r IN MD(c',mv'))) 
-           /\ (!r. reg_res r /\ r IN MD(c,mv) /\ (c.coreg = c'.coreg) ==> 
-	          (CV c mv r = CV c' mv' r)) 
+           /\ (!r. reg_res r /\ r IN MD(c,mv) ==> ?r'. r = COREG r')
 ``,
   EXISTS_TAC ``\(c,mv,va,m,ac):core_state # mem_view # vadr # mode # acc.
 		NONE:(padr # bool) option`` >>
@@ -288,7 +287,9 @@ val MD_coreg_oblg = store_thm("MD_coreg_oblg", ``
 !c c' mv mv' r. reg_res r /\ r IN MD_(c,mv) /\ (c.coreg = c'.coreg) ==> 
     (CV c mv r = CV c' mv' r) 
 ``,
-  METIS_TAC [Mmu_MD_spec]
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Mmu_MD_spec >>
+  RW_TAC std_ss [CV_def]
 );
 
 val Mon_mem_oblg = store_thm("Mon_mem_oblg", ``

@@ -1119,6 +1119,18 @@ val coh_clean_lem = store_thm("coh_clean_lem", ``
   RES_TAC
 );
 
+val coh_lem = store_thm("coh_lem", ``
+!ca ca' m m' pa. coh ca m pa /\ (ca' pa = ca pa) /\ (m' pa = m pa)
+        ==>
+    coh ca' m' pa
+``,
+  RW_TAC std_ss [coh_def] >>
+  IMP_RES_TAC chit_lem >>
+  IMP_RES_TAC ccnt_lem >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC cdirty_lem
+);
+
 val coh_equal_lem = store_thm("coh_equal_lem", ``
 !ca m pa. chit_ ca pa /\ (ccnt_ ca pa = m pa) ==> coh ca m pa
 ``,

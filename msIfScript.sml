@@ -425,12 +425,34 @@ val dCoh_oblg = store_thm("dCoh_oblg", ``
   RW_TAC std_ss [dCoh_def, dcoh_def, Coh_def]
 );
 
+val dCoh_oblg2 = store_thm("dCoh_oblg2", ``
+!ms As. dCoh ms As <=> !pa. pa IN As ==> dcoh ms pa
+``,
+  RW_TAC std_ss [dCoh_def, dcoh_def, Coh_def]
+);
+
 val dCoh_alt_oblg = store_thm("dCoh_alt_oblg", ``
 !ms Rs. dCoh ms Rs 
             <=> 
         !pa. pa IN Rs ==> ((dmvca ms) T pa = (dmvalt ms) T pa)
 ``,
   REWRITE_TAC [dCoh_def, dmvca_def, dmvalt_def, Coh_alt_lem]
+);
+
+val dcoh_diff_oblg = store_thm("dcoh_diff_oblg", ``
+!ms pa. dcoh ms pa <=> dhit ms pa /\ dcnt ms pa <> M ms pa ==> dirty ms pa
+``,
+  RW_TAC std_ss [dcoh_def, dw_def, M_def, dhit_def, 
+		 dcnt_def, dirty_def, coh_def]
+);
+
+val dcoh_unchanged_oblg = store_thm("dcoh_unchanged_oblg", ``
+!ms ms' pa. dcoh ms pa /\ (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa)
+        ==>
+    dcoh ms' pa
+``,
+  RW_TAC std_ss [dcoh_def, dw_def, M_def] >>
+  IMP_RES_TAC coh_lem
 );
 
 val dcoh_clean_oblg = store_thm("dcoh_clean_oblg", ``
@@ -440,6 +462,20 @@ val dcoh_clean_oblg = store_thm("dcoh_clean_oblg", ``
   IMP_RES_TAC coh_clean_lem >>
   ASM_REWRITE_TAC []
 );
+
+val dcoh_equal_oblg = store_thm("dcoh_equal_oblg", ``
+!ms pa. dhit ms pa /\ (dcnt ms pa = M ms pa) ==> dcoh ms pa
+``,
+  RW_TAC std_ss [dcoh_def, dhit_def, dcnt_def, M_def] >>
+  IMP_RES_TAC coh_equal_lem
+);
+
+val dcoh_miss_oblg = store_thm("dcoh_miss_oblg", ``
+!ms pa. ~dhit ms pa ==> dcoh ms pa
+``,
+  RW_TAC std_ss [dhit_def, dcoh_def, coh_miss_lem]
+);
+
 
 val dcoh_write_oblg = store_thm("dcoh_write_oblg", ``
 !ms dop ms'. CA dop /\ wt dop /\ (ms' = msca_trans ms (DREQ dop))
@@ -465,7 +501,7 @@ val dcoh_ca_trans_oblg = store_thm("dcoh_ca_trans_oblg", ``
   IMP_RES_TAC coh_ca_trans_lem
 );
 
-val dcoh_other_lem = store_thm("dcoh_other_lem", ``
+val dcoh_other_oblg = store_thm("dcoh_other_oblg", ``
 !ms dop ms' pa. dcoh ms pa /\ (ms' = msca_trans ms (DREQ dop)) /\ pa <> PA dop
         ==>
     dcoh ms' pa
@@ -477,7 +513,7 @@ val dcoh_other_lem = store_thm("dcoh_other_lem", ``
   IMP_RES_TAC coh_other_lem
 );
 
-val dcoh_not_write_lem = store_thm("dcoh_not_write_lem", ``
+val dcoh_not_write_oblg = store_thm("dcoh_not_write_oblg", ``
 !ms dop ms' pa. dcoh ms pa /\ ~wt dop /\ (ms' = msca_trans ms (DREQ dop))
         ==>
     dcoh ms' pa
@@ -813,7 +849,7 @@ val imv_dreq_lem = store_thm("imv_dreq_lem", ``
       RES_TAC >>
       FULL_SIMP_TAC std_ss [] >>
       REV_FULL_SIMP_TAC std_ss [Adr_def] >>
-      IMP_RES_TAC dcoh_other_lem >>
+      IMP_RES_TAC dcoh_other_oblg >>
       `dmvca ms' T pa = dmvca ms T pa` by (
           IMP_RES_TAC dmv_unchanged_oblg
       ) >>
@@ -828,7 +864,7 @@ val imv_dreq_lem = store_thm("imv_dreq_lem", ``
       `dmvca ms' T pa = dmvca ms T pa` by (
           IMP_RES_TAC dmv_unchanged_oblg
       ) >>
-      IMP_RES_TAC dcoh_not_write_lem >>
+      IMP_RES_TAC dcoh_not_write_oblg >>
       REV_FULL_SIMP_TAC std_ss [] >>
       IMP_RES_TAC imv_dmv_oblg >>
       RW_TAC std_ss []
