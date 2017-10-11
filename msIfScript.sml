@@ -203,6 +203,16 @@ val msca_NOREQ_lem = store_thm("msca_NOREQ_lem", ``
 
 (* some obligations *)
 
+val msca_DREQ_unchanged_oblg = store_thm("msca_DREQ_unchanged_oblg", ``
+!ms pa ms'. (ms' = msca_trans ms (DREQ pa)) 
+    ==>
+(!pa. iw ms' pa = iw ms pa)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC msca_DREQ_lem >>
+  RW_TAC std_ss [iw_def]
+);
+
 val msca_FREQ_unchanged_oblg = store_thm("msca_FREQ_unchanged_oblg", ``
 !ms pa ms'. (ms' = msca_trans ms (FREQ pa)) 
     ==>
@@ -414,7 +424,35 @@ val M_uncacheable_write_oblg = store_thm("M_uncacheable_write_oblg", ``
   )
 );
 
-(* Data Coherency *)
+(* instruction fetch *)
+
+val ic_cacheable_other_oblg = store_thm("ic_cacheable_other_oblg", ``
+!ms pa ms' pa'. (ms' = msca_trans ms (FREQ pa')) /\ (pa <> pa')
+             /\ (iw ms' pa <> iw ms pa) ==> 
+    ~ihit ms' pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC msca_FREQ_lem >>
+  FULL_SIMP_TAC std_ss [iw_def, ihit_def] >>
+  IMP_RES_TAC ca_cacheable_other_lem
+);
+
+val ic_cacheable_read_oblg = store_thm("ic_cacheable_read_oblg", ``
+!ms pa ms'. (ms' = msca_trans ms (FREQ pa)) /\ (iw ms' pa <> iw ms pa) 
+        ==>
+    ~ihit ms pa /\ (icnt ms' pa = M ms pa)
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC msca_FREQ_lem >>
+  FULL_SIMP_TAC std_ss [ihit_def, iw_def, icnt_def, M_def] >>
+  IMP_RES_TAC ca_cacheable_read_lem >>
+  ASM_REWRITE_TAC []
+);
+
+
+(******* Data Coherency **********)
 
 val dcoh_def = Define `dcoh ms pa = coh ms.dc ms.mem pa`;
 val dCoh_def = Define `dCoh ms (Rs:padr set) = Coh ms.dc ms.mem Rs`;
@@ -606,7 +644,7 @@ val Invic_preserve_oblg = store_thm("Invic_preserve_oblg", ``
      ]
 );
 
-(* Instruction Cache Coherency *)
+(* Instruction Cache Coherency *) (* TODO: check *)
 
 val icoh_def = Define `icoh ms pa = 
 (ihit ms pa ==> (icnt ms pa = M ms pa)) /\ ~dirty ms pa`;
