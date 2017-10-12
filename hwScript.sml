@@ -962,10 +962,12 @@ val drvbl_non_def = Define `drvbl_non s s' pa =
         (~dhit s'.ms pa /\ (dirty s.ms pa ==> (M s'.ms pa = dcnt s.ms pa))))
 `;
 
+(* NOTE: need cleanness here to preserve isafe later *)
 val drvbl_rd_def = Define `drvbl_rd s s' pa = 
    Mon s (MEM pa) USER R 
 /\ (M s'.ms pa = M s.ms pa)
-/\ (dw s'.ms pa <> dw s.ms pa ==> ~dhit s.ms pa /\ (dcnt s'.ms pa = M s.ms pa))
+/\ (dw s'.ms pa <> dw s.ms pa ==> 
+        ~dhit s.ms pa /\ ~dirty s'.ms pa /\ (dcnt s'.ms pa = M s.ms pa))
 `;
 
 val drvbl_wt_def = Define `drvbl_wt s s' pa = 
