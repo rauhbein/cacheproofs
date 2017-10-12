@@ -431,6 +431,7 @@ val Invic_preserve_lem = store_thm("Invic_preserve_lem", ``
 val icoh_preserve_lem = store_thm("icoh_preserve_lem", ``
 !ms req ms' pa. icoh ms pa /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
+	     /\ (Freq req ==> ~dirty ms (Adr req))
         ==>
     icoh ms' pa
 ``,
@@ -438,7 +439,8 @@ val icoh_preserve_lem = store_thm("icoh_preserve_lem", ``
 );
 
 val imv_dmv_lem = store_thm("imv_dmv_lem", ``
-!ms pa. icoh ms pa /\ dcoh ms pa ==> (imv ms T pa = dmvca ms T pa)
+!ms pa. icoh ms pa /\ dcoh ms pa /\ ~dirty ms pa ==> 
+    (imv ms T pa = dmvca ms T pa)
 ``,
   REWRITE_TAC [imv_dmv_oblg]
 );
@@ -460,6 +462,7 @@ val imv_fetch_lem = store_thm("imv_fetch_lem", ``
 val imv_preserve_lem = store_thm("imv_preserve_lem", ``
 !ms req ms' pa. icoh ms pa /\ dcoh ms pa /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
+	     /\ ~dirty ms pa
         ==>
     (imv ms' T pa = imv ms T pa)
 ``,
