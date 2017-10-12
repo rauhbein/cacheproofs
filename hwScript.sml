@@ -174,6 +174,12 @@ val dirty_lem = store_thm("dirty_lem", ``
   REWRITE_TAC [dirty_oblg]
 );
 
+val not_dhit_not_dirty_lem = store_thm("not_dhit_not_dirty_lem", ``
+!ms pa. ~dhit ms pa ==> ~dirty ms pa 
+``,
+  REWRITE_TAC [not_dhit_not_dirty_oblg]
+);
+
 val dcnt_lem = store_thm("dcnt_lem", ``
 !ms ms' pa. (dw ms' pa = dw ms pa) ==> (dcnt ms' pa = dcnt ms pa)
 ``,
@@ -185,6 +191,39 @@ val dirty_hit_lem = store_thm("dirty_hit_lem", ``
 ``,
   REWRITE_TAC [dirty_hit_oblg]
 );
+
+
+val imv_hit_lem = store_thm("imv_hit_lem", ``
+!ms pa. ihit ms pa ==> (imv ms T pa = icnt ms pa)
+``,
+  REWRITE_TAC [imv_hit_oblg]
+);
+
+val imv_miss_lem = store_thm("imv_miss_lem", ``
+!ms pa. ~ihit ms pa ==> (imv ms T pa = M ms pa)
+``,
+  REWRITE_TAC [imv_miss_oblg]
+);
+
+val ihit_lem = store_thm("ihit_lem", ``
+!ms ms' pa. (iw ms' pa = iw ms pa) ==> (ihit ms' pa <=> ihit ms pa)
+``,
+  REWRITE_TAC [ihit_oblg]
+);
+
+val double_not_ihit_lem = store_thm("double_not_ihit_lem", ``
+!ms ms' pa. (~ihit ms' pa /\ ~ihit ms pa) ==> (iw ms' pa = iw ms pa)
+``,
+  REWRITE_TAC [double_not_ihit_oblg]
+);
+
+val icnt_lem = store_thm("icnt_lem", ``
+!ms ms' pa. (iw ms' pa = iw ms pa) ==> (icnt ms' pa = icnt ms pa)
+``,
+  REWRITE_TAC [icnt_oblg]
+);
+
+(* deriveability lemmas *)
 
 val dc_cacheable_other_lem = store_thm("dc_cacheable_other_lem", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
@@ -420,6 +459,13 @@ val dmvca_lem = store_thm("dmvca_lem", ``
     (dmvca ms' T pa = dmvca ms T pa)
 ``,
   REWRITE_TAC [dmvca_oblg]
+);
+
+val imv_lem = store_thm("imv_lem", ``
+!ms ms' pa. (iw ms' pa = iw ms pa) /\ (M ms' pa = M ms pa) ==>
+    (imv ms' T pa = imv ms T pa)
+``,
+  REWRITE_TAC [imv_oblg]
 );
 
 val Invic_preserve_lem = store_thm("Invic_preserve_lem", ``
@@ -1464,17 +1510,150 @@ val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
 (* instruction cache integrity *)
 
 val isafe_def = Define `isafe s As =
-!pa. pa IN As /\ Mon s (MEM pa) USER EX ==> ~dirty s.ms pa
+!pa m. pa IN As /\ Mon s (MEM pa) m EX ==> ~dirty s.ms pa
 `;
 
-(* TODO:
+val drvbl_clean_lem = store_thm("drvbl_clean_lem", ``
+!s s' pa. drvbl s s' /\ ~Mon s (MEM pa) USER W /\ ~dirty s.ms pa ==>
+    ~dirty s'.ms pa
+``,
+  RW_TAC std_ss [drvbl_def, drvbl_data_def] >>
+  PAT_X_ASSUM ``!pa. X`` (
+      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm )
+  ) >>
+  REV_FULL_SIMP_TAC std_ss [drvbl_wt_def]
+  >| [(* eviction *)
+      Cases_on `dw s'.ms pa = dw s.ms pa`
+      >| [(* cache unchanged *)
+	  METIS_TAC [dirty_lem]
+	  ,
+	  (* cache changed *)
+	  FULL_SIMP_TAC std_ss [drvbl_non_def] >>
+	  IMP_RES_TAC not_dhit_not_dirty_lem
+	 ]
+      ,
+      (* read *)
+      Cases_on `dw s'.ms pa = dw s.ms pa`
+      >| [(* cache and memory unchanged *)
+	  METIS_TAC [dirty_lem]
+	  ,
+	  (* only cache changed *)
+	  FULL_SIMP_TAC std_ss [drvbl_rd_def]
+	 ]
+     ]
+);
 
-drvbl /\ not writable As /\ isafe /\ iCoh ==> isafe'
+val drvbl_isafe_lem = store_thm("drvbl_isafe_lem", ``
+!s s' As. (!pa. pa IN As ==> ~Mon s (MEM pa) USER W)
+       /\ safe s 
+       /\ isafe s As
+       /\ drvbl s s'
+    ==>
+        isafe s' As
+``,
+  RW_TAC std_ss [isafe_def, safe_def] >>
+  RES_TAC >>
+  RES_TAC >>
+  IMP_RES_TAC drvbl_clean_lem
+);
 
-drvbl /\ not writable As /\ isafe /\ iCoh ==> iCoh
+val drvbl_mem_unchanged_lem = store_thm("drvbl_mem_unchanged_lem", ``
+!s s' pa. ~Mon s (MEM pa) USER W /\ drvbl s s' /\ ~dirty s.ms pa
+         ==> 
+    (M s'.ms pa = M s.ms pa)
+``,
+  RW_TAC std_ss [drvbl_def, drvbl_data_def] >>
+  PAT_X_ASSUM ``!pa. X`` (
+      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm )
+  ) >>
+  CCONTR_TAC >>
+  REV_FULL_SIMP_TAC std_ss [drvbl_wt_def]
+  >| [(* eviction *)
+      FULL_SIMP_TAC std_ss [drvbl_non_def]
+      ,
+      (* read *)
+      FULL_SIMP_TAC std_ss [drvbl_rd_def]
+     ]		  
+);
 
-*)
 
+val drvbl_iCoh_lem = store_thm("drvbl_isafe_lem", ``
+!s s' As. (!pa. pa IN As ==> ~Mon s (MEM pa) USER W /\ ?m. Mon s (MEM pa) m EX)
+       /\ iCoh s.ms As 
+       /\ isafe s As
+       /\ drvbl s s'
+    ==>
+        iCoh s'.ms As
+``,
+  RW_TAC std_ss [iCoh_def, isafe_def] >>
+  RES_TAC >>
+  RES_TAC >>
+  FULL_SIMP_TAC std_ss [icoh_def] >>
+  NTAC 2 STRIP_TAC 
+  >| [(* instruction memory coherence *)
+      IMP_RES_TAC drvbl_mem_unchanged_lem >>
+      Cases_on `iw s'.ms pa = iw s.ms pa`
+      >| [(* ic unchanged *)
+	  IMP_RES_TAC ihit_lem >>
+	  IMP_RES_TAC icnt_lem >>
+	  RES_TAC >>
+	  ASM_REWRITE_TAC []
+	  ,
+	  (* ic changed *)
+	  `drvbl_ic_non s s' pa \/ drvbl_ic_ex s s' pa` by (
+	      FULL_SIMP_TAC std_ss [drvbl_def, drvbl_ic_def] )
+	  >| [(* eviction -> contradiction with hit *)
+	      FULL_SIMP_TAC std_ss [drvbl_ic_non_def]
+	      ,
+	      (* cache fill on fetch *)
+	      FULL_SIMP_TAC std_ss [drvbl_ic_ex_def]
+	     ]
+	 ]
+      ,
+      (* not dirty in dc *)
+      IMP_RES_TAC drvbl_clean_lem
+     ]
+);
+
+val drvbl_iCoh_mem_lem = store_thm("drvbl_iCoh_mem_lem", ``
+!s s' Rs. drvbl s s' 	
+       /\ (!pa. MEM pa IN Rs ==> ~Mon s (MEM pa) USER W 
+	                      /\ ?m. Mon s (MEM pa) m EX)
+       /\ iCoh s.ms {pa | MEM pa IN Rs}
+       /\ isafe s {pa | MEM pa IN Rs}
+           ==> 
+       Cv_imv_eq s s' Rs
+``,
+  RW_TAC std_ss [Cv_imv_eq, Cv_def] >>
+  `pa IN {pa | MEM pa IN Rs}` by ( 
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] 
+  ) >>
+  FULL_SIMP_TAC std_ss [iCoh_def, isafe_def] >>
+  RES_TAC >> 
+  `~dirty s.ms pa` by ( RES_TAC ) >>
+  IMP_RES_TAC drvbl_mem_unchanged_lem >>
+  Cases_on `iw s'.ms pa = iw s.ms pa`
+  >| [(* cache unchanged *)
+      IMP_RES_TAC imv_lem
+      ,
+      (* cache changed *)
+      `drvbl_ic_non s s' pa \/ drvbl_ic_ex s s' pa` by (
+      FULL_SIMP_TAC std_ss [drvbl_def, drvbl_ic_def] )
+      >| [(* eviction *)
+	  FULL_SIMP_TAC std_ss [drvbl_ic_non_def] >>
+	  RES_TAC >>
+	  `ihit s.ms pa` by ( METIS_TAC [double_not_ihit_lem] ) >>
+	  RW_TAC std_ss [imv_hit_lem, imv_miss_lem] >>
+	  FULL_SIMP_TAC std_ss [icoh_def] 
+	  ,
+	  (* cache fill on fetch *)
+	  FULL_SIMP_TAC std_ss [drvbl_ic_ex_def] >>
+	  RES_TAC >>
+	  `ihit s'.ms pa` by ( METIS_TAC [double_not_ihit_lem] ) >>
+	  RW_TAC std_ss [imv_hit_lem, imv_miss_lem]
+	 ]
+     ]
+);
 
 (*********** finish ************)
 

@@ -68,6 +68,18 @@ val dmvca_miss_oblg = store_thm("dmvca_miss_oblg", ``
   RW_TAC std_ss [dhit_def, dmvca_def, M_def, MVca_def] 
 );
 
+val imv_hit_oblg = store_thm("imv_hit_oblg", ``
+!ms pa. ihit ms pa ==> (imv ms T pa = icnt ms pa)
+``,
+  RW_TAC std_ss [ihit_def, imv_def, icnt_def, MVca_def] 
+);
+
+val imv_miss_oblg = store_thm("imv_miss_oblg", ``
+!ms pa. ~ihit ms pa ==> (imv ms T pa = M ms pa)
+``,
+  RW_TAC std_ss [ihit_def, imv_def, M_def, MVca_def] 
+);
+
 val dhit_oblg = store_thm("dhit_oblg", ``
 !ms ms' pa. (dw ms' pa = dw ms pa) ==> (dhit ms' pa <=> dhit ms pa)
 ``,
@@ -106,6 +118,24 @@ val dirty_hit_oblg = store_thm("dirty_hit_oblg", ``
   RW_TAC std_ss [dirty_def, dhit_def, cdirty_chit_lem]
 );
 		    
+val ihit_oblg = store_thm("ihit_oblg", ``
+!ms ms' pa. (iw ms' pa = iw ms pa) ==> (ihit ms' pa <=> ihit ms pa)
+``,
+  RW_TAC std_ss [ihit_def, iw_def, chit_lem]
+);
+
+val double_not_ihit_oblg = store_thm("double_not_ihit_oblg", ``
+!ms ms' pa. (~ihit ms' pa /\ ~ihit ms pa) ==> (iw ms' pa = iw ms pa)
+``,
+  RW_TAC std_ss [ihit_def, iw_def] >>
+  IMP_RES_TAC double_not_chit_lem
+);
+
+val icnt_oblg = store_thm("icnt_oblg", ``
+!ms ms' pa. (iw ms' pa = iw ms pa) ==> (icnt ms' pa = icnt ms pa)
+``,
+  RW_TAC std_ss [icnt_def, iw_def, ccnt_lem]
+);
 
 (* transition system *)
 
@@ -199,7 +229,7 @@ val msca_FREQ_lem = store_thm("msca_FREQ_lem", ``
 );
 
 val msca_NOREQ_lem = store_thm("msca_NOREQ_lem", ``
-!ms pa ms'. (ms' = msca_trans ms NOREQ) 
+!ms ms'. (ms' = msca_trans ms NOREQ) 
     ==>
     (ms'.dc = ms.dc)
  /\ (ms'.ic = ms.ic)
@@ -596,6 +626,16 @@ val dmvca_oblg = store_thm("dmvca_oblg", ``
   ASM_REWRITE_TAC []
 );
 
+val imv_oblg = store_thm("imv_oblg", ``
+!ms ms' pa. (iw ms' pa = iw ms pa) /\ (M ms' pa = M ms pa) ==>
+    (imv ms' T pa = imv ms T pa)
+``,
+  RW_TAC std_ss [iw_def, M_def, imv_def] >>
+  MATCH_MP_TAC MVca_lem >>
+  ASM_REWRITE_TAC []
+);
+
+
 (* instruction cache *)
 
 val Invic_fetch_lem = store_thm("Invic_fetch_lem", ``
@@ -681,7 +721,7 @@ val icoh_lem = store_thm("icoh_lem", ``
 );
 
 val icoh_fetch_lem = store_thm("icoh_fetch_lem", ``
-!ms req ms' pa. icoh ms pa /\ ~dirty ms pa /\ (ms' = msca_trans ms (FREQ pa))
+!ms ms' pa. icoh ms pa /\ ~dirty ms pa /\ (ms' = msca_trans ms (FREQ pa))
         ==>
     icoh ms' pa
 ``,
@@ -718,7 +758,7 @@ val icoh_fetch_lem = store_thm("icoh_fetch_lem", ``
 );
 
 val icoh_fetch_other_lem = store_thm("icoh_fetch_other_lem", ``
-!ms req ms' pa pa'. icoh ms pa' /\ (ms' = msca_trans ms (FREQ pa)) /\ pa' <> pa
+!ms ms' pa pa'. icoh ms pa' /\ (ms' = msca_trans ms (FREQ pa)) /\ pa' <> pa
         ==>
     icoh ms' pa'
 ``,
