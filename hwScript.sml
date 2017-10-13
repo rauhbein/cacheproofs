@@ -11,12 +11,12 @@ val _ = new_theory "hw";
 
 (************ importing interface lemmas **********)
 
-val CR_lem = store_thm("CR_lem", ``
-!c c' mv mv'. (!r. r IN CR_ (c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-              (CR_ (c,mv) = CR_ (c',mv'))
-``,
-  REWRITE_TAC [CR_oblg]
-);
+(* val CR_lem = store_thm("CR_lem", `` *)
+(* !c c' mv mv'. (!r. r IN CR_ (c,mv) ==> (CV c mv r = CV c' mv' r)) ==> *)
+(*               (CR_ (c,mv) = CR_ (c',mv')) *)
+(* ``, *)
+(*   REWRITE_TAC [CR_oblg] *)
+(* ); *)
 
 val Mmu_lem = store_thm("Mmu_lem", ``
 !c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
@@ -25,7 +25,7 @@ val Mmu_lem = store_thm("Mmu_lem", ``
   REWRITE_TAC [Mmu_oblg]
 );
 
-val MD__lem = store_thm("MD_lem", ``
+val MD__lem = store_thm("MD__lem", ``
 !c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
 	      (MD_(c,mv) = MD_(c',mv'))
 ``,
@@ -595,6 +595,13 @@ val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
     ==>
     hw_trans s M NOREQ s')
 `;
+
+val MD_lem = store_thm("MD_lem", ``
+!s s'. (!r. r IN MD s ==> (Cv s r = Cv s' r)) ==> (MD s = MD s')
+``,
+  RW_TAC std_ss [MD_def, Cv_def, MD__lem]
+);
+
 
 (* hw_trans lemmas *)
 

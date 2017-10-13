@@ -54,19 +54,6 @@ val CV_reg_lem = store_thm("CV_reg_lem", ``
 );
 
 
-val CR_exists = prove (``
-?CR:core_state # mem_view -> resource set.
-!c c' mv mv'. (!r. r IN CR(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	      (CR(c,mv) = CR(c',mv'))
-``,
-  EXISTS_TAC ``\ (c,mv):core_state # mem_view. EMPTY:resource set`` >>
-  RW_TAC std_ss []
-);  
-
-val CR_spec = new_specification ("CR_spec",
-  ["CR_"], CR_exists);
-
-
 (* introduce uninterpreted functions *)
 
 new_constant("MODE", ``:(psrs_name -> word) -> mode``);
@@ -255,13 +242,6 @@ val core_rcv_spec = new_specification ("core_rcv_spec",
   ["core_rcv"], core_rcv_exists);
 
 (* Proof obligations on components, exported to main theory *)
-
-val CR_oblg = store_thm("CR_oblg", ``
-!c c' mv mv'. (!r. r IN CR_ (c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-              (CR_ (c,mv) = CR_ (c',mv'))
-``,
-  METIS_TAC [CR_spec]
-);
 
 val Mmu_oblg = store_thm("Mmu_oblg", ``
 !c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
