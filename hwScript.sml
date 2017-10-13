@@ -11,13 +11,6 @@ val _ = new_theory "hw";
 
 (************ importing interface lemmas **********)
 
-(* val CR_lem = store_thm("CR_lem", `` *)
-(* !c c' mv mv'. (!r. r IN CR_ (c,mv) ==> (CV c mv r = CV c' mv' r)) ==> *)
-(*               (CR_ (c,mv) = CR_ (c',mv')) *)
-(* ``, *)
-(*   REWRITE_TAC [CR_oblg] *)
-(* ); *)
-
 val Mmu_lem = store_thm("Mmu_lem", ``
 !c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
 	      (!va m ac. Mmu_(c,mv,va,m,ac) = Mmu_(c',mv',va,m,ac))
@@ -1584,7 +1577,7 @@ val drvbl_mem_unchanged_lem = store_thm("drvbl_mem_unchanged_lem", ``
 );
 
 
-val drvbl_iCoh_lem = store_thm("drvbl_isafe_lem", ``
+val drvbl_iCoh_lem = store_thm("drvbl_iCoh_lem", ``
 !s s' As. (!pa. pa IN As ==> ~Mon s (MEM pa) USER W /\ ?m. Mon s (MEM pa) m EX)
        /\ iCoh s.ms As 
        /\ isafe s As
