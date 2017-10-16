@@ -95,10 +95,11 @@ val core_rcv_mode_lem = store_thm("core_rcv_mode_lem", ``
 );
 
 val core_req_MD_mv_lem = store_thm("core_req_MD_mv_lem", ``
-!c M mv mv' req c'. core_req (c,M,mv,req,c') 
-		 /\ (!r. r IN MD_ (c,mv) ==> (CV c mv r = CV c mv' r))
+!c mv mv' req c'. core_req (c,Mode c,mv,req,c') 
+	       /\ (!va. Mmu_(c, mv, va, Mode c, Acc req) = 
+		        Mmu_(c, mv', va, Mode c, Acc req))
         ==> 
-    core_req(c,M,mv',req,c')
+    core_req(c,Mode c,mv',req,c')
 ``,
   REWRITE_TAC [core_req_MD_mv_oblg]
 );
@@ -640,7 +641,7 @@ val hw_trans_data_lem = store_thm("hw_trans_data_lem", ``
   )
 );
 
-val hw_trans_data_ic_lem = store_thm("hw_trans_data_lem", ``
+val hw_trans_data_ic_lem = store_thm("hw_trans_data_ic_lem", ``
 !s M req s'. Dreq req /\ hw_trans s M req s' 
         ==> 
     (!pa. iw s'.ms pa = iw s.ms pa)
@@ -675,9 +676,11 @@ val hw_trans_read_lem = store_thm("hw_trans_read_lem", ``
   REPEAT STRIP_TAC >>
   IMP_RES_TAC Rreq_lem >>
   ASM_REWRITE_TAC [CAreq_def, Adr_def] >>
-  IMP_RES_TAC hw_trans_cases >> (
-      FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
-      REV_FULL_SIMP_TAC std_ss []
+  RW_TAC std_ss [] >> (
+      IMP_RES_TAC hw_trans_cases >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
+          REV_FULL_SIMP_TAC std_ss []
+      )
   ) >>
   HINT_EXISTS_TAC >>
   RW_TAC std_ss []
@@ -693,9 +696,11 @@ val hw_trans_write_lem = store_thm("hw_trans_write_lem", ``
   IMP_RES_TAC Wreq_lem >>
   ASM_REWRITE_TAC [] >>
   IMP_RES_TAC not_rd_lem >>
-  IMP_RES_TAC hw_trans_cases >> (
-      FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
-      REV_FULL_SIMP_TAC std_ss []
+  RW_TAC std_ss [] >> (
+      IMP_RES_TAC hw_trans_cases >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
+          REV_FULL_SIMP_TAC std_ss []
+      )
   )
 );
 
@@ -709,9 +714,11 @@ val hw_trans_clean_lem = store_thm("hw_trans_clean_lem", ``
   IMP_RES_TAC Creq_lem >>
   ASM_REWRITE_TAC [] >>
   IMP_RES_TAC not_rd_lem >>
-  IMP_RES_TAC hw_trans_cases >> (
-      FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
-      REV_FULL_SIMP_TAC std_ss []
+  RW_TAC std_ss [] >> (
+      IMP_RES_TAC hw_trans_cases >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
+          REV_FULL_SIMP_TAC std_ss []
+      )
   )
 );
 
@@ -1654,6 +1661,57 @@ val drvbl_iCoh_mem_lem = store_thm("drvbl_iCoh_mem_lem", ``
 	 ]
      ]
 );
+
+(******** cachelaware computation ********)
+
+val (ca_kcomp_rules, ca_kcomp_ind, ca_kcomp_cases) = Hol_reln `
+   (!s. exentry s ==> ca_kcomp s s 0)
+/\ (!s s' s'' n. ca_kcomp s s' n /\ (?req. hw_trans s' PRIV req s'')
+        ==>
+    ca_kcomp s s'' (SUC n))
+`;
+
+val ca_kcomp_exentry_lem = store_thm("ca_kcomp_exentry_lem", ``
+!s s' n. ca_kcomp s s' n ==> exentry s
+``,
+  Induct_on `n` 
+  >| [(* n = 0 *)
+      ONCE_REWRITE_TAC [ca_kcomp_cases] >>
+      REPEAT STRIP_TAC >>
+      FULL_SIMP_TAC std_ss [numTheory.NOT_SUC]
+      ,
+      (* n -> SUC n *)
+      ONCE_REWRITE_TAC [ca_kcomp_cases] >>
+      REPEAT STRIP_TAC >>
+      FULL_SIMP_TAC std_ss [numTheory.INV_SUC] >>
+      RW_TAC std_ss [] >>
+      RES_TAC
+     ]
+);
+
+val ca_wrel_def = Define` ca_wrel s s' = 
+?n. ca_kcomp s s' n /\ (mode s' = USER)`;
+
+val ca_wrel_exentry_lem = store_thm("ca_wrel_exentry_lem", ``
+!s s'. ca_wrel s s' ==> exentry s
+``,
+  RW_TAC std_ss [ca_wrel_def] >>
+  IMP_RES_TAC ca_kcomp_exentry_lem
+);
+
+val ca_wrel_mode_lem = store_thm("ca_wrel_mode_lem", ``
+!s s'. ca_wrel s s' ==> (mode s = PRIV) /\ (mode s' = USER)
+``,
+  RW_TAC std_ss [ca_wrel_def]
+  >| [(* PRIV *)
+      IMP_RES_TAC ca_kcomp_exentry_lem >>
+      FULL_SIMP_TAC std_ss [exentry_def, mode_def, exentry_spec]
+      ,
+      (* USER *)
+      ASM_REWRITE_TAC []
+     ]      
+);
+
 
 (*********** finish ************)
 

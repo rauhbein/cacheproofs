@@ -201,6 +201,11 @@ val Acc_def = Define `
 /\ (Acc (FREQ pa) = EX)
 `;
 
+val Dop_def = Define `
+   (Dop (DREQ dop) = dop)
+/\ (Dop (FREQ pa) = RD pa T)
+`;
+
 val Freq_lem = store_thm("Freq_lem", ``
 !req. Freq req ==> ?pa. req = FREQ pa
 ``,

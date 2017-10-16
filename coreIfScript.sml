@@ -146,10 +146,17 @@ val core_Mon_reg_po = Define `core_Mon_reg_po trans =
     (CV c mv r = CV c' mv r)
 `;
 
-(* corereq only depending on MD in memview *)
+(* corereq only depending on MD in memview 
+NOTE: too strong for kernel mode, should only depend on current MMU setting
+*)
+(* val core_MD_mv_po = Define `core_MD_mv_po trans =  *)
+(* !c M mv mv' req c'. (!r. r IN MD_ (c,mv) ==> (CV c mv r = CV c mv' r)) ==> *)
+(*     (trans (c,M,mv,req,c') <=> trans (c,M,mv',req,c')) *)
+(* `; *)
 val core_MD_mv_po = Define `core_MD_mv_po trans = 
-!c M mv mv' req c'. (!r. r IN MD_ (c,mv) ==> (CV c mv r = CV c mv' r)) ==>
-    (trans (c,M,mv,req,c') <=> trans (c,M,mv',req,c'))
+!c mv mv' req c'. (!va. Mmu_(c, mv, va, Mode c, Acc req) = 
+		        Mmu_(c, mv', va, Mode c, Acc req)) ==>
+    (trans (c,Mode c,mv,req,c') <=> trans (c,Mode c,mv',req,c'))
 `;
 
 (* user transitions do not modify coregs *)
@@ -352,10 +359,11 @@ val core_rcv_mode_oblg = store_thm("core_rcv_mode_oblg", ``
 );
 
 val core_req_MD_mv_oblg = store_thm("core_req_MD_mv_oblg", ``
-!c M mv mv' req c'. core_req (c,M,mv,req,c') 
-		 /\ (!r. r IN MD_ (c,mv) ==> (CV c mv r = CV c mv' r))
+!c mv mv' req c'. core_req (c,Mode c,mv,req,c') 
+	       /\ (!va. Mmu_(c, mv, va, Mode c, Acc req) = 
+		        Mmu_(c, mv', va, Mode c, Acc req))
         ==> 
-    core_req(c,M,mv',req,c')
+    core_req(c,Mode c,mv',req,c')
 ``,
   REPEAT STRIP_TAC >>
   ASSUME_TAC core_req_spec >>

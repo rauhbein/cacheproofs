@@ -63,10 +63,8 @@ val Icoh_dCoh_lem = store_thm("Icoh_dCoh_lem", ``
   REWRITE_TAC [Icoh_dCoh_oblg]
 ); 
 
-val Icode_CR_lem = store_thm("Icoh_CR_lem", ``
-!s s'. dCoh s.ms {pa | MEM pa IN CR s} 
-    /\ dCoh s'.ms {pa | MEM pa IN CR s'}
-    /\ iCoh s.ms {pa | MEM pa IN CRex s}
+val Icode_CR_lem = store_thm("Icode_CR_lem", ``
+!s s'. iCoh s.ms {pa | MEM pa IN CRex s}
     /\ iCoh s'.ms {pa | MEM pa IN CRex s'}
     /\ isafe s {pa | MEM pa IN CRex s}
     /\ isafe s' {pa | MEM pa IN CRex s'}
@@ -280,10 +278,10 @@ val Inv_Icode_lem = store_thm("Inv_Icode_lem", ``
   IMP_RES_TAC Inv_lem >>
   IMP_RES_TAC drvbl_lem >>
   IMP_RES_TAC Inv_CR_unchanged_lem >>
-  IMP_RES_TAC Icoh_dCoh_lem >>
+  (* IMP_RES_TAC Icoh_dCoh_lem >> *)
   IMP_RES_TAC Icode_iCoh_lem >>
   IMP_RES_TAC Icode_isafe_lem >>
-  IMP_RES_TAC Inv_Coh_CR_lem >>
+  (* IMP_RES_TAC Inv_Coh_CR_lem >> *)
   IMP_RES_TAC Inv_iCoh_lem >>
   IMP_RES_TAC Inv_isafe_lem >>
   IMP_RES_TAC Icode_CR_lem
@@ -341,3 +339,6 @@ val Inv_user_preserved_lem = store_thm("Inv_user_preserved_lem", ``
      ]
 );
 
+(*********** finish ************)
+
+val _ = export_theory();
