@@ -538,6 +538,12 @@ val dcoh_clean_oblg = store_thm("dcoh_clean_oblg", ``
   ASM_REWRITE_TAC []
 );
 
+val dcoh_dirty_oblg = store_thm("dcoh_dirty_oblg", ``
+!ms pa. dirty ms pa ==> dcoh ms pa
+``,
+  RW_TAC std_ss [dirty_def, dcoh_def, coh_dirty_lem]
+);
+
 val dcoh_equal_oblg = store_thm("dcoh_equal_oblg", ``
 !ms pa. dhit ms pa /\ (dcnt ms pa = M ms pa) ==> dcoh ms pa
 ``,

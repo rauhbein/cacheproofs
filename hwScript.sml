@@ -395,6 +395,12 @@ val dcoh_clean_lem = store_thm("dcoh_clean_lem", ``
   REWRITE_TAC [dcoh_clean_oblg]
 );
 
+val dcoh_dirty_lem = store_thm("dcoh_dirty_lem", ``
+!ms pa. dirty ms pa ==> dcoh ms pa
+``,
+  REWRITE_TAC [dcoh_dirty_oblg]
+);
+
 val dcoh_equal_lem = store_thm("dcoh_equal_lem", ``
 !ms pa. dhit ms pa /\ (dcnt ms pa = M ms pa) ==> dcoh ms pa
 ``,
@@ -1029,7 +1035,7 @@ val drvbl_wt_def = Define `drvbl_wt s s' pa =
         (dirty s'.ms pa \/ 
 	 ~dirty s'.ms pa /\ (M s'.ms pa = dcnt s'.ms pa))) (* WT case *)
 /\ (M s'.ms pa <> M s.ms pa ==> 
-        (~dirty s.ms pa ==> ((?va. Mmu s va USER W = SOME (pa,F))
+        (~dirty s'.ms pa ==> ((?va. Mmu s va USER W = SOME (pa,F))
 			     \/ (M s'.ms pa = dcnt s'.ms pa)))) (* WT case *)
 `;
 
@@ -1459,6 +1465,53 @@ val Mon_Coh_safe_lem = store_thm("Mon_Coh_safe_lem", ``
   RW_TAC std_ss [drvbl_MD_unchanged_lem]
 );
 
+val drvbl_non_dcoh_lem = store_thm("drvbl_non_dcoh", ``
+!s s' pa. drvbl_non s s' pa /\ dcoh s.ms pa ==> dcoh s'.ms pa
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [drvbl_non_def] >>
+  Cases_on `dw s'.ms pa = dw s.ms pa`
+  >| [(* cache unchanged *)
+      Cases_on `M s'.ms pa = M s.ms pa`
+      >| [(* memory unchanged *)
+	  IMP_RES_TAC dcoh_unchanged_lem
+	  ,
+	  (* memory changed -> becomes equal*)
+	  RES_TAC >>
+          IMP_RES_TAC dirty_hit_lem >>
+	  IMP_RES_TAC dhit_lem >>
+	  IMP_RES_TAC dcnt_lem >>
+	  `dcnt s'.ms pa = M s'.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
+	  IMP_RES_TAC dcoh_equal_lem
+	 ]
+      ,
+      (* cache changed -> miss *)
+      RES_TAC >>
+      IMP_RES_TAC dcoh_miss_lem
+     ]
+);
+
+
+val drvbl_rd_dcoh_lem = store_thm("drvbl_rd_dcoh", ``
+!s s' pa. drvbl_rd s s' pa /\ dcoh s.ms pa ==> dcoh s'.ms pa
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [drvbl_rd_def] >>
+  Cases_on `dw s'.ms pa = dw s.ms pa`
+  >| [(* cache and memory unchanged *)
+      IMP_RES_TAC dcoh_unchanged_lem
+      ,
+      (* only cache changed *)
+      RES_TAC >>
+      `dcnt s'.ms pa = M s'.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
+      `dhit s'.ms pa` by (
+          CCONTR_TAC >>
+	  FULL_SIMP_TAC std_ss [double_not_dhit_lem]
+      ) >>
+      IMP_RES_TAC dcoh_equal_lem
+     ]
+);
+
 val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
 !s s' As. drvbl s s' 	
        /\ (!pa. pa IN As ==> ~Mon s (MEM pa) USER W)
@@ -1472,8 +1525,48 @@ val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
   PAT_X_ASSUM ``!pa. X \/ Y \/ Z`` (
       fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
   ) >>
-  FULL_SIMP_TAC std_ss [drvbl_non_def, drvbl_rd_def, drvbl_wt_def]
+  FULL_SIMP_TAC std_ss [drvbl_wt_def]
   >| [(* eviction *)
+      IMP_RES_TAC drvbl_non_dcoh_lem
+      ,
+      (* read *)
+      IMP_RES_TAC drvbl_rd_dcoh_lem
+      ,
+      (* write -> not possible *)
+      FULL_SIMP_TAC std_ss []
+     ]
+);
+
+val only_CA_def = Define `only_CA s pa =
+!va m ac c. (Mmu s va m ac = SOME (pa,c)) ==> (c = T)
+`;
+
+val drvbl_dCoh_cacheable_lem = store_thm("drvbl_dCoh_cacheable_lem", ``
+!s s' As. drvbl s s' 	
+       /\ (!pa. pa IN As ==> only_CA s pa)	       
+       /\ dCoh s.ms As
+           ==> 
+       dCoh s'.ms As
+``,
+  REPEAT STRIP_TAC >>
+  REWRITE_TAC [dCoh_lem2] >>
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC dCoh_lem2 >>
+  PAT_X_ASSUM ``!pa. X`` (
+      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+  ) >>
+  FULL_SIMP_TAC std_ss [drvbl_def,drvbl_data_def] >>
+  PAT_X_ASSUM ``!pa. X \/ Y \/ Z`` (
+      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+  ) >>
+  FULL_SIMP_TAC std_ss [drvbl_wt_def]
+  >| [(* eviction *)
+      IMP_RES_TAC drvbl_non_dcoh_lem
+      ,
+      (* read *)
+      IMP_RES_TAC drvbl_rd_dcoh_lem
+      ,
+      (* write *)
       Cases_on `dw s'.ms pa = dw s.ms pa`
       >| [(* cache unchanged *)
 	  Cases_on `M s'.ms pa = M s.ms pa`
@@ -1481,38 +1574,48 @@ val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
 	      IMP_RES_TAC dcoh_unchanged_lem
 	      ,
 	      (* memory changed -> becomes equal*)
-	      RES_TAC >>
-	      IMP_RES_TAC dirty_hit_lem >>
-	      IMP_RES_TAC dhit_lem >>
-	      IMP_RES_TAC dcnt_lem >>
-	      `dcnt s'.ms pa = M s'.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
-	      IMP_RES_TAC dcoh_equal_lem
+	      Cases_on `dirty s'.ms pa`
+	      >| [(* dirty' *)
+		  IMP_RES_TAC dcoh_dirty_lem
+		  ,
+		  (* ~dirty' *)
+		  RES_TAC
+		  >| [(* uncacheable alias *)
+		      IMP_RES_TAC only_CA_def >>
+		      FULL_SIMP_TAC std_ss []
+		      ,
+		      (* WT case *)
+		      Cases_on `dhit s'.ms pa`
+		      >| [(* hit *)
+			  IMP_RES_TAC dcoh_equal_lem >>
+			  FULL_SIMP_TAC std_ss []
+			  ,
+			  (* miss *)
+			  IMP_RES_TAC dcoh_miss_lem
+			 ]
+		     ]
+		 ]
 	     ]
 	  ,
-	  (* cache changed -> miss *)
-	  RES_TAC >>
-	  IMP_RES_TAC dcoh_miss_lem
+	  (* cache changed *)
+	  RES_TAC
+	  >| [(* dirty case *)
+	      IMP_RES_TAC dcoh_dirty_lem
+	      ,
+	      (* WT case *)
+	      Cases_on `dhit s'.ms pa`
+	      >| [(* hit *)
+		  IMP_RES_TAC dcoh_equal_lem >>
+		  FULL_SIMP_TAC std_ss []
+		  ,
+		  (* miss *)
+		  IMP_RES_TAC dcoh_miss_lem
+		 ]
+	     ]
 	 ]
-      ,
-      (* read *)
-      Cases_on `dw s'.ms pa = dw s.ms pa`
-      >| [(* cache and memory unchanged *)
-	  IMP_RES_TAC dcoh_unchanged_lem
-	  ,
-	  (* only cache changed *)
-	  RES_TAC >>
-	  `dcnt s'.ms pa = M s'.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
-	  `dhit s'.ms pa` by (
-	      CCONTR_TAC >>
-	      FULL_SIMP_TAC std_ss [double_not_dhit_lem]
-	  ) >>
-	  IMP_RES_TAC dcoh_equal_lem
-	 ]
-      ,
-      (* write -> not possible *)
-      FULL_SIMP_TAC std_ss []
      ]
 );
+
 
 (* instruction cache integrity *)
 

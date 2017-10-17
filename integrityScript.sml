@@ -419,10 +419,7 @@ val _ = new_constant("Mac", ``:padr set``);
 
 val Ifun_AC_po = Define `Ifun_AC_po = 
 !s. Ifun s ==> 
-    !pa. pa IN Mac ==> 
-        !va m ac c. (Mmu_(s.cs, dmvca s.ms, va, m, ac) = SOME (pa,c))            
-		        ==>
-	            (c = T)
+    !pa. pa IN Mac ==> only_CA s pa
 `;
 
 val Icoh_AC_def = Define `Icoh_AC s = 
@@ -438,6 +435,115 @@ val Icode_AC_def = Define `Icode_AC s =
 val Icm_AC_def = Define `Icm_AC s = 
 dCoh s.ms (Mac DIFF {pa | MEM pa IN CR s})
 `; 
+
+val Inv_AC_CR_unchanged_lem = store_thm("Inv_AC_CR_unchanged_lem", ``
+!s s'. 
+    Icoh_AC s
+ /\ Ifun s
+ /\ Ifun_AC_po
+ /\ drvbl s s'
+        ==> 
+    (!r. r IN CR s ==> (Cv s r = Cv s' r))
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  MATCH_MP_TAC Cv_lem >>
+  STRIP_TAC
+  >| [(* regs equal *)
+      RW_TAC std_ss [Cv_reg_eq_def] >>
+      FULL_SIMP_TAC std_ss [drvbl_def] >>
+      IMP_RES_TAC CR_coreg_lem >>
+      ASM_REWRITE_TAC []
+      ,
+      (* data core view of CR unchanged *)
+      MATCH_MP_TAC drvbl_Coh_mem_lem >>
+      IMP_RES_TAC Ifun_Mon_lem >>
+      IMP_RES_TAC Icoh_AC_def >>
+      FULL_SIMP_TAC std_ss [dCoh_lem2, pred_setTheory.IN_INTER] >>
+      REPEAT STRIP_TAC >>
+      `MEM pa IN CR s` by ( 
+          FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+      ) >>
+      FULL_SIMP_TAC std_ss []
+     ]
+);
+
+val Inv_AC_CR_lem = store_thm("Inv_AC_CR_lem", ``
+!s s'.
+    Icoh_AC s
+ /\ Ifun s
+ /\ Ifun_AC_po
+ /\ drvbl s s'
+        ==> 
+    (CR s' = CR s)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Inv_AC_CR_unchanged_lem >>
+  IMP_RES_TAC CR_lem >>
+  ASM_REWRITE_TAC []
+);
+
+
+val discharge_user_AC_lem = store_thm("discharge_user_AC_lem", ``
+Ifun_AC_po ==> cm_user_po Icoh_AC Icode_AC Icm_AC
+``,
+  RW_TAC std_ss [cm_user_po_def]
+  >| [(* Icoh_CR_po *)
+      RW_TAC std_ss [Icoh_CR_po_def, Icoh_AC_def] >>
+      IMP_RES_TAC CR_lem >>
+      FULL_SIMP_TAC std_ss [dCoh_lem2, pred_setTheory.IN_INTER]
+      ,
+      (* Icoh_dCoh_po *)
+      RW_TAC std_ss [Icoh_dCoh_po_def, Icoh_AC_def] >>
+      FULL_SIMP_TAC std_ss [dCoh_lem2, pred_setTheory.IN_INTER] >>
+      RW_TAC std_ss [] >>
+      `MEM pa IN CR s` by ( 
+          FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+      ) >>
+      FULL_SIMP_TAC std_ss []
+      ,
+      (* Icode_CR_po *)
+      RW_TAC std_ss [Icode_CR_po_def, Icode_AC_def]
+      ,
+      (* Icode_iCoh_po *)
+      RW_TAC std_ss [Icode_iCoh_po_def, Icode_AC_def]
+      ,
+      (* Icode_isafe_po *)
+      RW_TAC std_ss [Icode_isafe_po_def, Icode_AC_def]
+      ,
+      (* Icm_po *)
+      RW_TAC std_ss [Icm_po_def, Icm_AC_def] >>
+      FULL_SIMP_TAC std_ss [Inv_lem] >>
+      IMP_RES_TAC Inv_AC_CR_lem >>
+      FULL_SIMP_TAC std_ss [Ifun_AC_po, Icm_AC_def] >>
+      RES_TAC >>
+      `!pa. pa IN (Mac DIFF {pa | MEM pa IN CR s'}) ==> only_CA s pa` by (
+          REPEAT STRIP_TAC >>
+          FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF]
+      ) >>
+      MATCH_MP_TAC drvbl_dCoh_cacheable_lem >>
+      HINT_EXISTS_TAC >>
+      RW_TAC std_ss []
+     ]
+);
+
+val Inv_AC_user_preserved_thm = store_thm("Inv_AC_user_preserved_thm", ``
+!s s' req. 
+    Inv Icoh_AC Icode_AC Icm_AC s
+ /\ Ifun_AC_po
+ /\ hw_trans s USER req s' 
+        ==> 
+    Inv Icoh_AC Icode_AC Icm_AC s'
+ /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))
+ /\ Cv_imv_eq s s' (CRex s)
+ /\ ((mode s' = PRIV) ==> exentry s')
+``,
+  NTAC 4 STRIP_TAC >>
+  MATCH_MP_TAC Inv_user_preserved_thm >>
+  HINT_EXISTS_TAC >> 
+  IMP_RES_TAC discharge_user_AC_lem >>
+  ASM_REWRITE_TAC []
+);
 
 (*********** finish ************)
 
