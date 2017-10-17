@@ -459,6 +459,25 @@ val MValt_def = Define `MValt ca m =
 \c pa. if c /\ cdirty_ ca pa then ccnt_ ca pa else m pa
 `;
 
+val MValt_lem = store_thm("MValt_lem", ``
+!ca m pa c ca' m'. (ca' pa = ca pa) /\ (m' pa = m pa) ==>
+    ((MValt ca' m') c pa = (MValt ca m) c pa)
+``,
+  RW_TAC std_ss [MValt_def]
+  >| [(* ccnt, ca unchanged *)
+      IMP_RES_TAC ccnt_lem
+      ,
+      (* ~dirty and dirty' -> contradiction *)
+      IMP_RES_TAC cdirty_lem >>
+      FULL_SIMP_TAC std_ss []
+      ,
+      (* dirty and ~dirty' -> contradiction *)
+      IMP_RES_TAC cdirty_lem >>
+      FULL_SIMP_TAC std_ss []
+     ]      
+);
+
+
 (* memory semantics *)
 
 (* cacheless *)
@@ -1488,6 +1507,41 @@ val mvca_unchanged_lem = store_thm("mvca_unchanged_lem", ``
      ]
 );
 
+val mvalt_unchanged_lem = store_thm("mvalt_unchanged_lem", ``
+!ca m dop ca' m' pa. pa <> PA dop /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    (MValt ca' m' T pa = MValt ca m T pa)
+``,
+  REPEAT STRIP_TAC >>				    
+  Cases_on `CA dop`
+  >| [(* cacheable *)
+      Cases_on `ca' pa = ca pa` 
+      >| [(* cache unchanged *)
+	  IMP_RES_TAC cdirty_lem >>
+	  IMP_RES_TAC ccnt_lem >>
+	  Cases_on `m' pa = m pa`
+          >| [(* mem unchanged *)
+	      RW_TAC std_ss [MValt_def]
+	      ,
+	      (* mem changed *)
+	      IMP_RES_TAC mem_cacheable_other_lem >>
+	      RW_TAC std_ss [MValt_def]
+	     ]
+	  ,
+	  (* cache changed *)
+	  IMP_RES_TAC ca_cacheable_other_lem >>
+	  IMP_RES_TAC not_chit_not_cdirty_lem >>
+	  RW_TAC std_ss [MValt_def] >>
+	  CCONTR_TAC >>
+	  IMP_RES_TAC mem_cacheable_other_lem
+	 ]
+      ,
+      (* uncacheable *)
+      IMP_RES_TAC ca_uncacheable >>
+      IMP_RES_TAC cl_other_unchanged_lem >>
+      RW_TAC std_ss [MValt_def]
+     ]
+);
 
 (*********** finish ************)
 

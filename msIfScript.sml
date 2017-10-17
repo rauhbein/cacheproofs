@@ -641,6 +641,26 @@ val imv_oblg = store_thm("imv_oblg", ``
   ASM_REWRITE_TAC []
 );
 
+val dmvalt_oblg = store_thm("dmvalt_oblg", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa) ==>
+    (dmvalt ms' T pa = dmvalt ms T pa)
+``,
+  RW_TAC std_ss [dw_def, M_def, dmvalt_def] >>
+  MATCH_MP_TAC MValt_lem >>
+  ASM_REWRITE_TAC []
+);
+
+val dmvalt_unchanged_oblg = store_thm("dmvalt_unchanged_oblg", ``
+!ms dop ms' pa. pa <> PA dop /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    (dmvalt ms' T pa = dmvalt ms T pa)
+``,
+  REPEAT STRIP_TAC >> 
+  IMP_RES_TAC msca_DREQ_lem >>
+  FULL_SIMP_TAC std_ss [dcoh_def, dmvalt_def] >>
+  IMP_RES_TAC mvalt_unchanged_lem
+);
+
 
 (* instruction cache *)
 

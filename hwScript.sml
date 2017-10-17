@@ -468,6 +468,21 @@ val imv_lem = store_thm("imv_lem", ``
   REWRITE_TAC [imv_oblg]
 );
 
+val dmvalt_lem = store_thm("dmvalt_lem", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa) ==>
+    (dmvalt ms' T pa = dmvalt ms T pa)
+``,
+  REWRITE_TAC [dmvalt_oblg]
+);
+
+val dmvalt_unchanged_lem = store_thm("dmvalt_unchanged_lem", ``
+!ms dop ms' pa. pa <> PA dop /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    (dmvalt ms' T pa = dmvalt ms T pa)
+``,
+  REWRITE_TAC [dmvalt_unchanged_oblg]
+);
+
 val Invic_preserve_lem = store_thm("Invic_preserve_lem", ``
 !ms req ms'. Invic ms /\ (ms' = msca_trans ms req) ==> Invic ms'
 ``,
@@ -1012,6 +1027,27 @@ val hw_trans_user_MD_lem = store_thm("hw_trans_user_MD_lem", ``
       FULL_SIMP_TAC std_ss [CV_reg_lem]
      ]
 );
+
+val hw_trans_dmvalt_lem = store_thm("hw_trans_dmvalt_lem", ``
+!s m req s' pa. pa <> Adr req /\ hw_trans s m req s'
+         ==>
+    (dmvalt s'.ms T pa = dmvalt s.ms T pa)
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `Dreq req`
+  >| [(* Dreq *)
+      IMP_RES_TAC Dreq_lem >>
+      FULL_SIMP_TAC std_ss [Adr_def] >>
+      IMP_RES_TAC hw_trans_data_lem >>
+      IMP_RES_TAC dmvalt_unchanged_lem 
+      ,
+      (* other *) 
+      IMP_RES_TAC hw_trans_not_Dreq_lem >>
+      MATCH_MP_TAC dmvalt_lem >>
+      ASM_REWRITE_TAC []
+     ]
+);
+
 
 (****** Deriveability *******) 
 
