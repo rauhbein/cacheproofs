@@ -131,25 +131,22 @@ val exentry_spec = new_specification ("exentry_spec",
    otherwise: need that it is self-contained wrt. translated mem
 	    + depending on registers *)
 
-new_constant("vdeps_", ``:core_state -> vadr set``);
-
-(* physical address dependencies, not actually needed here *)
-
-val deps_exists = store_thm("deps_exists", ``
-?deps. 
-!c mv. deps c mv SUBSET ({Tr_ c mv (VApc c)} UNION 
-                         {Tr_ c mv va | va IN vdeps_ c} UNION 
-                         {pa | MEM pa IN MD_(c,mv,vdeps_ c)})
- /\ (!mv'. (!pa. pa IN deps c mv ==> (CV c mv (MEM pa) = CV c mv' (MEM pa)))
-         ==>
- 	      (deps c mv = deps c mv'))
+val vdeps_exists = store_thm("vdeps_exists", ``
+?vdeps. !c. VApc c IN vdeps c
 ``,
-  EXISTS_TAC ``\c:core_state mv:mem_view. EMPTY :padr set`` >>
-  RW_TAC std_ss [pred_setTheory.EMPTY_SUBSET]
+  EXISTS_TAC ``\c. {VApc c}`` >>
+  RW_TAC std_ss [pred_setTheory.IN_SING]
 );
 
-val deps_spec = new_specification ("deps_spec",
-  ["deps_"], deps_exists);
+val vdeps_spec = new_specification ("vdeps_spec",
+  ["vdeps_"], vdeps_exists);
+
+(* physical address dependencies *)
+
+val deps__def = Define `deps_ c mv = 
+{pa | ?va. (Tr_ c mv va = pa) /\ va IN vdeps_ c} UNION 
+{pa | MEM pa IN MD_(c,mv,vdeps_ c)}
+`;
 
 (* requesting transition *)
 

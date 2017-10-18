@@ -340,11 +340,39 @@ val cl_Tr_def = Define `cl_Tr s va = Tr_ s.cs (MVcl s.M) va`;
 
 val cl_vdeps_def = Define `cl_vdeps s = vdeps_ s.cs`;
 
-val cl_deps_def = Define `cl_deps s = 
-      {cl_Tr s (VApc s.cs)} 
-UNION {pa | ?va. (pa = cl_Tr s va) /\ va IN vdeps_ s.cs} 
-UNION {pa | MEM pa IN cl_MDVA s (cl_vdeps s)}
-`;
+val cl_deps_def = Define `cl_deps s = deps_ s.cs (MVcl s.M)`;
+
+val cl_deps_pc_oblg = store_thm("cl_deps_pc_oblg", ``
+!s. cl_Tr s (VApc s.cs) IN cl_deps s
+``,
+  RW_TAC std_ss [cl_Tr_def, cl_deps_def, coreIfTheory.deps__def] >>
+  REWRITE_TAC [pred_setTheory.IN_UNION] >>
+  DISJ1_TAC >>
+  RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  EXISTS_TAC ``VApc s.cs`` >>
+  REWRITE_TAC [coreIfTheory.vdeps_spec]
+);
+
+val cl_deps_vdeps_oblg = store_thm("cl_deps_vdeps_oblg", ``
+!s va. va IN cl_vdeps s ==> cl_Tr s va IN cl_deps s
+``,
+  RW_TAC std_ss [cl_Tr_def, cl_deps_def, cl_vdeps_def, coreIfTheory.deps__def] >>
+  REWRITE_TAC [pred_setTheory.IN_UNION] >>
+  DISJ1_TAC >>
+  RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  HINT_EXISTS_TAC >>
+  ASM_REWRITE_TAC []
+);
+
+val cl_deps_MD_oblg = store_thm("cl_deps_MD_oblg", ``
+!s pa. MEM pa IN cl_MDVA s (cl_vdeps s) ==> pa IN cl_deps s
+``,
+  RW_TAC std_ss [cl_deps_def, cl_vdeps_def, cl_MDVA_def, 
+		 coreIfTheory.deps__def] >>
+  REWRITE_TAC [pred_setTheory.IN_UNION] >>
+  DISJ2_TAC >>
+  RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+);
 
 val cl_fixmmu_def = Define `cl_fixmmu s VAs f = 
 !va. va IN VAs ==> (cl_Mmu s va PRIV R = SOME (f va, T))
@@ -358,35 +386,35 @@ val cl_fixmmu_Tr_lem = store_thm("cl_fixmmu_Tr_lem", ``
 		 coreIfTheory.Tr__def]
 );
 
-val deps_fixmmu_oblg = store_thm("deps_fixmmu_oblg", ``
-!s VAs f. cl_fixmmu s VAs f /\ cl_vdeps s SUBSET VAs 
-       /\ VApc s.cs IN VAs /\ (cl_mode s = PRIV) ==>
-    cl_deps s SUBSET ({f (VApc s.cs)} UNION 
-		      {pa | ?va. (pa = f va) /\ va IN cl_vdeps s} UNION 
-                      {pa | MEM pa IN cl_MDVA s (cl_vdeps s)})
-``,
-  RW_TAC std_ss [cl_deps_def] >>
-  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, pred_setTheory.IN_UNION] >>
-  REPEAT STRIP_TAC
-  >| [(* VApc *)
-      IMP_RES_TAC cl_fixmmu_Tr_lem >>
-      FULL_SIMP_TAC std_ss []
-      ,
-      (* vdeps *)
-      DISJ1_TAC >>
-      DISJ2_TAC >>
-      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, cl_vdeps_def] >>
-      RES_TAC >>
-      IMP_RES_TAC cl_fixmmu_Tr_lem >>
-      ASM_REWRITE_TAC [] >>
-      HINT_EXISTS_TAC >>
-      ASM_REWRITE_TAC []
-      ,
-      (* MEM pa *)
-      DISJ2_TAC >>
-      ASM_REWRITE_TAC []
-     ]
-);
+(* val deps_fixmmu_oblg = store_thm("deps_fixmmu_oblg", `` *)
+(* !s VAs f. cl_fixmmu s VAs f /\ cl_vdeps s SUBSET VAs  *)
+(*        /\ VApc s.cs IN VAs /\ (cl_mode s = PRIV) ==> *)
+(*     cl_deps s SUBSET ({f (VApc s.cs)} UNION  *)
+(* 		      {pa | ?va. (pa = f va) /\ va IN cl_vdeps s} UNION  *)
+(*                       {pa | MEM pa IN cl_MDVA s (cl_vdeps s)}) *)
+(* ``, *)
+(*   RW_TAC std_ss [cl_deps_def] >> *)
+(*   FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, pred_setTheory.IN_UNION] >> *)
+(*   REPEAT STRIP_TAC *)
+(*   >| [(* VApc *) *)
+(*       IMP_RES_TAC cl_fixmmu_Tr_lem >> *)
+(*       FULL_SIMP_TAC std_ss [] *)
+(*       , *)
+(*       (* vdeps *) *)
+(*       DISJ1_TAC >> *)
+(*       DISJ2_TAC >> *)
+(*       FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, cl_vdeps_def] >> *)
+(*       RES_TAC >> *)
+(*       IMP_RES_TAC cl_fixmmu_Tr_lem >> *)
+(*       ASM_REWRITE_TAC [] >> *)
+(*       HINT_EXISTS_TAC >> *)
+(*       ASM_REWRITE_TAC [] *)
+(*       , *)
+(*       (* MEM pa *) *)
+(*       DISJ2_TAC >> *)
+(*       ASM_REWRITE_TAC [] *)
+(*      ] *)
+(* ); *)
 
 (********* cacheless computation **********)
 
