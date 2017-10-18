@@ -1837,7 +1837,7 @@ val drvbl_iCoh_mem_lem = store_thm("drvbl_iCoh_mem_lem", ``
      ]
 );
 
-(******** cachelaware computation ********)
+(******** cacheaware computation ********)
 
 val (ca_kcomp_rules, ca_kcomp_ind, ca_kcomp_cases) = Hol_reln `
    (!s. exentry s ==> ca_kcomp s s 0)

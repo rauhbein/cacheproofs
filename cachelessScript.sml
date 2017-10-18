@@ -277,6 +277,117 @@ val cl_trans_mon_lem = store_thm("cl_trans_mon_lem", ``
      ]
 );
 
+(********* abstract cacheless transition **********)
+
+val abs_cl_trans_def = Define `
+   (abs_cl_trans s m [] s' = cl_trans s m NOREQ s' 
+			  \/ ?pa. cl_trans s m (FREQ pa) s')
+/\ (abs_cl_trans s m (d::ds) s' = cl_trans s m (DREQ d) s' /\ (ds = []))
+`;
+
+val abs_cl_distinct_dl_lem = store_thm("abs_cl_distinct_dl_lem", ``
+!s m dl s'. abs_cl_trans s m dl s' ==> ALL_DISTINCT dl
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl` 
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [abs_cl_trans_def] >> (
+          RW_TAC std_ss [listTheory.ALL_DISTINCT]
+      )
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_cl_trans_def] >>
+      RW_TAC std_ss [listTheory.ALL_DISTINCT_SING]
+     ]
+);
+
+val abs_cl_trans_no_dop_oblg = store_thm("abs_cl_trans_no_dop_oblg", ``
+!s m s'. abs_cl_trans s m [] s' ==> 
+    !pa. cl_Cv s' (MEM pa) = cl_Cv s (MEM pa)
+``,
+  RW_TAC std_ss [cl_Cv_def, coreIfTheory.CV_def, cachememTheory.MVcl_def] >>
+  MATCH_MP_TAC cl_trans_not_Dreq_lem >>
+  FULL_SIMP_TAC std_ss [abs_cl_trans_def] >> (
+      METIS_TAC [Dreq_def]
+  )
+);
+ 
+val abs_cl_trans_not_write_oblg = store_thm("abs_cl_trans_not_write_oblg", ``
+!s m dl s' pa. abs_cl_trans s m dl s' /\ pa NOTIN writes dl ==> 
+    (cl_Cv s' (MEM pa) = cl_Cv s (MEM pa))
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl`
+  >| [(* empty *)
+      IMP_RES_TAC abs_cl_trans_no_dop_oblg >>
+      ASM_REWRITE_TAC []
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_cl_trans_def] >>
+      REV_FULL_SIMP_TAC list_ss [] >>
+      IMP_RES_TAC writes_lem >>
+      MATCH_MP_TAC cl_trans_not_write_lem2 >>
+      EXISTS_TAC ``m:mode`` >>
+      EXISTS_TAC ``DREQ h:corereq`` >>
+      RW_TAC std_ss [Wreq_def, Adr_def] >>
+      METIS_TAC []
+     ]
+);
+
+(* dependencies *)
+
+val cl_Tr_def = Define `cl_Tr s va = Tr_ s.cs (MVcl s.M) va`;
+
+val cl_vdeps_def = Define `cl_vdeps s = vdeps_ s.cs`;
+
+val cl_deps_def = Define `cl_deps s = 
+      {cl_Tr s (VApc s.cs)} 
+UNION {pa | ?va. (pa = cl_Tr s va) /\ va IN vdeps_ s.cs} 
+UNION {pa | MEM pa IN cl_MDVA s (cl_vdeps s)}
+`;
+
+val cl_fixmmu_def = Define `cl_fixmmu s VAs f = 
+!va. va IN VAs ==> (cl_Mmu s va PRIV R = SOME (f va, T))
+`;
+
+val cl_fixmmu_Tr_lem = store_thm("cl_fixmmu_Tr_lem", ``
+!s VAs va f. cl_fixmmu s VAs f /\ va IN VAs /\ (cl_mode s = PRIV) ==> 
+    (cl_Tr s va = f va)
+``,
+  RW_TAC std_ss [cl_fixmmu_def, cl_Tr_def, cl_Mmu_def, cl_mode_def,
+		 coreIfTheory.Tr__def]
+);
+
+val deps_fixmmu_oblg = store_thm("deps_fixmmu_oblg", ``
+!s VAs f. cl_fixmmu s VAs f /\ cl_vdeps s SUBSET VAs 
+       /\ VApc s.cs IN VAs /\ (cl_mode s = PRIV) ==>
+    cl_deps s SUBSET ({f (VApc s.cs)} UNION 
+		      {pa | ?va. (pa = f va) /\ va IN cl_vdeps s} UNION 
+                      {pa | MEM pa IN cl_MDVA s (cl_vdeps s)})
+``,
+  RW_TAC std_ss [cl_deps_def] >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, pred_setTheory.IN_UNION] >>
+  REPEAT STRIP_TAC
+  >| [(* VApc *)
+      IMP_RES_TAC cl_fixmmu_Tr_lem >>
+      FULL_SIMP_TAC std_ss []
+      ,
+      (* vdeps *)
+      DISJ1_TAC >>
+      DISJ2_TAC >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, cl_vdeps_def] >>
+      RES_TAC >>
+      IMP_RES_TAC cl_fixmmu_Tr_lem >>
+      ASM_REWRITE_TAC [] >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+      ,
+      (* MEM pa *)
+      DISJ2_TAC >>
+      ASM_REWRITE_TAC []
+     ]
+);
+
 (********* cacheless computation **********)
 
 val (cl_kcomp_rules, cl_kcomp_ind, cl_kcomp_cases) = Hol_reln `

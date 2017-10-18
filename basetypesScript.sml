@@ -283,6 +283,27 @@ val not_NOREQ_lem = store_thm("not_NOREQ_lem", ``
   METIS_TAC [req_cases_lem]
 );
 
+(* dop list *)
+
+val adrs_def = Define `adrs dl = set (MAP PA dl)`;
+
+val writes_def = Define `writes dl = set (MAP PA (FILTER wt dl))`;
+
+val writes_lem = store_thm("writes_lem", ``
+!d pa. pa NOTIN writes [d] ==>  ~(wt d /\ (PA d = pa))
+``,
+  RW_TAC std_ss [writes_def] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_MAP] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_FILTER] >>
+  CCONTR_TAC >>
+  FULL_SIMP_TAC std_ss [GSYM IMP_DISJ_THM] >>
+  PAT_X_ASSUM ``!y. x`` (
+      fn thm => ASSUME_TAC ( SPEC ``d:dop`` thm )
+  ) >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM] 
+);
+
+
 (*********** finish ************)
 
 val _ = export_theory();
