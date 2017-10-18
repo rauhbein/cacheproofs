@@ -15,7 +15,8 @@ val _ = Datatype `cl_state = <|
     M  : mem_state
 |>`;
 
-val cl_MD_def = Define `cl_MD s = MD_ (s.cs, MVcl s.M)`;
+val cl_MD_def = Define `cl_MD s = MD_ (s.cs, MVcl s.M, UNIV:vadr set)`;
+val cl_MDVA_def = Define `cl_MDVA s VAs = MD_ (s.cs, MVcl s.M, VAs)`;
 val cl_Mon_def = Define `cl_Mon s r m ac = Mon_ (s.cs, MVcl s.M, r, m, ac)`;
 val cl_Mmu_def = Define `cl_Mmu s va m ac = Mmu_ (s.cs, MVcl s.M, va, m, ac)`;
 val cl_Cv_def = Define `cl_Cv s r = CV s.cs (MVcl s.M) r`;

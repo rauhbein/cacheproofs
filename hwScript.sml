@@ -11,28 +11,32 @@ val _ = new_theory "hw";
 
 (************ importing interface lemmas **********)
 
+(* core *)
+
 val Mmu_lem = store_thm("Mmu_lem", ``
-!c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	      (!va m ac. Mmu_(c,mv,va,m,ac) = Mmu_(c',mv',va,m,ac))
+!c c' mv mv' VAs. (!r. r IN MD_(c,mv,VAs) ==> (CV c mv r = CV c' mv' r)) ==>
+	          (!va m ac. va IN VAs ==>
+		             (Mmu_(c,mv,va,m,ac) = Mmu_(c',mv',va,m,ac)))
 ``,
   REWRITE_TAC [Mmu_oblg]
 );
 
 val MD__lem = store_thm("MD__lem", ``
-!c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	      (MD_(c,mv) = MD_(c',mv'))
+!c c' mv mv' VAs. (!r. r IN MD_(c,mv,VAs) ==> (CV c mv r = CV c' mv' r)) ==>
+		  (MD_(c,mv,VAs) = MD_(c',mv',VAs))
 ``,
   REWRITE_TAC [MD_oblg]
 );
 
 val MD__reg_lem = store_thm("MD__reg_lem", ``
-!c c' mv mv' r. reg_res r ==> (r IN MD_(c,mv) <=> r IN MD_(c',mv')) 
+!c c' mv mv' VAs. (!r. reg_res r ==> 
+		       (r IN MD_(c,mv,VAs) <=> r IN MD_(c',mv',VAs))) 
 ``,
   REWRITE_TAC [MD_reg_oblg]
 );
 
 val MD__coreg_lem = store_thm("MD__coreg_lem", ``
-!c c' mv mv' r. reg_res r /\ r IN MD_(c,mv) /\ (c.coreg = c'.coreg) ==> 
+!c c' mv mv' r VAs. reg_res r /\ r IN MD_(c,mv,VAs) /\ (c.coreg = c'.coreg) ==> 
     (CV c mv r = CV c' mv' r) 
 ``,
   REWRITE_TAC [MD_coreg_oblg]
@@ -52,26 +56,34 @@ val Mon__reg_lem = store_thm("Mon__reg_lem", ``
 );
 
 val core_req_user_MD_reg_lem = store_thm("core_req_user_MD_reg_lem", ``
-!c mv req r c'. reg_res r /\ r IN MD_ (c,mv) 
-	     /\ core_req (c,USER,mv,req,c') ==>
+!c mv req r c' VAs. reg_res r /\ r IN MD_ (c,mv,VAs) 
+	         /\ core_req (c,USER,mv,req,c') ==>
     (CV c mv r = CV c' mv r)
 ``,
   REWRITE_TAC [core_req_user_MD_reg_oblg]
 );
 
 val core_rcv_user_MD_reg_lem = store_thm("core_rcv_user_MD_reg_lem", ``
-!c w mv r c'. reg_res r /\ r IN MD_ (c,mv) 
-	   /\ core_rcv (c,USER,w,c') ==>
+!c w mv r c' VAs. reg_res r /\ r IN MD_ (c,mv,VAs) 
+	       /\ core_rcv (c,USER,w,c') ==>
     (CV c mv r = CV c' mv r)
 ``,
   REWRITE_TAC [core_rcv_user_MD_reg_oblg]
 );
 
-val core_req_mmu_lem = store_thm("core_req_mmu_lem", ``
-!c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
-    ?va. Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req)
+val core_req_mmu_Freq_lem = store_thm("core_req_mmu_Freq_lem", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ Freq req ==> 
+    (Mmu_(c,mv,VApc c,M,EX) = SOME (Adr req, T))
 ``,
-  REWRITE_TAC [core_req_mmu_oblg]
+  REWRITE_TAC [core_req_mmu_Freq_oblg]
+);
+
+val core_req_mmu_Dreq_lem = store_thm("core_req_mmu_Dreq_lem", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ Dreq req ==> 
+    ?va. va IN vdeps_ c 
+      /\ (Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req))
+``,
+  REWRITE_TAC [core_req_mmu_Dreq_oblg]
 );
 
 val core_req_exentry_lem = store_thm("core_req_exentry_lem", ``
@@ -95,11 +107,11 @@ val core_rcv_mode_lem = store_thm("core_rcv_mode_lem", ``
 );
 
 val core_req_MD_mv_lem = store_thm("core_req_MD_mv_lem", ``
-!c mv mv' req c'. core_req (c,Mode c,mv,req,c') 
-	       /\ (!va. Mmu_(c, mv, va, Mode c, Acc req) = 
-		        Mmu_(c, mv', va, Mode c, Acc req))
+!c mv mv' req c'. 
+    (!pa. MEM pa IN MD_(c,mv,vdeps_ c) ==> 
+	  (CV c mv (MEM pa) = CV c mv' (MEM pa)))
         ==> 
-    core_req(c,Mode c,mv',req,c')
+    (core_req(c,Mode c,mv,req,c') <=> core_req(c,Mode c,mv',req,c'))
 ``,
   REWRITE_TAC [core_req_MD_mv_oblg]
 );
@@ -115,6 +127,8 @@ val core_rcv_user_coreg_lem = store_thm("core_rcv_user_coreg_lem", ``
 ``,
   REWRITE_TAC [core_rcv_user_coreg_oblg]
 );
+
+(* memory system *)
 
 val msca_DREQ_unchanged_lem = store_thm("msca_DREQ_unchanged_lem", ``
 !ms pa ms'. (ms' = msca_trans ms (DREQ pa)) 
@@ -532,12 +546,34 @@ val imv_preserve_lem = store_thm("imv_preserve_lem", ``
 
 (******* some derived lemmas *******)
 
+val core_req_mmu_lem = store_thm("core_req_mmu_lem", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
+    ?va. Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC not_NOREQ_lem
+  >| [(* Dreq *)
+      IMP_RES_TAC core_req_mmu_Dreq_lem >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+      ,
+      (* Freq *)
+      IMP_RES_TAC core_req_mmu_Freq_lem >>
+      IMP_RES_TAC Freq_lem >>
+      RW_TAC std_ss [Acc_def, CAreq_def] >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+     ]      
+);
+
 val Mon__lem = store_thm("Mon__lem", ``
-!c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	      (!r m ac. Mon_(c,mv,r,m,ac) <=> Mon_(c',mv',r,m,ac))
+!c c' mv mv'. (!r. r IN MD_(c,mv,UNIV:vadr set) ==> (CV c mv r = CV c' mv' r))
+                  ==>
+              (!r m ac. Mon_(c,mv,r,m,ac) <=> Mon_(c',mv',r,m,ac))
 ``,
   REPEAT STRIP_TAC >>
   IMP_RES_TAC Mmu_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNIV] >>
   Cases_on `reg_res r`
   >| [(* register resource *)
       METIS_TAC [Mon__reg_lem] 
@@ -565,7 +601,8 @@ val _ = Datatype `hw_state = <|
     ms  : memsys_state
 |>`;
 
-val MD_def = Define `MD s = MD_ (s.cs, dmvca s.ms)`;
+val MD_def = Define `MD s = MD_ (s.cs, dmvca s.ms, UNIV:vadr set)`;
+val MDVA_def = Define `MDVA s VAs = MD_ (s.cs, dmvca s.ms, VAs)`;
 val Mon_def = Define `Mon s r m ac = Mon_ (s.cs, dmvca s.ms, r, m, ac)`;
 val Mmu_def = Define `Mmu s va m ac = Mmu_ (s.cs, dmvca s.ms, va, m, ac)`;
 val Cv_def = Define `Cv s r = CV s.cs (dmvca s.ms) r`;
@@ -578,6 +615,12 @@ val Mon_lem = store_thm("Mon_lem", ``
 ``,
   RW_TAC std_ss [MD_def, Mon_def, Cv_def] >>
   RW_TAC std_ss [Mon__lem]
+);
+
+val MD_lem = store_thm("MD_lem", ``
+!s s'. (!r. r IN MD s ==> (Cv s r = Cv s' r)) ==> (MD s = MD s')
+``,
+  RW_TAC std_ss [MD_def, Cv_def, MD__lem]
 );
 
 val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
@@ -610,13 +653,6 @@ val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
     ==>
     hw_trans s M NOREQ s')
 `;
-
-val MD_lem = store_thm("MD_lem", ``
-!s s'. (!r. r IN MD s ==> (Cv s r = Cv s' r)) ==> (MD s = MD s')
-``,
-  RW_TAC std_ss [MD_def, Cv_def, MD__lem]
-);
-
 
 (* hw_trans lemmas *)
 
@@ -987,7 +1023,7 @@ val hw_trans_user_MD_lem = store_thm("hw_trans_user_MD_lem", ``
       `CV cs' (dmvca s.ms) r = CV cs' (dmvca s'.ms) r` by (
           FULL_SIMP_TAC std_ss [CV_reg_lem]
       ) >>
-      `r IN MD_ (cs',dmvca s'.ms)` by (
+      `r IN MD_ (cs',dmvca s'.ms, UNIV:vadr set)` by (
           IMP_RES_TAC MD__reg_lem >>
 	  FULL_SIMP_TAC std_ss []
       ) >>
@@ -1002,7 +1038,7 @@ val hw_trans_user_MD_lem = store_thm("hw_trans_user_MD_lem", ``
           `CV cs' (dmvca s.ms) r = CV cs' (dmvca s'.ms) r` by (
               FULL_SIMP_TAC std_ss [CV_reg_lem]
 	  ) >>
-          `r IN MD_ (cs',dmvca s'.ms)` by (
+          `r IN MD_ (cs',dmvca s'.ms, UNIV:vadr set)` by (
               IMP_RES_TAC MD__reg_lem >>
 	      FULL_SIMP_TAC std_ss []
 	  ) >>

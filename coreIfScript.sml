@@ -37,6 +37,8 @@ val res_cases = store_thm("res_cases", ``
   )
 );
 
+val VApc = Define `VApc c = VADR ((31><2) (c.reg PC) :bool[30])`;
+
 val CV_def = Define `
    (CV c (mv:mem_view) (REG r) = c.reg r)
 /\ (CV c mv (COREG r) = c.coreg r)
@@ -65,22 +67,25 @@ val Pc_def = Define `Pc c = c.reg PC`;
 
 val Mmu_MD_exists = prove (``
 ?(Mmu:core_state # mem_view # vadr # mode # acc -> (padr # bool) option) 
- (MD:core_state # mem_view -> resource set).
-!c c' mv mv'. ((!r. r IN MD(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	       (MD(c,mv) = MD(c',mv')) /\	
-	       (!va m ac. Mmu(c,mv,va,m,ac) = Mmu(c',mv',va,m,ac)))
-           /\ (!r. reg_res r ==> (r IN MD(c,mv) <=> r IN MD(c',mv'))) 
-           /\ (!r. reg_res r /\ r IN MD(c,mv) ==> ?r'. r = COREG r')
+ (MD:core_state # mem_view # vadr set -> resource set).
+!c c' mv mv' VAs. ((!r. r IN MD(c,mv,VAs) ==> (CV c mv r = CV c' mv' r)) ==>
+	       (MD(c,mv,VAs) = MD(c',mv',VAs)) /\	
+	       (!va m ac. va IN VAs ==>
+		          (Mmu(c,mv,va,m,ac) = Mmu(c',mv',va,m,ac))))
+           /\ (!r. reg_res r ==> (r IN MD(c,mv,VAs) <=> r IN MD(c',mv',VAs))) 
+           /\ (!r. reg_res r /\ r IN MD(c,mv,VAs) ==> ?r'. r = COREG r')
 ``,
   EXISTS_TAC ``\(c,mv,va,m,ac):core_state # mem_view # vadr # mode # acc.
 		NONE:(padr # bool) option`` >>
-  EXISTS_TAC ``\ (c,mv):core_state # mem_view. EMPTY:resource set`` >>
+  EXISTS_TAC ``\(c,mv):core_state # mem_view # vadr set. EMPTY:resource set`` >>
   RW_TAC std_ss [] >>
   FULL_SIMP_TAC std_ss [pred_setTheory.NOT_IN_EMPTY]
 );  
 
 val Mmu_MD_spec = new_specification ("Mmu_MD_spec",
   ["Mmu_", "MD_"], Mmu_MD_exists);
+
+val Tr__def = Define `Tr_ c mv va = FST(THE(Mmu_(c,mv,va,Mode c,R)))`;
 
 val dummyMon_def = Define `
    (dummyMon (c,mv, MEM pa ,m,ac) = ?va ca. Mmu_(c,mv,va,m,ac) = SOME (pa,ca))
@@ -91,7 +96,7 @@ val Mon_exists = prove (``
 ?(Mon:core_state # mem_view # resource # mode # acc -> bool).
 !c mv ac. 
    (!pa m. (?va ca. Mmu_(c,mv,va,m,ac) = SOME(pa,ca)) <=> Mon(c,mv,MEM pa,m,ac))
-/\ (!r. reg_res r /\ r IN MD_ (c,mv) ==> ~Mon(c,mv,r,USER,ac))
+/\ (!r VAs. reg_res r /\ r IN MD_ (c,mv,VAs) ==> ~Mon(c,mv,r,USER,ac))
 /\ (!r c' mv' m. reg_res r ==> (Mon(c,mv,r,m,ac) = Mon(c',mv',r,m,ac)))
 ``,
   EXISTS_TAC ``dummyMon`` >>
@@ -122,6 +127,30 @@ val exentry_spec = new_specification ("exentry_spec",
 
 (***** transition relations *****)
 
+(* touched va, depending on core registers here, as fetch separate 
+   otherwise: need that it is self-contained wrt. translated mem
+	    + depending on registers *)
+
+new_constant("vdeps_", ``:core_state -> vadr set``);
+
+(* physical address dependencies, not actually needed here *)
+
+val deps_exists = store_thm("deps_exists", ``
+?deps. 
+!c mv. deps c mv SUBSET ({Tr_ c mv (VApc c)} UNION 
+                         {Tr_ c mv va | va IN vdeps_ c} UNION 
+                         {pa | MEM pa IN MD_(c,mv,vdeps_ c)})
+ /\ (!mv'. (!pa. pa IN deps c mv ==> (CV c mv (MEM pa) = CV c mv' (MEM pa)))
+         ==>
+ 	      (deps c mv = deps c mv'))
+``,
+  EXISTS_TAC ``\c:core_state mv:mem_view. EMPTY :padr set`` >>
+  RW_TAC std_ss [pred_setTheory.EMPTY_SUBSET]
+);
+
+val deps_spec = new_specification ("deps_spec",
+  ["deps_"], deps_exists);
+
 (* requesting transition *)
 
 val core_mode_po = Define `core_mode_po trans = 
@@ -136,8 +165,10 @@ val core_exentry_po = Define `core_exentry_po trans =
 
 (* mem request -> Mon obeyed *)
 val core_Mon_mem_po = Define `core_Mon_mem_po trans = 
-!c M mv req c'. trans (c,M,mv,req,c') /\ (req <> NOREQ) ==> 
-    (?va. Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req))
+!c M mv req c'. trans (c,M,mv,req,c') ==>
+    (Dreq req ==> (?va. va IN vdeps_ c /\ 
+		  (Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req))))
+ /\ (Freq req ==> (Mmu_(c,mv,VApc c,M,EX) = SOME (Adr req, T)))
 `;
 
 (* reg unchanged if no Mon permission *)
@@ -146,17 +177,13 @@ val core_Mon_reg_po = Define `core_Mon_reg_po trans =
     (CV c mv r = CV c' mv r)
 `;
 
-(* corereq only depending on MD in memview 
-NOTE: too strong for kernel mode, should only depend on current MMU setting
-*)
-(* val core_MD_mv_po = Define `core_MD_mv_po trans =  *)
-(* !c M mv mv' req c'. (!r. r IN MD_ (c,mv) ==> (CV c mv r = CV c mv' r)) ==> *)
-(*     (trans (c,M,mv,req,c') <=> trans (c,M,mv',req,c')) *)
-(* `; *)
+(* corereq only depending on deps *)
 val core_MD_mv_po = Define `core_MD_mv_po trans = 
-!c mv mv' req c'. (!va. Mmu_(c, mv, va, Mode c, Acc req) = 
-		        Mmu_(c, mv', va, Mode c, Acc req)) ==>
-    (trans (c,Mode c,mv,req,c') <=> trans (c,Mode c,mv',req,c'))
+!c mv mv' req c'. 
+    (!pa. MEM pa IN MD_(c,mv,vdeps_ c) ==> 
+	  (CV c mv (MEM pa) = CV c mv' (MEM pa)))
+            ==>
+        (trans (c,Mode c,mv,req,c') <=> trans (c,Mode c,mv',req,c'))
 `;
 
 (* user transitions do not modify coregs *)
@@ -188,7 +215,7 @@ val core_req_exists = prove (``
       FULL_SIMP_TAC std_ss [mode_distinct]
       ,
       (* memory monitor *)
-      RW_TAC std_ss [core_Mon_mem_po, dummy_cr_def]
+      RW_TAC std_ss [core_Mon_mem_po, dummy_cr_def, Dreq_def, Freq_def]
       ,
       (* reg monitor *)
       RW_TAC std_ss [core_Mon_reg_po, dummy_cr_def]
@@ -251,27 +278,29 @@ val core_rcv_spec = new_specification ("core_rcv_spec",
 (* Proof obligations on components, exported to main theory *)
 
 val Mmu_oblg = store_thm("Mmu_oblg", ``
-!c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	      (!va m ac. Mmu_(c,mv,va,m,ac) = Mmu_(c',mv',va,m,ac))
+!c c' mv mv' VAs. (!r. r IN MD_(c,mv,VAs) ==> (CV c mv r = CV c' mv' r)) ==>
+	          (!va m ac. va IN VAs ==>
+		             (Mmu_(c,mv,va,m,ac) = Mmu_(c',mv',va,m,ac)))
 ``,
   METIS_TAC [Mmu_MD_spec]
 );
 
 val MD_oblg = store_thm("MD_oblg", ``
-!c c' mv mv'. (!r. r IN MD_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	      (MD_(c,mv) = MD_(c',mv'))
+!c c' mv mv' VAs. (!r. r IN MD_(c,mv,VAs) ==> (CV c mv r = CV c' mv' r)) ==>
+		  (MD_(c,mv,VAs) = MD_(c',mv',VAs))
 ``,
   METIS_TAC [Mmu_MD_spec]
 );
 
 val MD_reg_oblg = store_thm("MD_reg_oblg", ``
-!c c' mv mv' r. reg_res r ==> (r IN MD_(c,mv) <=> r IN MD_(c',mv')) 
+!c c' mv mv' VAs. (!r. reg_res r ==> 
+		       (r IN MD_(c,mv,VAs) <=> r IN MD_(c',mv',VAs))) 
 ``,
   METIS_TAC [Mmu_MD_spec]
 );
 
 val MD_coreg_oblg = store_thm("MD_coreg_oblg", ``
-!c c' mv mv' r. reg_res r /\ r IN MD_(c,mv) /\ (c.coreg = c'.coreg) ==> 
+!c c' mv mv' r VAs. reg_res r /\ r IN MD_(c,mv,VAs) /\ (c.coreg = c'.coreg) ==> 
     (CV c mv r = CV c' mv' r) 
 ``,
   REPEAT STRIP_TAC >>
@@ -293,8 +322,8 @@ val Mon_reg_oblg = store_thm("Mon_reg_oblg", ``
 );
 
 val core_req_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
-!c mv req r c'. reg_res r /\ r IN MD_ (c,mv) 
-	     /\ core_req (c,USER,mv,req,c') ==>
+!c mv req r c' VAs. reg_res r /\ r IN MD_ (c,mv,VAs) 
+	         /\ core_req (c,USER,mv,req,c') ==>
     (CV c mv r = CV c' mv r)
 ``,
   REPEAT STRIP_TAC >>
@@ -305,8 +334,8 @@ val core_req_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
 );
 
 val core_rcv_user_MD_reg_oblg = store_thm("core_rcv_user_MD_reg_oblg", ``
-!c w mv r c'. reg_res r /\ r IN MD_ (c,mv) 
-	   /\ core_rcv (c,USER,w,c') ==>
+!c w mv r c' VAs. reg_res r /\ r IN MD_ (c,mv,VAs) 
+	       /\ core_rcv (c,USER,w,c') ==>
     (CV c mv r = CV c' mv r)
 ``,
   REPEAT STRIP_TAC >>
@@ -316,9 +345,20 @@ val core_rcv_user_MD_reg_oblg = store_thm("core_rcv_user_MD_reg_oblg", ``
   IMP_RES_TAC rcv_Mon_reg_po
 );
 
-val core_req_mmu_oblg = store_thm("core_req_mmu_oblg", ``
-!c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> 
-    ?va. Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req)
+val core_req_mmu_Freq_oblg = store_thm("core_req_mmu_Freq_oblg", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ Freq req ==> 
+    (Mmu_(c,mv,VApc c,M,EX) = SOME (Adr req, T))
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_Mon_mem_po
+);
+
+val core_req_mmu_Dreq_oblg = store_thm("core_req_mmu_Dreq_oblg", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ Dreq req ==> 
+    ?va. va IN vdeps_ c 
+      /\ (Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req))
 ``,
   REPEAT STRIP_TAC >>
   ASSUME_TAC core_req_spec >>
@@ -359,16 +399,17 @@ val core_rcv_mode_oblg = store_thm("core_rcv_mode_oblg", ``
 );
 
 val core_req_MD_mv_oblg = store_thm("core_req_MD_mv_oblg", ``
-!c mv mv' req c'. core_req (c,Mode c,mv,req,c') 
-	       /\ (!va. Mmu_(c, mv, va, Mode c, Acc req) = 
-		        Mmu_(c, mv', va, Mode c, Acc req))
+!c mv mv' req c'. 
+    (!pa. MEM pa IN MD_(c,mv,vdeps_ c) ==> 
+	  (CV c mv (MEM pa) = CV c mv' (MEM pa)))
         ==> 
-    core_req(c,Mode c,mv',req,c')
+    (core_req(c,Mode c,mv,req,c') <=> core_req(c,Mode c,mv',req,c'))
 ``,
   REPEAT STRIP_TAC >>
   ASSUME_TAC core_req_spec >>
   FULL_SIMP_TAC std_ss [] >>
-  IMP_RES_TAC core_MD_mv_po  
+  IMP_RES_TAC core_MD_mv_po >>
+  RW_TAC std_ss []
 );
 
 val core_req_user_coreg_oblg = store_thm("core_req_user_coreg_oblg", ``
