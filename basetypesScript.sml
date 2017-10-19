@@ -303,6 +303,19 @@ val writes_lem = store_thm("writes_lem", ``
   FULL_SIMP_TAC std_ss [listTheory.MEM] 
 );
 
+val reads_def = Define `reads dl = set (MAP PA (FILTER rd dl))`;
+
+val reads_lem = store_thm("reads_lem", ``
+!d pa. pa IN reads [d] ==>  rd d /\ (PA d = pa)
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [reads_def] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_MAP] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_FILTER] >>
+  IMP_RES_TAC rd_lem >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM] 
+);
 
 (*********** finish ************)
 

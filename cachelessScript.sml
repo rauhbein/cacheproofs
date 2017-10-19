@@ -353,15 +353,35 @@ val cl_deps_pc_oblg = store_thm("cl_deps_pc_oblg", ``
   REWRITE_TAC [coreIfTheory.vdeps_spec]
 );
 
+(* val cl_deps_vdeps_oblg = store_thm("cl_deps_vdeps_oblg", `` *)
+(* !s va. va IN cl_vdeps s ==> cl_Tr s va IN cl_deps s *)
+(* ``, *)
+(*   RW_TAC std_ss [cl_Tr_def, cl_deps_def, cl_vdeps_def, coreIfTheory.deps__def] >> *)
+(*   REWRITE_TAC [pred_setTheory.IN_UNION] >> *)
+(*   DISJ1_TAC >> *)
+(*   RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >> *)
+(*   HINT_EXISTS_TAC >> *)
+(*   ASM_REWRITE_TAC [] *)
+(* ); *)
+
 val cl_deps_vdeps_oblg = store_thm("cl_deps_vdeps_oblg", ``
-!s va. va IN cl_vdeps s ==> cl_Tr s va IN cl_deps s
+!s. cl_deps s SUBSET ({pa | ?va. (pa = cl_Tr s va) /\ va IN cl_vdeps s} UNION
+                      {pa | MEM pa IN cl_MDVA s (cl_vdeps s)})
 ``,
-  RW_TAC std_ss [cl_Tr_def, cl_deps_def, cl_vdeps_def, coreIfTheory.deps__def] >>
-  REWRITE_TAC [pred_setTheory.IN_UNION] >>
-  DISJ1_TAC >>
-  RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
-  HINT_EXISTS_TAC >>
-  ASM_REWRITE_TAC []
+  RW_TAC std_ss [cl_deps_def, coreIfTheory.deps__def] >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, pred_setTheory.IN_UNION] >>
+  REPEAT STRIP_TAC
+  >| [(* vdeps *)
+      DISJ1_TAC >>
+      RW_TAC std_ss [cl_vdeps_def, cl_Tr_def] >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+      ,
+      (* MEM pa *)
+      DISJ2_TAC >>
+      RW_TAC std_ss [cl_vdeps_def, cl_MDVA_def]
+     ]
 );
 
 val cl_deps_MD_oblg = store_thm("cl_deps_MD_oblg", ``
@@ -374,11 +394,41 @@ val cl_deps_MD_oblg = store_thm("cl_deps_MD_oblg", ``
   RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
 );
 
+val cl_deps_reads_oblg = store_thm("cl_deps_MD_oblg", ``
+!s m dl s' pa. abs_cl_trans s m dl s' /\ pa IN reads dl ==> pa IN cl_deps s
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl` 
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [reads_def, listTheory.FILTER, listTheory.MAP, 
+			    listTheory.MEM]
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_cl_trans_def] >>
+      REV_FULL_SIMP_TAC list_ss [] >>
+      IMP_RES_TAC reads_lem >>
+      IMP_RES_TAC cl_trans_mode_lem >>
+      IMP_RES_TAC cl_trans_core_req_lem >>
+      `Dreq (DREQ h)` by ( FULL_SIMP_TAC std_ss [Dreq_def] ) >>
+      IMP_RES_TAC core_req_mmu_Dreq_lem >>
+      RW_TAC std_ss [cl_deps_def, coreIfTheory.deps__def, 
+		     pred_setTheory.IN_UNION] >>
+      DISJ1_TAC >>
+      `~wt h` by ( FULL_SIMP_TAC std_ss [not_wt_lem] ) >>
+      FULL_SIMP_TAC std_ss [Acc_def] >>
+      RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, coreIfTheory.Tr__def] >>
+      HINT_EXISTS_TAC >>
+      RW_TAC std_ss [Adr_def]
+     ]
+);
+
+(* fix translation for privileged mode *)
+
 val cl_fixmmu_def = Define `cl_fixmmu s VAs f = 
 !va. va IN VAs ==> (cl_Mmu s va PRIV R = SOME (f va, T))
 `;
 
-val cl_fixmmu_Tr_lem = store_thm("cl_fixmmu_Tr_lem", ``
+val cl_fixmmu_Tr_oblg = store_thm("cl_fixmmu_Tr_oblg", ``
 !s VAs va f. cl_fixmmu s VAs f /\ va IN VAs /\ (cl_mode s = PRIV) ==> 
     (cl_Tr s va = f va)
 ``,
@@ -386,35 +436,6 @@ val cl_fixmmu_Tr_lem = store_thm("cl_fixmmu_Tr_lem", ``
 		 coreIfTheory.Tr__def]
 );
 
-(* val deps_fixmmu_oblg = store_thm("deps_fixmmu_oblg", `` *)
-(* !s VAs f. cl_fixmmu s VAs f /\ cl_vdeps s SUBSET VAs  *)
-(*        /\ VApc s.cs IN VAs /\ (cl_mode s = PRIV) ==> *)
-(*     cl_deps s SUBSET ({f (VApc s.cs)} UNION  *)
-(* 		      {pa | ?va. (pa = f va) /\ va IN cl_vdeps s} UNION  *)
-(*                       {pa | MEM pa IN cl_MDVA s (cl_vdeps s)}) *)
-(* ``, *)
-(*   RW_TAC std_ss [cl_deps_def] >> *)
-(*   FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, pred_setTheory.IN_UNION] >> *)
-(*   REPEAT STRIP_TAC *)
-(*   >| [(* VApc *) *)
-(*       IMP_RES_TAC cl_fixmmu_Tr_lem >> *)
-(*       FULL_SIMP_TAC std_ss [] *)
-(*       , *)
-(*       (* vdeps *) *)
-(*       DISJ1_TAC >> *)
-(*       DISJ2_TAC >> *)
-(*       FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, cl_vdeps_def] >> *)
-(*       RES_TAC >> *)
-(*       IMP_RES_TAC cl_fixmmu_Tr_lem >> *)
-(*       ASM_REWRITE_TAC [] >> *)
-(*       HINT_EXISTS_TAC >> *)
-(*       ASM_REWRITE_TAC [] *)
-(*       , *)
-(*       (* MEM pa *) *)
-(*       DISJ2_TAC >> *)
-(*       ASM_REWRITE_TAC [] *)
-(*      ] *)
-(* ); *)
 
 (********* cacheless computation **********)
 
