@@ -111,6 +111,17 @@ val Inv_lem = store_thm("Inv_lem", ``
   REWRITE_TAC [Inv_oblg]
 ); 
 
+val abs_ca_trans_drvbl_lem = store_thm("abs_ca_trans_drvbl_lem", ``
+!s m dl s' pa. abs_ca_trans s USER dl s' ==> drvbl s s'
+``,
+  REWRITE_TAC [abs_ca_trans_drvbl_oblg]
+);
+
+val abs_ca_trans_switch_lem = store_thm("abs_ca_trans_switch_lem", ``
+!s dl s'. abs_ca_trans s USER dl s' ∧ (mode s' = PRIV) ⇒ exentry s'
+``,
+  REWRITE_TAC [abs_ca_trans_switch_oblg]
+);
 
 (******** top level proof ********)
 
@@ -216,12 +227,12 @@ val Inv_Ifun_lem = store_thm("Inv_Ifun_lem", ``
 !s s' req Icoh Icode Icm. 
     cm_user_po Icoh Icode Icm
  /\ Inv Icoh Icode Icm s
- /\ hw_trans s USER req s' 
+ /\ abs_ca_trans s USER req s' 
         ==> 
     Ifun s' 
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC drvbl_lem >>
+  IMP_RES_TAC abs_ca_trans_drvbl_lem >>
   IMP_RES_TAC Inv_CR_unchanged_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
   IMP_RES_TAC Ifun_CR_lem
@@ -231,12 +242,12 @@ val Inv_Icoh_lem = store_thm("Inv_Icoh_lem", ``
 !s s' req Icoh Icode Icm. 
     cm_user_po Icoh Icode Icm
  /\ Inv Icoh Icode Icm s
- /\ hw_trans s USER req s' 
+ /\ abs_ca_trans s USER req s' 
         ==> 
     Icoh s' 
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC drvbl_lem >>
+  IMP_RES_TAC abs_ca_trans_drvbl_lem >>
   IMP_RES_TAC Inv_CR_unchanged_lem >>
   IMP_RES_TAC Inv_Coh_CR_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
@@ -333,10 +344,12 @@ val Inv_Icode_lem = store_thm("Inv_Icode_lem", ``
 !s s' req Icoh Icode Icm. 
     cm_user_po Icoh Icode Icm
  /\ Inv Icoh Icode Icm s
- /\ hw_trans s USER req s' ==> Icode s' 
+ /\ abs_ca_trans s USER req s' 
+        ==> 
+    Icode s' 
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC drvbl_lem >>
+  IMP_RES_TAC abs_ca_trans_drvbl_lem >>
   IMP_RES_TAC Inv_CR_unchanged_lem >>
   IMP_RES_TAC Inv_iCoh_lem >>
   IMP_RES_TAC Inv_isafe_lem >>
@@ -352,12 +365,12 @@ val Inv_Icm_lem = store_thm("Inv_Icm_lem", ``
 !s s' req Icoh Icode Icm. 
     cm_user_po Icoh Icode Icm
  /\ Inv Icoh Icode Icm s
- /\ hw_trans s USER req s' 
+ /\ abs_ca_trans s USER req s' 
         ==> 
     Icm s' 
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC drvbl_lem >>
+  IMP_RES_TAC abs_ca_trans_drvbl_lem >>
   IMP_RES_TAC Icm_lem
 );
 
@@ -365,7 +378,7 @@ val Inv_user_preserved_lem = store_thm("Inv_user_preserved_lem", ``
 !s s' req Icoh Icode Icm. 
     cm_user_po Icoh Icode Icm
  /\ Inv Icoh Icode Icm s
- /\ hw_trans s USER req s' 
+ /\ abs_ca_trans s USER req s' 
         ==> 
     Inv Icoh Icode Icm s'
 ``,
@@ -383,7 +396,7 @@ val Inv_user_preserved_thm = store_thm("Inv_user_preserved_thm", ``
 !s s' req Icoh Icode Icm. 
     cm_user_po Icoh Icode Icm
  /\ Inv Icoh Icode Icm s
- /\ hw_trans s USER req s' 
+ /\ abs_ca_trans s USER req s' 
         ==> 
     Inv Icoh Icode Icm s'
  /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))
@@ -392,9 +405,9 @@ val Inv_user_preserved_thm = store_thm("Inv_user_preserved_thm", ``
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
-  IMP_RES_TAC drvbl_lem >>
+  IMP_RES_TAC abs_ca_trans_drvbl_lem >>
   IMP_RES_TAC Inv_CR_unchanged_lem >>
-  IMP_RES_TAC hw_trans_switch_lem >>
+  IMP_RES_TAC abs_ca_trans_switch_lem >>
   RW_TAC std_ss [] >- ( IMP_RES_TAC Inv_user_preserved_lem ) >>
   MATCH_MP_TAC drvbl_iCoh_mem_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
@@ -531,7 +544,7 @@ val Inv_AC_user_preserved_thm = store_thm("Inv_AC_user_preserved_thm", ``
 !s s' req. 
     Inv Icoh_AC Icode_AC Icm_AC s
  /\ Ifun_AC_po
- /\ hw_trans s USER req s' 
+ /\ abs_ca_trans s USER req s' 
         ==> 
     Inv Icoh_AC Icode_AC Icm_AC s'
  /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))

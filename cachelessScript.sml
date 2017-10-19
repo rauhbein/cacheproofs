@@ -334,6 +334,16 @@ val abs_cl_trans_not_write_oblg = store_thm("abs_cl_trans_not_write_oblg", ``
      ]
 );
 
+val abs_cl_trans_not_adrs_oblg = store_thm("abs_cl_trans_adrs_write_oblg", ``
+!s m dl s' pa. abs_cl_trans s m dl s' /\ pa NOTIN adrs dl ==> 
+    (cl_Cv s' (MEM pa) = cl_Cv s (MEM pa))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC not_adrs_not_writes_lem >>
+  IMP_RES_TAC abs_cl_trans_not_write_oblg
+);
+
+
 (* dependencies *)
 
 val cl_Tr_def = Define `cl_Tr s va = Tr_ s.cs (MVcl s.M) va`;
@@ -352,17 +362,6 @@ val cl_deps_pc_oblg = store_thm("cl_deps_pc_oblg", ``
   EXISTS_TAC ``VApc s.cs`` >>
   REWRITE_TAC [coreIfTheory.vdeps_spec]
 );
-
-(* val cl_deps_vdeps_oblg = store_thm("cl_deps_vdeps_oblg", `` *)
-(* !s va. va IN cl_vdeps s ==> cl_Tr s va IN cl_deps s *)
-(* ``, *)
-(*   RW_TAC std_ss [cl_Tr_def, cl_deps_def, cl_vdeps_def, coreIfTheory.deps__def] >> *)
-(*   REWRITE_TAC [pred_setTheory.IN_UNION] >> *)
-(*   DISJ1_TAC >> *)
-(*   RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >> *)
-(*   HINT_EXISTS_TAC >> *)
-(*   ASM_REWRITE_TAC [] *)
-(* ); *)
 
 val cl_deps_vdeps_oblg = store_thm("cl_deps_vdeps_oblg", ``
 !s. cl_deps s SUBSET ({pa | ?va. (pa = cl_Tr s va) /\ va IN cl_vdeps s} UNION
@@ -441,7 +440,7 @@ val cl_fixmmu_Tr_oblg = store_thm("cl_fixmmu_Tr_oblg", ``
 
 val (cl_kcomp_rules, cl_kcomp_ind, cl_kcomp_cases) = Hol_reln `
    (!s. cl_exentry s ==> cl_kcomp s s 0)
-/\ (!s s' s'' n. cl_kcomp s s' n /\ (?req. cl_trans s' PRIV req s'')
+/\ (!s s' s'' n. cl_kcomp s s' n /\ (?dl. abs_cl_trans s' PRIV dl s'')
         ==>
     cl_kcomp s s'' (SUC n))
 `;

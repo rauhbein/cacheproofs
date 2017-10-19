@@ -318,6 +318,15 @@ val Mon_reg_oblg = store_thm("Mon_reg_oblg", ``
   METIS_TAC [Mon_spec]
 );
 
+val core_req_curr_mode_oblg = store_thm("core_req_curr_mode_oblg", ``
+!c M mv req c'. core_req (c,M,mv,req,c') ==> (Mode c = M)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_mode_po
+);
+
 val core_req_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
 !c mv req r c' VAs. reg_res r /\ r IN MD_ (c,mv,VAs) 
 	         /\ core_req (c,USER,mv,req,c') ==>

@@ -55,6 +55,12 @@ val Mon__reg_lem = store_thm("Mon__reg_lem", ``
   REWRITE_TAC [Mon_reg_oblg]
 );
 
+val core_req_curr_mode_lem = store_thm("core_curr_req_mode_lem", ``
+!c M mv req c'. core_req (c,M,mv,req,c') ==> (Mode c = M)
+``,
+  REWRITE_TAC [core_req_curr_mode_oblg] 
+);
+
 val core_req_user_MD_reg_lem = store_thm("core_req_user_MD_reg_lem", ``
 !c mv req r c' VAs. reg_res r /\ r IN MD_ (c,mv,VAs) 
 	         /\ core_req (c,USER,mv,req,c') ==>
@@ -131,7 +137,7 @@ val core_rcv_user_coreg_lem = store_thm("core_rcv_user_coreg_lem", ``
 (* memory system *)
 
 val msca_DREQ_unchanged_lem = store_thm("msca_DREQ_unchanged_lem", ``
-!ms pa ms'. (ms' = msca_trans ms (DREQ pa)) 
+!ms dop ms'. (ms' = msca_trans ms (DREQ dop)) 
     ==>
 (!pa. iw ms' pa = iw ms pa)
 ``,
@@ -1837,11 +1843,227 @@ val drvbl_iCoh_mem_lem = store_thm("drvbl_iCoh_mem_lem", ``
      ]
 );
 
+(******** abstract cache-aware model ********)
+
+val abs_ca_trans_def = Define `
+   (abs_ca_trans s m [] s' = hw_trans s m NOREQ s' 
+			  \/ ?pa. hw_trans s m (FREQ pa) s')
+/\ (abs_ca_trans s m (d::ds) s' = hw_trans s m (DREQ d) s' /\ (ds = []))
+`;
+
+val abs_ca_distinct_dl_lem = store_thm("abs_ca_distinct_dl_lem", ``
+!s m dl s'. abs_ca_trans s m dl s' ==> ALL_DISTINCT dl
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl` 
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >> (
+          RW_TAC std_ss [listTheory.ALL_DISTINCT]
+      )
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+      RW_TAC std_ss [listTheory.ALL_DISTINCT_SING]
+     ]
+);
+
+val abs_ca_req_lem = store_thm("abs_ca_req_lem", ``
+!s m dl s'. abs_ca_trans s m dl s' ==> 
+    ?req. hw_trans s m req s' /\ (dl <> [] ==> Adr req IN adrs dl)
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl`
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >> (
+	  HINT_EXISTS_TAC >>
+	  ASM_REWRITE_TAC []
+      )
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >> 
+      HINT_EXISTS_TAC >>
+      RW_TAC list_ss [Adr_def, adrs_def]
+     ] 
+);
+
+val abs_ca_trans_no_dop_oblg = store_thm("abs_ca_trans_no_dop_oblg", ``
+!s m s'. abs_ca_trans s m [] s' ==> 
+    !pa. Cv s' (MEM pa) = Cv s (MEM pa)
+``,
+  RW_TAC std_ss [Cv_def, coreIfTheory.CV_def, cachememTheory.MVcl_def] >>
+  MATCH_MP_TAC dmvca_lem >>
+  MATCH_MP_TAC hw_trans_not_Dreq_lem >>
+  FULL_SIMP_TAC std_ss [abs_ca_trans_def] >> (
+      METIS_TAC [Dreq_def]
+  )
+);
+ 
+val abs_ca_trans_not_write_oblg = store_thm("abs_ca_trans_not_write_oblg", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ dcoh s.ms pa /\ pa NOTIN writes dl ==> 
+    (Cv s' (MEM pa) = Cv s (MEM pa))
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl`
+  >| [(* empty *)
+      IMP_RES_TAC abs_ca_trans_no_dop_oblg >>
+      ASM_REWRITE_TAC []
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+      REV_FULL_SIMP_TAC list_ss [] >>
+      IMP_RES_TAC writes_lem >>
+      RW_TAC std_ss [Cv_def, CV_def] >>
+      MATCH_MP_TAC hw_trans_dmv_lem >>
+      EXISTS_TAC ``m:mode`` >>
+      EXISTS_TAC ``DREQ h:corereq`` >>
+      RW_TAC std_ss [Wreq_def, Adr_def] >>
+      METIS_TAC []
+     ]
+);
+
+val abs_ca_trans_dmvalt_oblg = store_thm("abs_ca_trans_dmvalt_oblg", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa NOTIN adrs dl ==> 
+    (dmvalt s'.ms T pa = dmvalt s.ms T pa)
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl`
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [abs_ca_trans_def]
+      >| [(* NOREQ *)
+	  FULL_SIMP_TAC std_ss [hw_trans_cases, corereq_distinct]
+	  ,
+	  (* FREQ *)
+	  FULL_SIMP_TAC std_ss [hw_trans_cases, corereq_distinct] >>
+	  IMP_RES_TAC msca_FREQ_lem >>
+	  MATCH_MP_TAC dmvalt_lem >>
+	  RW_TAC std_ss [dw_def, M_def] >> ( METIS_TAC [] )
+	 ]
+      ,
+      (* non-empty *)
+      IMP_RES_TAC abs_ca_req_lem >>
+      FULL_SIMP_TAC list_ss [] >>
+      MATCH_MP_TAC hw_trans_dmvalt_lem >>
+      EXISTS_TAC ``m:mode`` >>
+      HINT_EXISTS_TAC >>
+      RW_TAC std_ss [] >>
+      CCONTR_TAC >>
+      FULL_SIMP_TAC std_ss []
+     ]
+);
+
+val abs_ca_trans_drvbl_oblg = store_thm("abs_ca_trans_drvbl_oblg", ``
+!s m dl s' pa. abs_ca_trans s USER dl s' ==> drvbl s s'
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC abs_ca_req_lem >>
+  IMP_RES_TAC drvbl_lem
+);
+
+val abs_ca_trans_switch_oblg = store_thm("abs_ca_trans_switch_oblg", ``
+!s dl s'. abs_ca_trans s USER dl s' ∧ (mode s' = PRIV) ⇒ exentry s'
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC abs_ca_req_lem >>
+  IMP_RES_TAC hw_trans_switch_lem
+);
+
+(* dependencies *)
+
+val ca_Tr_def = Define `ca_Tr s va = Tr_ s.cs (dmvca s.ms) va`;
+
+val ca_vdeps_def = Define `ca_vdeps s = vdeps_ s.cs`;
+
+val ca_deps_def = Define `ca_deps s = deps_ s.cs (dmvca s.ms)`;
+
+val ca_deps_pc_oblg = store_thm("ca_deps_pc_oblg", ``
+!s. ca_Tr s (VApc s.cs) IN ca_deps s
+``,
+  RW_TAC std_ss [ca_Tr_def, ca_deps_def, coreIfTheory.deps__def] >>
+  REWRITE_TAC [pred_setTheory.IN_UNION] >>
+  DISJ1_TAC >>
+  RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  EXISTS_TAC ``VApc s.cs`` >>
+  REWRITE_TAC [coreIfTheory.vdeps_spec]
+);
+
+val ca_deps_vdeps_oblg = store_thm("ca_deps_vdeps_oblg", ``
+!s. ca_deps s SUBSET ({pa | ?va. (pa = ca_Tr s va) /\ va IN ca_vdeps s} UNION
+                      {pa | MEM pa IN MDVA s (ca_vdeps s)})
+``,
+  RW_TAC std_ss [ca_deps_def, coreIfTheory.deps__def] >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, pred_setTheory.IN_UNION] >>
+  REPEAT STRIP_TAC
+  >| [(* vdeps *)
+      DISJ1_TAC >>
+      RW_TAC std_ss [ca_vdeps_def, ca_Tr_def] >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+      ,
+      (* MEM pa *)
+      DISJ2_TAC >>
+      RW_TAC std_ss [ca_vdeps_def, MDVA_def]
+     ]
+);
+
+val ca_deps_MD_oblg = store_thm("ca_deps_MD_oblg", ``
+!s pa. MEM pa IN MDVA s (ca_vdeps s) ==> pa IN ca_deps s
+``,
+  RW_TAC std_ss [ca_deps_def, ca_vdeps_def, MDVA_def,
+		 coreIfTheory.deps__def] >>
+  REWRITE_TAC [pred_setTheory.IN_UNION] >>
+  DISJ2_TAC >>
+  RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+);
+
+val ca_deps_reads_oblg = store_thm("ca_deps_MD_oblg", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN reads dl ==> pa IN ca_deps s
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl` 
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [reads_def, listTheory.FILTER, listTheory.MAP, 
+			    listTheory.MEM]
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+      REV_FULL_SIMP_TAC list_ss [] >>
+      IMP_RES_TAC reads_lem >>
+      IMP_RES_TAC hw_trans_core_req_lem >>
+      IMP_RES_TAC core_req_curr_mode_lem >>
+      `Dreq (DREQ h)` by ( FULL_SIMP_TAC std_ss [Dreq_def] ) >>
+      IMP_RES_TAC core_req_mmu_Dreq_lem >>
+      RW_TAC std_ss [ca_deps_def, coreIfTheory.deps__def, 
+		     pred_setTheory.IN_UNION] >>
+      DISJ1_TAC >>
+      `~wt h` by ( FULL_SIMP_TAC std_ss [not_wt_lem] ) >>
+      FULL_SIMP_TAC std_ss [Acc_def, Adr_def] >>
+      RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, coreIfTheory.Tr__def] >>
+      HINT_EXISTS_TAC >>
+      RW_TAC std_ss []
+     ]
+);
+
+(* fix translation for privileged mode *)
+
+val ca_fixmmu_def = Define `ca_fixmmu s VAs f = 
+!va. va IN VAs ==> (Mmu s va PRIV R = SOME (f va, T))
+`;
+
+val ca_fixmmu_Tr_oblg = store_thm("ca_fixmmu_Tr_oblg", ``
+!s VAs va f. ca_fixmmu s VAs f /\ va IN VAs /\ (mode s = PRIV) ==> 
+    (ca_Tr s va = f va)
+``,
+  RW_TAC std_ss [ca_fixmmu_def, ca_Tr_def, Mmu_def, mode_def,
+		 coreIfTheory.Tr__def]
+);
+
+
 (******** cacheaware computation ********)
 
 val (ca_kcomp_rules, ca_kcomp_ind, ca_kcomp_cases) = Hol_reln `
    (!s. exentry s ==> ca_kcomp s s 0)
-/\ (!s s' s'' n. ca_kcomp s s' n /\ (?req. hw_trans s' PRIV req s'')
+/\ (!s s' s'' n. ca_kcomp s s' n /\ (?dl. abs_ca_trans s' PRIV dl s'')
         ==>
     ca_kcomp s s'' (SUC n))
 `;

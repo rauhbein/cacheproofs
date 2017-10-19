@@ -287,6 +287,19 @@ val not_NOREQ_lem = store_thm("not_NOREQ_lem", ``
 
 val adrs_def = Define `adrs dl = set (MAP PA dl)`;
 
+val adrs_lem = store_thm("adrs_lem", ``
+!d pa. pa NOTIN adrs [d] ==>  pa <> PA d
+``,
+  RW_TAC std_ss [adrs_def] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_MAP] >>
+  FULL_SIMP_TAC std_ss [GSYM IMP_DISJ_THM] >>
+  CCONTR_TAC >>
+  PAT_X_ASSUM ``!y. x`` (
+      fn thm => ASSUME_TAC ( SPEC ``d:dop`` thm )
+  ) >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM] 
+);
+
 val writes_def = Define `writes dl = set (MAP PA (FILTER wt dl))`;
 
 val writes_lem = store_thm("writes_lem", ``
@@ -316,6 +329,19 @@ val reads_lem = store_thm("reads_lem", ``
   IMP_RES_TAC rd_lem >>
   FULL_SIMP_TAC std_ss [listTheory.MEM] 
 );
+
+val adrs_writes_lem = store_thm("adrs_writes_lem", ``
+!pa dl. pa IN writes dl ==> pa IN adrs dl
+``,
+  RW_TAC std_ss [adrs_def, writes_def, listTheory.MEM_MAP] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_FILTER] >>
+  HINT_EXISTS_TAC >> 
+  ASM_REWRITE_TAC []
+);
+
+val not_adrs_not_writes_lem = save_thm("not_adrs_not_writes_lem", 
+adrs_writes_lem |> SPEC_ALL |> CONTRAPOS |> GEN_ALL)
+;
 
 (*********** finish ************)
 
