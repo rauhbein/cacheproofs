@@ -13,6 +13,13 @@ val _ = new_theory "hw";
 
 (* core *)
 
+val CV_lem = store_thm("CV_lem", ``
+!c c' mv mv' pa. (mv T pa = mv' T pa) ==> 
+    (CV c mv (MEM pa) = CV c' mv' (MEM pa))
+``,
+  REWRITE_TAC [CV_oblg]
+);
+
 val Mmu_lem = store_thm("Mmu_lem", ``
 !c c' mv mv' VAs. (!r. r IN MD_(c,mv,VAs) ==> (CV c mv r = CV c' mv' r)) ==>
 	          (!va m ac. va IN VAs ==>
@@ -126,6 +133,15 @@ val core_req_user_coreg_lem = store_thm("core_req_user_coreg_lem", ``
 !c mv req c'. core_req (c,USER,mv,req,c') ==> (c'.coreg = c.coreg)
 ``,
   REWRITE_TAC [core_req_user_coreg_oblg]
+);
+
+val core_req_det_lem = store_thm("core_req_det_lem", ``
+!c m mv req req' c' c''. 
+    core_req(c,m,mv,req,c') /\ core_req(c,m,mv,req',c'')
+        ==>
+    (c' = c'') /\ (req = req')
+``,
+  REWRITE_TAC [core_req_det_oblg]
 );
 
 val core_rcv_user_coreg_lem = store_thm("core_rcv_user_coreg_lem", ``
@@ -2016,7 +2032,7 @@ val ca_deps_MD_oblg = store_thm("ca_deps_MD_oblg", ``
   RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
 );
 
-val ca_deps_reads_oblg = store_thm("ca_deps_MD_oblg", ``
+val ca_deps_reads_oblg = store_thm("ca_deps_reads_oblg", ``
 !s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN reads dl ==> pa IN ca_deps s
 ``,
   REPEAT STRIP_TAC >>

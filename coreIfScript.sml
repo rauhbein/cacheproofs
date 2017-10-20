@@ -55,6 +55,12 @@ val CV_reg_lem = store_thm("CV_reg_lem", ``
   )   
 );
 
+val CV_oblg = store_thm("CV_oblg", ``
+!c c' mv mv' pa. (mv T pa = mv' T pa) ==> 
+    (CV c mv (MEM pa) = CV c' mv' (MEM pa))
+``,
+  RW_TAC std_ss [CV_def]
+);
 
 (* introduce uninterpreted functions *)
 
@@ -188,6 +194,13 @@ val core_user_coreg_po = Define `core_user_coreg_po trans =
 !c mv req c'. trans (c,USER,mv,req,c') ==> (c'.coreg = c.coreg)
 `;
 
+(* core transitions are deterministic *)
+val core_det_po = Define `core_det_po trans = 
+!c mv m req req' c' c''. trans (c,m,mv,req,c') /\ trans (c,m,mv,req',c'')
+        ==> 
+    (c' = c'') /\ (req = req')
+`;
+
 val dummy_cr_def = Define `
 dummy_cr (c:core_state,M:mode,mv:mem_view,req:corereq,c':core_state) = 
 (c = c') /\ (req = NOREQ) /\ (Mode c = M)
@@ -201,6 +214,7 @@ val core_req_exists = prove (``
  /\ core_Mon_reg_po trans
  /\ core_MD_mv_po trans
  /\ core_user_coreg_po trans
+ /\ core_det_po trans
 ``,
   EXISTS_TAC ``dummy_cr`` >>
   REPEAT STRIP_TAC 
@@ -222,6 +236,9 @@ val core_req_exists = prove (``
       ,
       (* coreg unchanged *)
       RW_TAC std_ss [core_user_coreg_po, dummy_cr_def]
+      ,
+      (* determinism *)
+      RW_TAC std_ss [core_det_po, dummy_cr_def]
      ]
 );  
 
@@ -425,6 +442,20 @@ val core_req_user_coreg_oblg = store_thm("core_req_user_coreg_oblg", ``
   ASSUME_TAC core_req_spec >>
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC core_user_coreg_po  
+);
+
+val core_req_det_oblg = store_thm("core_req_det_oblg", ``
+!c m mv req req' c' c''. 
+    core_req(c,m,mv,req,c') /\ core_req(c,m,mv,req',c'')
+        ==>
+    (c' = c'') /\ (req = req')
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >> 
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_det_po >>
+  RW_TAC std_ss []
 );
 
 val core_rcv_user_coreg_oblg = store_thm("core_rcv_user_coreg_oblg", ``
