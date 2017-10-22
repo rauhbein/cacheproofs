@@ -80,6 +80,11 @@ val Mmu_MD_exists = prove (``
 		          (Mmu(c,mv,va,m,ac) = Mmu(c',mv',va,m,ac))))
            /\ (!r. reg_res r ==> (r IN MD(c,mv,VAs) <=> r IN MD(c',mv',VAs))) 
            /\ (!r. reg_res r /\ r IN MD(c,mv,VAs) ==> ?r'. r = COREG r')
+(* reads and fetches have same translation for a given address, 
+   must be readable in ARM to be executable, 
+   NOTE: just used to simplifiy the model, i.e., def of Tr / deps for PC *)
+           /\ (!va m pa C. (Mmu(c,mv,va,m,EX) = SOME (pa,C)) ==>
+		           (Mmu(c,mv,va,m,R) = SOME (pa,C)))
 ``,
   EXISTS_TAC ``\(c,mv,va,m,ac):core_state # mem_view # vadr # mode # acc.
 		NONE:(padr # bool) option`` >>
@@ -92,6 +97,14 @@ val Mmu_MD_spec = new_specification ("Mmu_MD_spec",
   ["Mmu_", "MD_"], Mmu_MD_exists);
 
 val Tr__def = Define `Tr_ c mv va = FST(THE(Mmu_(c,mv,va,Mode c,R)))`;
+
+val Mmu_read_fetch_oblg = store_thm("Mmu_read_fetch_oblg", ``
+!c mv va m pa C. (Mmu_(c,mv,va,m,EX) = SOME (pa,C)) ==>
+                 (Mmu_(c,mv,va,m,R) = SOME (pa,C))
+``,
+  METIS_TAC [Mmu_MD_spec]
+);
+
 
 val dummyMon_def = Define `
    (dummyMon (c,mv, MEM pa ,m,ac) = ?va ca. Mmu_(c,mv,va,m,ac) = SOME (pa,ca))
@@ -261,6 +274,11 @@ val rcv_user_coreg_po = Define `rcv_user_coreg_po trans =
 !c w c'. trans (c,USER,w,c') ==> (c'.coreg = c.coreg)
 `;
 
+(* deterministic *)
+val rcv_det_po = Define `rcv_det_po trans = 
+!c:core_state m:mode w:word c':core_state c''. 
+    trans (c,m,w,c') /\ trans (c,m,w,c'') ==> (c' = c'')
+`;
 
 val dummy_rcv_def = Define `
 dummy_rcv (c:core_state,M:mode,w:word,c':core_state) = 
@@ -272,6 +290,7 @@ val core_rcv_exists = prove (``
     rcv_mode_po trans
  /\ rcv_Mon_reg_po trans
  /\ rcv_user_coreg_po trans
+ /\ rcv_det_po trans
 ``,
   EXISTS_TAC ``dummy_rcv`` >>
   REPEAT STRIP_TAC 
@@ -283,6 +302,9 @@ val core_rcv_exists = prove (``
       ,
       (* coregs *)
       RW_TAC std_ss [rcv_user_coreg_po, dummy_rcv_def]
+      ,
+      (* determinism *)
+      RW_TAC std_ss [rcv_det_po, dummy_rcv_def]
      ]
 );  
 
@@ -467,6 +489,14 @@ val core_rcv_user_coreg_oblg = store_thm("core_rcv_user_coreg_oblg", ``
   IMP_RES_TAC rcv_user_coreg_po 
 );
 
+val core_rcv_det_oblg = store_thm("core_rcv_det_oblg", ``
+!c M w c' c''. core_rcv (c,M,w,c') /\ core_rcv (c,M,w,c'')  ==> (c' = c'')
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_rcv_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC rcv_det_po
+);
 
 
 (*********** finish ************)

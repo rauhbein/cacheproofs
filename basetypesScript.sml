@@ -343,6 +343,9 @@ val not_adrs_not_writes_lem = save_thm("not_adrs_not_writes_lem",
 adrs_writes_lem |> SPEC_ALL |> CONTRAPOS |> GEN_ALL)
 ;
 
+val dops_def = Define `dops dl = set dl`;
+
+
 (*********** finish ************)
 
 val _ = export_theory();

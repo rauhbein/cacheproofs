@@ -62,6 +62,13 @@ val Mon__reg_lem = store_thm("Mon__reg_lem", ``
   REWRITE_TAC [Mon_reg_oblg]
 );
 
+val Mmu_read_fetch_lem = store_thm("Mmu_read_fetch_lem", ``
+!c mv va m pa C. (Mmu_(c,mv,va,m,EX) = SOME (pa,C)) ==>
+                 (Mmu_(c,mv,va,m,R) = SOME (pa,C))
+``,
+  REWRITE_TAC [Mmu_read_fetch_oblg]
+);
+
 val core_req_curr_mode_lem = store_thm("core_curr_req_mode_lem", ``
 !c M mv req c'. core_req (c,M,mv,req,c') ==> (Mode c = M)
 ``,
@@ -150,6 +157,12 @@ val core_rcv_user_coreg_lem = store_thm("core_rcv_user_coreg_lem", ``
   REWRITE_TAC [core_rcv_user_coreg_oblg]
 );
 
+val core_rcv_det_lem = store_thm("core_rcv_det_lem", ``
+!c M w c' c''. core_rcv (c,M,w,c') /\ core_rcv (c,M,w,c'')  ==> (c' = c'')
+``,
+  REWRITE_TAC [core_rcv_det_oblg]
+);
+
 (* memory system *)
 
 val msca_DREQ_unchanged_lem = store_thm("msca_DREQ_unchanged_lem", ``
@@ -166,6 +179,14 @@ val msca_FREQ_unchanged_lem = store_thm("msca_FREQ_unchanged_lem", ``
 !pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa)
 ``,
   REWRITE_TAC [msca_FREQ_unchanged_oblg]
+);
+
+val msca_write_val_lem = store_thm("msca_write_val_lem", ``
+!ms dop ms'. (ms' = msca_trans ms (DREQ dop)) /\ wt dop /\ CA dop 
+    ==>
+    (dmvca ms' T (PA dop) = VAL dop)
+``,
+  REWRITE_TAC [msca_write_val_oblg]
 );
 
 val M_dmvcl_lem = store_thm("M_dmvcl_lem", ``
@@ -783,6 +804,28 @@ val hw_trans_write_lem = store_thm("hw_trans_write_lem", ``
   )
 );
 
+val hw_trans_write_val_lem = store_thm("hw_trans_write_val_lem", ``
+!s M req s'. Wreq req /\ hw_trans s M req s' /\ CAreq req ==>
+    (Cv s' (MEM (Adr req)) = VAL (Dop req))
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC Wreq_lem >>
+  ASM_REWRITE_TAC [Dop_def, Adr_def] >>
+  IMP_RES_TAC not_rd_lem >>
+  RW_TAC std_ss [] >> 
+  `s'.ms = msca_trans s.ms (DREQ dop)` by ( 
+      IMP_RES_TAC hw_trans_cases >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
+	  REV_FULL_SIMP_TAC std_ss []
+      )
+  ) >>
+  FULL_SIMP_TAC std_ss [CAreq_def] >>
+  IMP_RES_TAC msca_write_val_lem >>
+  RW_TAC std_ss [Cv_def, CV_def] >>
+  REV_FULL_SIMP_TAC std_ss []
+);
+
 val hw_trans_clean_lem = store_thm("hw_trans_clean_lem", ``
 !s M req s'. Creq req /\ hw_trans s M req s' ==>
     core_req (s.cs, M, dmvca s.ms, req, s'.cs) 
@@ -1105,7 +1148,6 @@ val hw_trans_dmvalt_lem = store_thm("hw_trans_dmvalt_lem", ``
       ASM_REWRITE_TAC []
      ]
 );
-
 
 (****** Deriveability *******) 
 
@@ -1885,7 +1927,9 @@ val abs_ca_distinct_dl_lem = store_thm("abs_ca_distinct_dl_lem", ``
 
 val abs_ca_req_lem = store_thm("abs_ca_req_lem", ``
 !s m dl s'. abs_ca_trans s m dl s' ==> 
-    ?req. hw_trans s m req s' /\ (dl <> [] ==> Adr req IN adrs dl)
+    ?req. hw_trans s m req s' 
+       /\ (dl <> [] ==> Adr req IN adrs dl /\ 
+		        ?dop. (req = DREQ dop) /\ (dl = [dop]))
 ``,
   REPEAT STRIP_TAC >>
   Cases_on `dl`
@@ -2058,6 +2102,42 @@ val ca_deps_reads_oblg = store_thm("ca_deps_reads_oblg", ``
       HINT_EXISTS_TAC >>
       RW_TAC std_ss []
      ]
+);
+
+val hw_trans_fetch_deps_lem = store_thm("hw_trans_fetch_deps_lem", ``
+!s M req s'. Freq req /\ hw_trans s M req s' ==> Adr req IN ca_deps s
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Freq_lem >>
+  RW_TAC std_ss [Adr_def] >>
+  IMP_RES_TAC hw_trans_cases >> (
+      FULL_SIMP_TAC std_ss [corereq_distinct]
+  ) >>
+  FULL_SIMP_TAC std_ss [corereq_11] >>
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC core_req_mmu_Freq_lem >>
+  IMP_RES_TAC Mmu_read_fetch_lem >>
+  `pa = ca_Tr s (VApc s.cs)` by (
+      RW_TAC std_ss [ca_Tr_def, Tr__def, Adr_def]
+  ) >>
+  RW_TAC std_ss [ca_deps_pc_oblg]
+);
+
+val hw_trans_fetch_pc_lem = store_thm("hw_trans_fetch_pc_lem", ``
+!s M req s'. Freq req /\ hw_trans s M req s' ==>
+    (Adr req = ca_Tr s (VApc s.cs))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Freq_lem >>
+  RW_TAC std_ss [Adr_def] >>
+  IMP_RES_TAC hw_trans_cases >> (
+      FULL_SIMP_TAC std_ss [corereq_distinct]
+  ) >>
+  FULL_SIMP_TAC std_ss [corereq_11] >>
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC core_req_mmu_Freq_lem >>
+  IMP_RES_TAC Mmu_read_fetch_lem >>
+  RW_TAC std_ss [ca_Tr_def, coreIfTheory.Tr__def, Adr_def]
 );
 
 (* fix translation for privileged mode *)

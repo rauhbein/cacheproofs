@@ -241,7 +241,7 @@ val msca_NOREQ_lem = store_thm("msca_NOREQ_lem", ``
 (* some obligations *)
 
 val msca_DREQ_unchanged_oblg = store_thm("msca_DREQ_unchanged_oblg", ``
-!ms pa ms'. (ms' = msca_trans ms (DREQ pa)) 
+!ms dop ms'. (ms' = msca_trans ms (DREQ dop)) 
     ==>
 (!pa. iw ms' pa = iw ms pa)
 ``,
@@ -261,6 +261,23 @@ val msca_FREQ_unchanged_oblg = store_thm("msca_FREQ_unchanged_oblg", ``
   IMP_RES_TAC msca_FREQ_lem >>
   RW_TAC std_ss [dw_def, M_def]
 );
+
+val msca_write_val_oblg = store_thm("msca_write_val_oblg", ``
+!ms dop ms'. (ms' = msca_trans ms (DREQ dop)) /\ wt dop /\ CA dop 
+    ==>
+    (dmvca ms' T (PA dop) = VAL dop)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC msca_DREQ_lem >>
+  `~rd dop /\ ~cl dop` by ( METIS_TAC [not_wt_lem] ) >>
+  IMP_RES_TAC ca_cacheable_ca >>
+  PAT_X_ASSUM ``!pa. x`` (
+      fn thm => ASSUME_TAC ( SPEC ``PA dop`` thm )
+  ) >>
+  REV_FULL_SIMP_TAC std_ss [] >>
+  RW_TAC std_ss [dmvca_def, MVca_def]
+);
+
 
 (* deriveability obligations *)
 

@@ -162,6 +162,34 @@ val cl_trans_write_lem = store_thm("cl_trans_write_lem", ``
   )
 );
 
+val cl_trans_write_val_lem = store_thm("cl_trans_write_val_lem", ``
+!s M req s'. Wreq req /\ cl_trans s M req s' /\ CAreq req ==>
+    (cl_Cv s' (MEM (Adr req)) = VAL (Dop req))
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC Wreq_lem >>
+  ASM_REWRITE_TAC [Dop_def, Adr_def] >>
+  IMP_RES_TAC not_rd_lem >>
+  RW_TAC std_ss [] >> 
+  `s'.M = mtfcl s.M dop` by ( 
+      IMP_RES_TAC cl_trans_cases >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, corereq_11] >>
+	  REV_FULL_SIMP_TAC std_ss []
+      )
+  ) >>
+  Cases_on `dop` >> (
+      FULL_SIMP_TAC std_ss [wt_def]
+  ) >>
+  `MVcl (s'.M) b p = c` by (
+      METIS_TAC [cachememTheory.cl_write_semantics]
+  ) >>
+  FULL_SIMP_TAC std_ss [cl_Cv_def, coreIfTheory.CV_def, 
+			PA_def, VAL_def, CAreq_def, CA_def] >>
+  REV_FULL_SIMP_TAC std_ss []
+);
+
+
 val cl_trans_clean_lem = store_thm("cl_trans_clean_lem", ``
 !s M req s'. Creq req /\ cl_trans s M req s' ==>
     core_req (s.cs, M, MVcl s.M, req, s'.cs) 
@@ -301,6 +329,27 @@ val abs_cl_distinct_dl_lem = store_thm("abs_cl_distinct_dl_lem", ``
      ]
 );
 
+val abs_cl_req_lem = store_thm("abs_ca_req_lem", ``
+!s m dl s'. abs_cl_trans s m dl s' ==> 
+    ?req. cl_trans s m req s' 
+       /\ (dl <> [] ==> Adr req IN adrs dl /\ 
+		        ?dop. (req = DREQ dop) /\ (dl = [dop]))
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl`
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [abs_cl_trans_def] >> (
+	  HINT_EXISTS_TAC >>
+	  ASM_REWRITE_TAC []
+      )
+      ,
+      (* non-empty *)
+      FULL_SIMP_TAC std_ss [abs_cl_trans_def] >> 
+      HINT_EXISTS_TAC >>
+      RW_TAC list_ss [Adr_def, adrs_def]
+     ] 
+);
+
 val abs_cl_trans_no_dop_oblg = store_thm("abs_cl_trans_no_dop_oblg", ``
 !s m s'. abs_cl_trans s m [] s' ==> 
     !pa. cl_Cv s' (MEM pa) = cl_Cv s (MEM pa)
@@ -421,6 +470,42 @@ val cl_deps_reads_oblg = store_thm("cl_deps_MD_oblg", ``
      ]
 );
 
+val cl_trans_fetch_deps_lem = store_thm("cl_trans_fetch_deps_lem", ``
+!s M req s'. Freq req /\ cl_trans s M req s' ==> Adr req IN cl_deps s
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Freq_lem >>
+  RW_TAC std_ss [Adr_def] >>
+  IMP_RES_TAC cl_trans_cases >> (
+      FULL_SIMP_TAC std_ss [corereq_distinct]
+  ) >>
+  FULL_SIMP_TAC std_ss [corereq_11] >>
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC core_req_mmu_Freq_lem >>
+  IMP_RES_TAC Mmu_read_fetch_lem >>
+  `pa = cl_Tr s (VApc s.cs)` by (
+      RW_TAC std_ss [cl_Tr_def, coreIfTheory.Tr__def, Adr_def]
+  ) >>
+  RW_TAC std_ss [cl_deps_pc_oblg]
+);
+
+val cl_trans_fetch_pc_lem = store_thm("cl_trans_fetch_pc_lem", ``
+!s M req s'. Freq req /\ cl_trans s M req s' ==>
+    (Adr req = cl_Tr s (VApc s.cs))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Freq_lem >>
+  RW_TAC std_ss [Adr_def] >>
+  IMP_RES_TAC cl_trans_cases >> (
+      FULL_SIMP_TAC std_ss [corereq_distinct]
+  ) >>
+  FULL_SIMP_TAC std_ss [corereq_11] >>
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC core_req_mmu_Freq_lem >>
+  IMP_RES_TAC Mmu_read_fetch_lem >>
+  RW_TAC std_ss [cl_Tr_def, coreIfTheory.Tr__def, Adr_def]
+);
+
 (* fix translation for privileged mode *)
 
 val cl_fixmmu_def = Define `cl_fixmmu s VAs f = 
@@ -536,6 +621,170 @@ val deps_eq_oblg = store_thm("deps_eq_oblg", ``
       FULL_SIMP_TAC std_ss [cl_vdeps_def, ca_vdeps_def,
 			    pred_setTheory.IN_GSPEC_IFF] >>
       REV_FULL_SIMP_TAC std_ss []
+     ]
+);
+
+val core_bisim_req_lem = store_thm("core_bisim_req_lem", ``
+!s sc m req req' cs' cs''. 
+    (s.cs = sc.cs)
+ /\ core_req (sc.cs,m,dmvca sc.ms,req,cs')
+ /\ core_req (s.cs,m,MVcl s.M,req',cs'')
+ /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (cs' = cs'') /\ (req = req')  
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  `m = Mode sc.cs` by ( 
+      IMP_RES_TAC core_curr_req_mode_lem >>
+      RW_TAC std_ss []
+  ) >>
+  REV_FULL_SIMP_TAC std_ss [] >>
+  FULL_SIMP_TAC std_ss [] >>
+  `core_req(sc.cs,Mode sc.cs,dmvca sc.ms, req, cs') <=> 
+   core_req(sc.cs,Mode sc.cs,MVcl s.M, req, cs')` suffices_by (
+      STRIP_TAC >>
+      RES_TAC >>
+      IMP_RES_TAC core_req_det_lem >>
+      RW_TAC std_ss []
+  ) >>
+  MATCH_MP_TAC core_req_MD_mv_lem >>
+  IMP_RES_TAC deps_MD_lem >>
+  FULL_SIMP_TAC std_ss [MDVA_def, cl_Cv_def, Cv_def, ca_vdeps_def] >>
+  METIS_TAC []
+);
+
+val core_bisim_oblg = store_thm("core_bisim_oblg", ``
+!s s' sc sc' m dl dlc. 
+    abs_cl_trans s m dl s'
+ /\ abs_ca_trans sc m dlc sc'
+ /\ (s.cs = sc.cs)
+ /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+ /\ (cl_Cv s (MEM (cl_Tr s (VApc s.cs))) = imv sc.ms T (ca_Tr sc (VApc sc.cs)))
+ /\ (cl_deps s = ca_deps sc)
+ /\ (!d. MEM d dl ==> CA d)
+        ==>
+    (s'.cs = sc'.cs)
+ /\ (dl = dlc)
+ /\ (!pa. pa IN writes dl ==> (cl_Cv s' (MEM pa) = Cv sc' (MEM pa)))
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  Cases_on `dl`
+  >| [(* empty *)
+      Cases_on `dlc`
+      >| [(* empty *)
+	  FULL_SIMP_TAC list_ss [writes_def] >>
+	  IMP_RES_TAC abs_cl_trans_def >> (
+	      IMP_RES_TAC abs_ca_trans_def >>
+	      IMP_RES_TAC hw_trans_core_req_lem >>
+	      IMP_RES_TAC cl_trans_core_req_lem >>
+	      IMP_RES_TAC core_bisim_req_lem >>
+	      FULL_SIMP_TAC std_ss [corereq_distinct] )
+	  >| [(* NOREQ *) 
+	      REV_FULL_SIMP_TAC std_ss [cl_trans_cases, corereq_distinct] >>
+	      FULL_SIMP_TAC std_ss [hw_trans_cases, corereq_distinct] >>
+	      RW_TAC list_ss [] >>
+	      `(sc'.cs = s'.cs) /\ (NOREQ = NOREQ)` suffices_by (
+	          RW_TAC std_ss []
+	      ) >>
+	      MATCH_MP_TAC core_bisim_req_lem >>
+	      METIS_TAC []
+	      ,
+	      (* FREQ *)
+	      `Freq (FREQ pa)` by ( REWRITE_TAC [Freq_def] ) >>
+	      IMP_RES_TAC cl_trans_fetch_pc_lem >>
+	      IMP_RES_TAC hw_trans_fetch_pc_lem >>
+	      REV_FULL_SIMP_TAC std_ss [cl_trans_cases, corereq_distinct] >>
+	      FULL_SIMP_TAC std_ss [hw_trans_cases, corereq_distinct] >>
+	      RW_TAC list_ss [] >>
+	      `(cs'''' = cs''') /\ (FREQ pa = FREQ pa)` by (
+	          MATCH_MP_TAC core_bisim_req_lem >>
+	          METIS_TAC []
+	      ) >>
+	      RW_TAC std_ss [] >>
+	      FULL_SIMP_TAC std_ss [cl_Cv_def, coreIfTheory.CV_def, Adr_def] >>
+	      REV_FULL_SIMP_TAC std_ss [] >>
+	      IMP_RES_TAC core_rcv_det_lem
+	     ]
+	  ,
+	  (* empty = non-empty not possible *)
+	  REWRITE_TAC [listTheory.list_distinct] >>
+	  FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+	  FULL_SIMP_TAC std_ss [abs_cl_trans_def] >> (
+	      IMP_RES_TAC hw_trans_core_req_lem >>
+	      IMP_RES_TAC cl_trans_core_req_lem >>
+	      IMP_RES_TAC core_bisim_req_lem >>
+	      FULL_SIMP_TAC std_ss [corereq_distinct]
+	  )
+	 ]
+      ,
+      Cases_on `dlc`
+      >| [(* non-empty = empty -> not possible *)
+	  REWRITE_TAC [GSYM listTheory.list_distinct] >>
+	  FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+	  FULL_SIMP_TAC std_ss [abs_cl_trans_def] >> (
+	      IMP_RES_TAC hw_trans_core_req_lem >>
+	      IMP_RES_TAC cl_trans_core_req_lem >>
+	      IMP_RES_TAC core_bisim_req_lem >>
+	      FULL_SIMP_TAC std_ss [corereq_distinct]
+	  )
+	  ,
+	  (* non-empty vs non-empty *)
+	  FULL_SIMP_TAC list_ss [writes_def] >>
+	  IMP_RES_TAC abs_cl_trans_def >> (
+	      IMP_RES_TAC abs_ca_trans_def >>
+	      IMP_RES_TAC hw_trans_core_req_lem >>
+	      IMP_RES_TAC cl_trans_core_req_lem >>
+	      IMP_RES_TAC core_bisim_req_lem >>
+	      FULL_SIMP_TAC std_ss [corereq_distinct] 
+	  ) >>
+	  FULL_SIMP_TAC std_ss [corereq_11] >>
+	  `Dreq (DREQ h)` by ( REWRITE_TAC [Dreq_def] ) >>
+	  IMP_RES_TAC Dreq_cases_lem
+	  >| [(* read *)
+	      IMP_RES_TAC cl_trans_read_lem >>
+	      IMP_RES_TAC hw_trans_read_lem >>
+	      FULL_SIMP_TAC std_ss [Rreq_def, Wreq_def] >>
+	      RW_TAC list_ss [] >>
+	      FULL_SIMP_TAC list_ss [CAreq_def] >>
+	      `(cs''''' = cs''') /\ (DREQ h = DREQ h)` by (
+	          MATCH_MP_TAC core_bisim_req_lem >>
+		  METIS_TAC []
+	      ) >>
+	      RW_TAC std_ss [] >>
+	      REV_FULL_SIMP_TAC std_ss [] >>
+	      FULL_SIMP_TAC std_ss [cl_Cv_def, Cv_def,
+				    coreIfTheory.CV_def, Adr_def] >>
+	      `PA h IN reads [h]` by (
+	          RW_TAC list_ss [reads_def]
+	      ) >>
+	      IMP_RES_TAC ca_deps_reads_oblg >>
+	      RES_TAC >>
+	      FULL_SIMP_TAC std_ss [] >>
+	      IMP_RES_TAC core_rcv_det_lem
+	      ,
+	      (* write *)
+	      IMP_RES_TAC cl_trans_write_lem >>
+	      IMP_RES_TAC hw_trans_write_lem >>
+	      FULL_SIMP_TAC std_ss [Rreq_def, Wreq_def] >>
+	      IMP_RES_TAC core_bisim_req_lem >>
+	      RW_TAC list_ss [] >>
+	      FULL_SIMP_TAC list_ss [CAreq_def] >>
+	      `Wreq (DREQ h)` by ( ASM_REWRITE_TAC [Wreq_def] ) >>
+	      `CAreq (DREQ h)` by ( ASM_REWRITE_TAC [CAreq_def] ) >>
+	      IMP_RES_TAC cl_trans_write_val_lem >>
+	      IMP_RES_TAC hw_trans_write_val_lem >>
+	      FULL_SIMP_TAC std_ss [Adr_def]
+	      ,
+	      (* clean *)
+	      IMP_RES_TAC cl_trans_clean_lem >>
+	      IMP_RES_TAC hw_trans_clean_lem >>
+	      FULL_SIMP_TAC std_ss [Rreq_def, Wreq_def, Creq_def] >>
+	      IMP_RES_TAC core_bisim_req_lem >>
+	      RW_TAC list_ss []	      
+	     ]
+	 ]
      ]
 );
 
