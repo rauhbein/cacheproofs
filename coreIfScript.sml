@@ -160,6 +160,12 @@ val vdeps_exists = store_thm("vdeps_exists", ``
 val vdeps_spec = new_specification ("vdeps_spec",
   ["vdeps_"], vdeps_exists);
 
+val vdeps_PC_oblg = store_thm("vdeps_PC_oblg", ``
+!c. VApc c IN vdeps_ c
+``,
+  REWRITE_TAC [vdeps_spec]
+);
+
 (* physical address dependencies *)
 
 val deps__def = Define `deps_ c mv = 
@@ -173,10 +179,13 @@ val core_mode_po = Define `core_mode_po trans =
 !c M mv req c'. trans (c,M,mv,req,c') ==> (Mode c = M)
 `;
 
+val core_mode_change_po = Define `core_mode_change_po trans = 
+!c M mv req c'. trans (c,M,mv,req,c') /\ req <> NOREQ ==> (Mode c' = Mode c)
+`;
+
 (* change to PRIV -> exentry *)
 val core_exentry_po = Define `core_exentry_po trans = 
-!c mv req c'. trans (c,USER,mv,req,c') /\ (Mode c' = PRIV) ==> 
-    exentry_ c' /\ (req = NOREQ)
+!c mv req c'. trans (c,USER,mv,req,c') /\ (Mode c' = PRIV) ==> exentry_ c'
 `;
 
 (* mem request -> Mon obeyed *)
@@ -214,6 +223,11 @@ val core_det_po = Define `core_det_po trans =
     (c' = c'') /\ (req = req')
 `;
 
+(* core may not get stuck *)
+val core_progress_po = Define `core_progress_po trans = 
+!c mv. ?req c'. trans (c,Mode c,mv,req,c')
+`;
+
 val dummy_cr_def = Define `
 dummy_cr (c:core_state,M:mode,mv:mem_view,req:corereq,c':core_state) = 
 (c = c') /\ (req = NOREQ) /\ (Mode c = M)
@@ -222,17 +236,22 @@ dummy_cr (c:core_state,M:mode,mv:mem_view,req:corereq,c':core_state) =
 val core_req_exists = prove (``
 ?(trans:core_state # mode # mem_view # corereq # core_state -> bool).
     core_mode_po trans
+ /\ core_mode_change_po trans
  /\ core_exentry_po trans
  /\ core_Mon_mem_po trans
  /\ core_Mon_reg_po trans
  /\ core_MD_mv_po trans
  /\ core_user_coreg_po trans
  /\ core_det_po trans
+ /\ core_progress_po trans
 ``,
   EXISTS_TAC ``dummy_cr`` >>
   REPEAT STRIP_TAC 
   >| [(* mode *)
       RW_TAC std_ss [core_mode_po, dummy_cr_def]
+      ,
+      (* mode change *)
+      RW_TAC std_ss [core_mode_change_po, dummy_cr_def]
       ,
       (* exentry *)
       RW_TAC std_ss [core_exentry_po, dummy_cr_def] >>
@@ -252,6 +271,9 @@ val core_req_exists = prove (``
       ,
       (* determinism *)
       RW_TAC std_ss [core_det_po, dummy_cr_def]
+      ,
+      (* progress *)
+      RW_TAC std_ss [core_progress_po, dummy_cr_def]
      ]
 );  
 
@@ -280,6 +302,10 @@ val rcv_det_po = Define `rcv_det_po trans =
     trans (c,m,w,c') /\ trans (c,m,w,c'') ==> (c' = c'')
 `;
 
+val rcv_progress_po = Define `rcv_progress_po trans = 
+!c:core_state m:mode w:word. ?c':core_state. trans (c,Mode c,w,c')
+`;
+
 val dummy_rcv_def = Define `
 dummy_rcv (c:core_state,M:mode,w:word,c':core_state) = 
 (c = c') /\ (Mode c = M)
@@ -291,6 +317,7 @@ val core_rcv_exists = prove (``
  /\ rcv_Mon_reg_po trans
  /\ rcv_user_coreg_po trans
  /\ rcv_det_po trans
+ /\ rcv_progress_po trans
 ``,
   EXISTS_TAC ``dummy_rcv`` >>
   REPEAT STRIP_TAC 
@@ -305,6 +332,9 @@ val core_rcv_exists = prove (``
       ,
       (* determinism *)
       RW_TAC std_ss [rcv_det_po, dummy_rcv_def]
+      ,
+      (* progress *)
+      RW_TAC std_ss [rcv_progress_po, dummy_rcv_def]
      ]
 );  
 
@@ -364,6 +394,15 @@ val core_req_curr_mode_oblg = store_thm("core_req_curr_mode_oblg", ``
   ASSUME_TAC core_req_spec >>
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC core_mode_po
+);
+
+val core_req_mode_change_oblg = store_thm("core_req_mode_change_oblg", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ req <> NOREQ ==> (Mode c' = Mode c)
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_mode_change_po
 );
 
 val core_req_user_MD_reg_oblg = store_thm("core_req_user_MD_reg_oblg", ``
@@ -430,7 +469,10 @@ val core_req_mode_oblg = store_thm("core_req_mode_oblg", ``
   REPEAT STRIP_TAC >>
   ASSUME_TAC core_req_spec >>
   FULL_SIMP_TAC std_ss [] >>
-  IMP_RES_TAC core_exentry_po  
+  IMP_RES_TAC core_exentry_po >> 
+  IMP_RES_TAC core_mode_po >> 
+  IMP_RES_TAC core_mode_change_po >>
+  REV_FULL_SIMP_TAC std_ss [mode_distinct]
 );
 
 val core_rcv_mode_oblg = store_thm("core_rcv_mode_oblg", ``
@@ -480,6 +522,16 @@ val core_req_det_oblg = store_thm("core_req_det_oblg", ``
   RW_TAC std_ss []
 );
 
+val core_req_progress_oblg = store_thm("core_req_progress_oblg", ``
+!c mv. ?req c'. core_req(c,Mode c,mv,req,c')
+``,
+  REPEAT GEN_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_progress_po >>
+  RW_TAC std_ss []
+);
+
 val core_rcv_user_coreg_oblg = store_thm("core_rcv_user_coreg_oblg", ``
 !c w c'. core_rcv (c,USER,w,c') ==> (c'.coreg = c.coreg)
 ``,
@@ -498,6 +550,15 @@ val core_rcv_det_oblg = store_thm("core_rcv_det_oblg", ``
   IMP_RES_TAC rcv_det_po
 );
 
+val core_rcv_progress_oblg = store_thm("core_rcv_progress_oblg", ``
+!c w. ?c'. core_rcv (c,Mode c,w,c')
+``,
+  REPEAT GEN_TAC >>
+  ASSUME_TAC core_rcv_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC rcv_progress_po >>
+  RW_TAC std_ss []
+);
 
 (*********** finish ************)
 

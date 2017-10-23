@@ -343,6 +343,40 @@ val Rsim_lem = store_thm("Rsim_lem", ``
      ]	  
 );
 
+val Rsim_cs_lem = store_thm("Rsim_cs_lem", ``
+!sc s. Rsim sc s <=> (s.cs = sc.cs) /\ (!pa. MVcl s.M T pa = dmvalt sc.ms T pa)
+``,
+  RW_TAC std_ss [Rsim_lem] >>
+  EQ_TAC 
+  >| [(* ==> *) 
+      RW_TAC std_ss [coreIfTheory.core_state_component_equality, 
+		     FUN_EQ_THM]
+      >| [(* GPR *)
+	  `reg_res (REG x)` by ( REWRITE_TAC [coreIfTheory.reg_res_def] ) >>
+	  RES_TAC >>
+	  FULL_SIMP_TAC std_ss [cl_Cv_def, Cv_def, coreIfTheory.CV_def]
+	  ,
+	  (* COREG *)
+	  `reg_res (COREG x)` by ( REWRITE_TAC [coreIfTheory.reg_res_def] ) >>
+	  RES_TAC >>
+	  FULL_SIMP_TAC std_ss [cl_Cv_def, Cv_def, coreIfTheory.CV_def]
+	  ,
+	  (* PSRS *)
+	  `reg_res (PSRS x)` by ( REWRITE_TAC [coreIfTheory.reg_res_def] ) >>
+	  RES_TAC >>
+	  FULL_SIMP_TAC std_ss [cl_Cv_def, Cv_def, coreIfTheory.CV_def]
+	 ]
+      ,
+      (* <== *)
+      RW_TAC std_ss [cl_Cv_def, Cv_def] >>
+      Cases_on `r` >> ( 
+          FULL_SIMP_TAC std_ss [coreIfTheory.CV_def, 
+				coreIfTheory.reg_res_def]
+      )
+     ]
+);
+
+
 val Rsim_dCoh_lem = store_thm("Rsim_dCoh_lem", ``
 !sc s As. Rsim sc s /\ dCoh sc.ms As ==>
     !pa. pa IN As ==> (MVcl s.M T pa = dmvca sc.ms T pa)
@@ -658,6 +692,16 @@ val cl_II_po = Define `cl_II_po Icmf Icodef =
 !s s' n. cl_Inv s /\ cl_kcomp s s' n ==> cl_II Icmf Icodef s s'
 `; 
 
+val init_cm_xfer_po = Define `init_cm_xfer_po caI clI =
+!sc s Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm 
+ /\ Rsim sc s
+ /\ Inv Icoh Icode Icm sc
+ /\ cl_Inv s
+        ==>
+    (caI sc sc <=> clI s s)
+`;
+
 val Icmf_xfer_po = Define `Icmf_xfer_po caI clI =
 !sc sc' sc'' s s' s'' n dl Icoh Icode Icm cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm 
@@ -673,6 +717,7 @@ val Icmf_xfer_po = Define `Icmf_xfer_po caI clI =
         ==>
     (caI sc sc'' <=> clI s s'')
 `;
+
 
 val Icodef_xfer_po = Define `Icodef_xfer_po caI clI =
 !sc sc' sc'' s s' s'' n dl Icoh Icode Icm cl_Icmf ca_Icmf. 
@@ -744,7 +789,7 @@ val ca_Icodef_po = Define `ca_Icodef_po Icodef =
  /\ ((mode s' = USER) ==> Icode s')
 `;
 
-val ca_Icmf_Icoh_lem = store_thm("ca_Icmf_Icoh_lem", ``
+val ca_Icmf_Icode_lem = store_thm("ca_Icmf_Icode_lem", ``
 !s s' Icoh Icode Icm Icmf. 
     ca_Icodef_po Icmf
  /\ cm_user_po Icoh Icode Icm
@@ -758,9 +803,11 @@ val ca_Icmf_Icoh_lem = store_thm("ca_Icmf_Icoh_lem", ``
   RES_TAC
 );
 
-val cm_kernel_po = Define `
+val cm_kernel_po_def = Define `
 cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm =
-    Icmf_xfer_po ca_Icmf cl_Icmf
+    init_cm_xfer_po ca_Icmf cl_Icmf
+ /\ init_cm_xfer_po ca_Icodef cl_Icodef
+ /\ Icmf_xfer_po ca_Icmf cl_Icmf
  /\ Icodef_xfer_po ca_Icodef cl_Icodef
  /\ Icm_f_po ca_Icmf ca_Icodef Icm
  /\ cl_Icmf_po cl_Icmf

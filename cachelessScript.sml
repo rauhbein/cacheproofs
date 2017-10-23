@@ -311,6 +311,77 @@ val cl_trans_mon_lem = store_thm("cl_trans_mon_lem", ``
      ]
 );
 
+val cl_trans_progress_lem = store_thm("cl_trans_progress_lem", ``
+!s. ?req s'. cl_trans s (cl_mode s) req s'
+``,
+  RW_TAC std_ss [cl_mode_def] >>
+  ASSUME_TAC ( SPECL [``s.cs``,``MVcl s.M``] core_req_progress_lem ) >>
+  FULL_SIMP_TAC std_ss [] >>
+  ASSUME_TAC ( SPEC ``req:corereq`` req_cases_lem ) >>
+  FULL_SIMP_TAC std_ss [] 
+  >| [(* Freq *)
+      `?M'. M' = mtfcl s.M (Dop req)` by ( RW_TAC std_ss [] ) >>
+      `?cs'. core_rcv(c',Mode c',MVcl s.M T (Adr req),cs')` by (
+          RW_TAC std_ss [core_rcv_progress_lem]
+      ) >>
+      IMP_RES_TAC core_req_mode_change_lem >>
+      EXISTS_TAC ``req:corereq`` >>
+      EXISTS_TAC ``<|cs := cs'; M := M'|>`` >>
+      IMP_RES_TAC Freq_lem >>
+      RW_TAC std_ss [cl_trans_cases] >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+      ) >>
+      METIS_TAC []
+      ,
+      (* Dreq *)
+      IMP_RES_TAC Dreq_cases_lem
+      >| [(* read *)
+	  `?cs'. core_rcv(c',Mode c',MVcl s.M (CAreq req) (Adr req),cs')` by (
+	      RW_TAC std_ss [core_rcv_progress_lem]
+	  ) >>
+	  IMP_RES_TAC core_req_mode_change_lem >>
+	  EXISTS_TAC ``req:corereq`` >>
+	  EXISTS_TAC ``<|cs := cs'; M := s.M|>`` >>
+	  IMP_RES_TAC Rreq_lem >>
+	  RW_TAC std_ss [cl_trans_cases] >> (
+	      FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, CAreq_def]
+	  ) >>
+	  IMP_RES_TAC rd_lem >>
+	  RW_TAC std_ss [cachememTheory.mtfcl_def] >>
+	  METIS_TAC []
+	  ,
+	  (* write *)
+          `?M'. M' = mtfcl s.M (Dop req)` by ( RW_TAC std_ss [] ) >>
+          EXISTS_TAC ``req:corereq`` >>
+          EXISTS_TAC ``<|cs := c'; M := M'|>`` >>
+          IMP_RES_TAC Wreq_lem >>
+	  `~rd dop` by ( METIS_TAC [not_rd_lem] ) >>
+          RW_TAC std_ss [cl_trans_cases] >> (
+              FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+          )
+	  ,
+	  (* clean *)
+          EXISTS_TAC ``req:corereq`` >>
+          EXISTS_TAC ``<|cs := c'; M := s.M|>`` >>
+          IMP_RES_TAC Creq_lem >>
+	  `~rd dop` by ( METIS_TAC [not_rd_lem] ) >>
+          RW_TAC std_ss [cl_trans_cases] >> (
+              FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+          ) >>
+	  IMP_RES_TAC cl_lem >>
+	  RW_TAC std_ss [cachememTheory.mtfcl_def]
+	 ]
+      ,
+      (* NOREQ *)
+      EXISTS_TAC ``req:corereq`` >>
+      EXISTS_TAC ``<|cs := c'; M := s.M|>`` >>
+      RW_TAC std_ss [cl_trans_cases] >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+      )
+     ]
+);
+
+
 (********* abstract cacheless transition **********)
 
 val abs_cl_trans_def = Define `
@@ -389,7 +460,7 @@ val abs_cl_trans_not_write_oblg = store_thm("abs_cl_trans_not_write_oblg", ``
      ]
 );
 
-val abs_cl_trans_not_adrs_oblg = store_thm("abs_cl_trans_adrs_write_oblg", ``
+val abs_cl_trans_not_adrs_oblg = store_thm("abs_cl_trans_not_adrs_oblg", ``
 !s m dl s' pa. abs_cl_trans s m dl s' /\ pa NOTIN adrs dl ==> 
     (cl_Cv s' (MEM pa) = cl_Cv s (MEM pa))
 ``,
@@ -398,6 +469,25 @@ val abs_cl_trans_not_adrs_oblg = store_thm("abs_cl_trans_adrs_write_oblg", ``
   IMP_RES_TAC abs_cl_trans_not_write_oblg
 );
 
+val abs_cl_progress_oblg = store_thm("abs_cl_progress_oblg", ``
+!s. ?dl s'. abs_cl_trans s (cl_mode s) dl s'
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``s:cl_state`` cl_trans_progress_lem ) >>
+  FULL_SIMP_TAC std_ss [] >>
+  Cases_on `req` >- (
+      (* DREQ *)
+      EXISTS_TAC ``[d:dop]`` >>
+      EXISTS_TAC ``s':cl_state`` >>
+      RW_TAC std_ss [abs_cl_trans_def]
+  ) >> (
+      (* FREQ and NOREQ *)
+      EXISTS_TAC ``[]:dop list`` >>
+      EXISTS_TAC ``s':cl_state`` >>
+      RW_TAC std_ss [abs_cl_trans_def] >>
+      METIS_TAC []
+  )
+);
 
 (* dependencies *)
 
@@ -642,7 +732,7 @@ val core_bisim_req_lem = store_thm("core_bisim_req_lem", ``
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   `m = Mode sc.cs` by ( 
-      IMP_RES_TAC core_curr_req_mode_lem >>
+      IMP_RES_TAC core_req_curr_mode_lem >>
       RW_TAC std_ss []
   ) >>
   REV_FULL_SIMP_TAC std_ss [] >>
@@ -820,6 +910,85 @@ val cl_kcomp_exentry_lem = store_thm("cl_kcomp_exentry_lem", ``
       RES_TAC
      ]
 );
+
+val cl_kcomp_0_lem = store_thm("cl_kcomp_0_lem", ``
+!s s'. cl_kcomp s s' 0 ==> cl_exentry s /\ (s' = s)
+``,
+  ONCE_REWRITE_TAC [cl_kcomp_cases] >>
+  FULL_SIMP_TAC std_ss [numTheory.NOT_SUC]
+);
+
+val cl_kcomp_0_lem2 = store_thm("cl_kcomp_0_lem2", ``
+!s s'. cl_kcomp s s' 0 <=> cl_exentry s /\ (s' = s)
+``,
+  ONCE_REWRITE_TAC [cl_kcomp_cases] >>
+  FULL_SIMP_TAC std_ss [numTheory.NOT_SUC] >>
+  METIS_TAC []
+);
+
+val cl_kcomp_SUC_lem = store_thm("cl_kcomp_SUC_lem", ``
+!s s' n. 
+cl_kcomp s s' (SUC n) 
+    <=> 
+?s'' dl. cl_kcomp s s'' n /\ abs_cl_trans s'' PRIV dl s'
+``,
+  REPEAT STRIP_TAC >>
+  EQ_TAC 
+  >| [(* ==> *)
+      STRIP_TAC >>
+      IMP_RES_TAC cl_kcomp_cases >> (
+          FULL_SIMP_TAC std_ss [numTheory.NOT_SUC]
+      ) >>
+      METIS_TAC []
+      ,
+      (* <== *)
+      STRIP_TAC >>
+      ONCE_REWRITE_TAC [cl_kcomp_cases] >>
+      FULL_SIMP_TAC std_ss [numTheory.NOT_SUC] >>
+      METIS_TAC []
+     ]      
+);
+
+val cl_kcomp_exists_lem = store_thm("cl_kcomp_exists_lem", ``
+!s n. cl_exentry s ==> 
+    ?m s'. m <= n /\ cl_kcomp s s' m /\ (m < n ==> (cl_mode s' = USER))
+``,
+  STRIP_TAC >>
+  Induct
+  >| [(* n = 0 *)
+      STRIP_TAC >>
+      EXISTS_TAC ``0`` >>
+      EXISTS_TAC ``s:cl_state`` >>
+      FULL_SIMP_TAC arith_ss [cl_kcomp_0_lem2]
+      ,
+      (* n -> SUC n *)
+      STRIP_TAC >>
+      RES_TAC >>
+      Cases_on `m = n`
+      >| [(* m = n *)
+	  Cases_on `cl_mode s'`
+	  >| [(* PRIV *)
+	      EXISTS_TAC ``SUC n`` >>
+	      FULL_SIMP_TAC arith_ss [cl_kcomp_SUC_lem] >>
+	      ASSUME_TAC ( SPEC ``s':cl_state`` abs_cl_progress_oblg ) >>
+	      REV_FULL_SIMP_TAC std_ss [] >>
+	      METIS_TAC []
+	      ,
+	      (* USER *)
+	      EXISTS_TAC ``m:num`` >>
+	      FULL_SIMP_TAC arith_ss [cl_kcomp_SUC_lem] >>
+	      METIS_TAC []
+	     ]
+	  ,
+	  (* m <> n *)
+	  `m < n` by ( DECIDE_TAC ) >>
+	  EXISTS_TAC ``m:num`` >>
+	  FULL_SIMP_TAC arith_ss [cl_kcomp_SUC_lem] >>
+	  METIS_TAC []
+	 ]	  
+     ]      
+);
+
 
 val cl_wrel_def = Define` cl_wrel s s' = 
 ?n. cl_kcomp s s' n /\ (cl_mode s' = USER)`;

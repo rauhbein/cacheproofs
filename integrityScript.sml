@@ -5,6 +5,7 @@ open wordsLib blastLib;
 
 open hwTheory;
 open InvIfTheory;
+open cachelessTheory;
 
 val _ = new_theory "integrity";
 
@@ -111,6 +112,39 @@ val Inv_lem = store_thm("Inv_lem", ``
   REWRITE_TAC [Inv_oblg]
 ); 
 
+val abs_ca_trans_mode_lem = store_thm("abs_ca_trans_mode_lem", ``
+!s m dl s'. abs_ca_trans s m dl s' ==> (mode s = m) 
+``,
+  REWRITE_TAC [abs_ca_trans_mode_oblg]
+);
+
+val abs_ca_trans_dmvalt_lem = store_thm("abs_ca_trans_dmvalt_lem", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa NOTIN adrs dl ==> 
+    (dmvalt s'.ms T pa = dmvalt s.ms T pa)
+``,
+  REWRITE_TAC [abs_ca_trans_dmvalt_oblg]
+);
+
+val abs_ca_trans_dmvalt_not_write_lem = 
+store_thm("abs_ca_trans_dmvalt_not_write_lem", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN adrs dl /\ pa NOTIN writes dl 
+        ==> 
+    (dmvalt s'.ms T pa = dmvalt s.ms T pa)
+``,
+  REWRITE_TAC [abs_ca_trans_dmvalt_not_write_oblg]
+);
+
+val abs_ca_trans_dcoh_write_lem = store_thm("abs_ca_trans_dcoh_write_lem", ``
+!s m dl s' pa. 
+    abs_ca_trans s m dl s'
+ /\ (!d. MEM d dl ==> CA d)
+ /\ pa IN writes dl 
+        ==> 
+    dcoh s'.ms pa
+``,
+  REWRITE_TAC [abs_ca_trans_dcoh_write_oblg]
+);
+
 val abs_ca_trans_drvbl_lem = store_thm("abs_ca_trans_drvbl_lem", ``
 !s m dl s' pa. abs_ca_trans s USER dl s' ==> drvbl s s'
 ``,
@@ -121,6 +155,59 @@ val abs_ca_trans_switch_lem = store_thm("abs_ca_trans_switch_lem", ``
 !s dl s'. abs_ca_trans s USER dl s' ∧ (mode s' = PRIV) ⇒ exentry s'
 ``,
   REWRITE_TAC [abs_ca_trans_switch_oblg]
+);
+
+val abs_cl_trans_not_write_lem = store_thm("abs_cl_trans_not_write_lem", ``
+!s m dl s' pa. abs_cl_trans s m dl s' /\ pa NOTIN writes dl ==> 
+    (cl_Cv s' (MEM pa) = cl_Cv s (MEM pa))
+``,
+  REWRITE_TAC [abs_cl_trans_not_write_oblg]
+);
+
+val abs_cl_trans_not_adrs_lem = store_thm("abs_cl_trans_not_adrs_lem", ``
+!s m dl s' pa. abs_cl_trans s m dl s' /\ pa NOTIN adrs dl ==> 
+    (cl_Cv s' (MEM pa) = cl_Cv s (MEM pa))
+``,
+  REWRITE_TAC [abs_cl_trans_not_adrs_oblg]
+);
+
+
+val core_bisim_lem = store_thm("core_bisim_lem", ``
+!s s' sc sc' m dl dlc. 
+    abs_cl_trans s m dl s'
+ /\ abs_ca_trans sc m dlc sc'
+ /\ (s.cs = sc.cs)
+ /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+ /\ (cl_Cv s (MEM (cl_Tr s (VApc s.cs))) = imv sc.ms T (ca_Tr sc (VApc sc.cs)))
+ /\ (cl_deps s = ca_deps sc)
+ /\ (!d. MEM d dl ==> CA d)
+        ==>
+    (s'.cs = sc'.cs)
+ /\ (dl = dlc)
+ /\ (!pa. pa IN writes dl ==> (cl_Cv s' (MEM pa) = Cv sc' (MEM pa)))
+``,
+  REWRITE_TAC [core_bisim_oblg]
+);
+
+val ca_deps_pc_lem = store_thm("ca_deps_pc_lem", ``
+!s. ca_Tr s (VApc s.cs) IN ca_deps s
+``,
+  REWRITE_TAC [ca_deps_pc_oblg]
+);
+
+val deps_eq_lem = store_thm("deps_eq_lem", ``
+!s sc. (s.cs = sc.cs)
+    /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (cl_deps s = ca_deps sc)
+``,
+  REWRITE_TAC [deps_eq_oblg]
+);
+
+val ca_vdeps_PC_lem = store_thm("ca_vdeps_PC_lem", ``
+!s. VApc s.cs IN ca_vdeps s
+``,
+  REWRITE_TAC [ca_vdeps_PC_oblg]
 );
 
 (******** top level proof ********)
@@ -557,6 +644,168 @@ val Inv_AC_user_preserved_thm = store_thm("Inv_AC_user_preserved_thm", ``
   IMP_RES_TAC discharge_user_AC_lem >>
   ASM_REWRITE_TAC []
 );
+
+
+(*********** kernel integrity ************)
+
+val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
+!s' sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+    cm_user_po Icoh Icode Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ ca_wrel sc sc' 
+ /\ Rsim sc' s'
+ /\ cl_Inv s' 
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
+        ==>
+    Inv Icoh Icode Icm sc'
+``,
+  RW_TAC std_ss [cm_kernel_po_def] >>
+  IMP_RES_TAC Icm_f_po_def >>
+  FULL_SIMP_TAC std_ss [ca_II_def, Inv_lem] >>
+  REPEAT STRIP_TAC
+  >| [(* Ifun *)
+      `Icoh sc'` by ( IMP_RES_TAC ca_Icmf_Icoh_lem ) >>
+      IMP_RES_TAC Ifun_Icoh_lem 
+      ,
+      (* Icoh *)
+      IMP_RES_TAC ca_Icmf_Icoh_lem
+      ,
+      (* Icode *)
+      IMP_RES_TAC ca_Icmf_Icode_lem 
+     ]
+);
+
+val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
+!s s' sc sc' n Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+    cm_user_po Icoh Icode Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cl_II_po cl_Icmf cl_Icodef
+ /\ Rsim sc s
+ /\ cl_Inv s 
+ /\ Inv Icoh Icode Icm sc
+ /\ cl_kcomp s s' n
+ /\ ca_kcomp sc sc' n
+        ==>
+    Rsim sc' s'
+ /\ cl_II cl_Icmf cl_Icodef s s' 
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
+``,
+  Induct_on `n`
+  >| [(* n = 0 *)
+      REPEAT GEN_TAC >>
+      STRIP_TAC >>
+      IMP_RES_TAC cl_kcomp_0_lem >>
+      IMP_RES_TAC ca_kcomp_0_lem >>
+      IMP_RES_TAC cl_II_po_def >>
+      FULL_SIMP_TAC std_ss [cm_kernel_po_def, cl_II_def] >>
+      RW_TAC std_ss [ca_II_def] >> (
+	  IMP_RES_TAC init_cm_xfer_po_def
+      )
+      ,
+      (* n -> SUC n *)
+      REPEAT GEN_TAC >>
+      STRIP_TAC >>
+      IMP_RES_TAC cl_II_po_def >>
+      FULL_SIMP_TAC std_ss [cl_kcomp_SUC_lem, ca_kcomp_SUC_lem] >>
+      `Rsim s''' s'' /\
+       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc s'''` by ( METIS_TAC [] ) >>
+      MATCH_MP_TAC (
+          prove(``(A /\ (dl':dop list = dl)) /\ (A /\ (dl' = dl) ==> B) ==> 
+		  A /\ B``, PROVE_TAC [])
+      ) >>
+      STRIP_TAC 
+      >| [(* Rsim *)
+	  FULL_SIMP_TAC std_ss [Rsim_cs_lem] >>
+	  (* prepare for application of bisim lem *)
+	  `dCoh s'''.ms (ca_deps s''')` by (
+	      FULL_SIMP_TAC std_ss [cm_kernel_po_def, ca_II_def] >>
+	      IMP_RES_TAC abs_ca_trans_mode_lem >>
+	      FULL_SIMP_TAC std_ss [Inv_lem] >>
+	      IMP_RES_TAC ca_Icmf_po_def
+	  ) >>
+	  `!pa. pa IN ca_deps s''' ==> 
+           (cl_Cv s'' (MEM pa) = Cv s''' (MEM pa))` by (
+	      RW_TAC std_ss [cl_Cv_mem_lem, Cv_mem_lem] >>
+	      MATCH_MP_TAC EQ_SYM >>
+	      FULL_SIMP_TAC std_ss [dCoh_alt_lem]
+	  ) >>
+	  `ca_Tr s''' (VApc s'''.cs) IN ca_deps s'''` by (
+	      REWRITE_TAC [ca_deps_pc_lem]
+	  ) >>
+	  `VApc s'''.cs IN ca_vdeps s'''` by (
+	      REWRITE_TAC [ca_vdeps_PC_lem]
+	  ) >>
+	  `cl_Tr s'' (VApc s''.cs) = ca_Tr s''' (VApc s'''.cs)` by (
+	      RW_TAC std_ss [] >>
+	      IMP_RES_TAC deps_Tr_eq_lem 
+	  ) >>
+	  `cl_Cv s'' (MEM (cl_Tr s'' (VApc s''.cs))) = 
+           imv s'''.ms T (ca_Tr s''' (VApc s'''.cs))` by (
+              RW_TAC std_ss [Cv_mem_lem] >>
+	      MATCH_MP_TAC EQ_SYM >>
+	      MATCH_MP_TAC imv_dmv_lem >>
+	      IMP_RES_TAC dCoh_lem >>
+	      FULL_SIMP_TAC std_ss [cm_kernel_po_def, ca_II_def, Inv_lem] >>
+	      IMP_RES_TAC abs_ca_trans_mode_lem >>
+	      IMP_RES_TAC ca_Icodef_po_def >>
+	      ASM_REWRITE_TAC []
+	  ) >>
+	  `cl_deps s'' = ca_deps s'''` by ( IMP_RES_TAC deps_eq_lem ) >>
+	  `!d. MEM d dl ==> CA d` by (
+	      IMP_RES_TAC cl_II_po_def >>
+	      FULL_SIMP_TAC std_ss [cm_kernel_po_def, cl_II_def] >>
+	      IMP_RES_TAC cl_Icmf_po_def
+	  ) >>
+	  (* apply core bisim lem *)
+	  `(s'.cs = sc'.cs) /\ (dl = dl') /\  
+	   !pa. pa IN writes dl ==> (cl_Cv s' (MEM pa) = Cv sc' (MEM pa))` by (
+	      IMP_RES_TAC core_bisim_lem >>
+	      ASM_REWRITE_TAC []
+	  ) >>
+	  RW_TAC std_ss [] >>
+	  Cases_on `pa IN adrs dl`
+	  >| [(* touched address *)
+	      Cases_on `pa IN writes dl`
+	      >| [(* written address -> use coherency*)
+		  IMP_RES_TAC abs_ca_trans_dcoh_write_lem >>
+		  IMP_RES_TAC dcoh_alt_lem >>
+		  FULL_SIMP_TAC std_ss [cl_Cv_mem_lem, Cv_mem_lem]
+		  ,
+		  (* not write -> unchanged *)
+		  IMP_RES_TAC abs_cl_trans_not_write_lem >>
+		  IMP_RES_TAC abs_ca_trans_dmvalt_not_write_lem >>
+		  FULL_SIMP_TAC std_ss [cl_Cv_mem_lem]
+		 ]
+	      ,
+	      (* other addresses -> unchanged *)
+	      IMP_RES_TAC abs_cl_trans_not_adrs_lem >>
+	      IMP_RES_TAC abs_ca_trans_dmvalt_lem >>
+	      FULL_SIMP_TAC std_ss [cl_Cv_mem_lem]
+	     ]
+	  ,
+          (* ca_II *)
+	  STRIP_TAC >>
+	  FULL_SIMP_TAC std_ss [cm_kernel_po_def] >>
+	  IMP_RES_TAC cl_II_po_def >>
+	  RW_TAC std_ss [ca_II_def]
+	  >| [(* Icmf *)
+	      `ca_Icmf sc sc' <=> cl_Icmf s s'` suffices_by (
+	          FULL_SIMP_TAC std_ss [cl_II_def]
+	      ) >>
+	      IMP_RES_TAC Icmf_xfer_po_def
+	      ,
+	      (* Icmf *)
+	      `ca_Icodef sc sc' <=> cl_Icodef s s'` suffices_by (
+	          FULL_SIMP_TAC std_ss [cl_II_def]
+	      ) >>
+	      IMP_RES_TAC Icodef_xfer_po_def
+	     ]
+	 ]
+     ]
+);
+
+
+
 
 (*********** finish ************)
 

@@ -531,6 +531,12 @@ val dCoh_alt_oblg = store_thm("dCoh_alt_oblg", ``
   REWRITE_TAC [dCoh_def, dmvca_def, dmvalt_def, Coh_alt_lem]
 );
 
+val dcoh_alt_oblg = store_thm("dcoh_alt_oblg", ``
+!ms Rs pa. dcoh ms pa <=> ((dmvca ms) T pa = (dmvalt ms) T pa)
+``,
+  REWRITE_TAC [dcoh_def, dmvca_def, dmvalt_def, coh_alt_lem]
+);
+
 val dcoh_diff_oblg = store_thm("dcoh_diff_oblg", ``
 !ms pa. dcoh ms pa <=> dhit ms pa /\ dcnt ms pa <> M ms pa ==> dirty ms pa
 ``,
@@ -678,6 +684,16 @@ val dmvalt_unchanged_oblg = store_thm("dmvalt_unchanged_oblg", ``
   IMP_RES_TAC mvalt_unchanged_lem
 );
 
+val dmvalt_not_write_oblg = store_thm("dmvalt_not_write_oblg", ``
+!ms dop ms' pa. ~wt dop /\ (ms' = msca_trans ms (DREQ dop))
+        ==>
+    (dmvalt ms' T (PA dop) = dmvalt ms T (PA dop))
+``,
+  REPEAT STRIP_TAC >> 
+  IMP_RES_TAC msca_DREQ_lem >>
+  FULL_SIMP_TAC std_ss [dmvalt_def] >>
+  IMP_RES_TAC mvalt_not_write_lem
+);
 
 (* instruction cache *)
 

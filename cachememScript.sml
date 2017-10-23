@@ -1543,6 +1543,82 @@ val mvalt_unchanged_lem = store_thm("mvalt_unchanged_lem", ``
      ]
 );
 
+val mvalt_not_write_lem = store_thm("mvalt_not_write_lem", ``
+!ca m dop ca' m'. ~wt dop /\ ((ca',m') = mtfca (ca,m) dop)
+        ==>
+    (MValt ca' m' T (PA dop) = MValt ca m T (PA dop))
+``,
+  REPEAT STRIP_TAC >>				    
+  Cases_on `CA dop`
+  >| [(* cacheable *)
+      Cases_on `ca' (PA dop) = ca (PA dop)` 
+      >| [(* cache unchanged *)
+	  IMP_RES_TAC cdirty_lem >>
+	  IMP_RES_TAC ccnt_lem >>
+	  Cases_on `m' (PA dop) = m (PA dop)`
+          >| [(* mem unchanged *)
+	      RW_TAC std_ss [MValt_def]
+	      ,
+	      (* mem changed *)
+	      IMP_RES_TAC not_wt_lem
+	      >| [(* read *)
+		  IMP_RES_TAC mem_cacheable_read_lem
+		  ,
+		  (* clean *)
+		  `~rd dop` by ( METIS_TAC [dop_cases_lem2] ) >>
+		  IMP_RES_TAC ca_cacheable_ca >>
+		  PAT_X_ASSUM ``!pa. x`` (
+		      fn thm => ASSUME_TAC ( SPEC ``PA dop`` thm )
+		  ) >>
+		  REV_FULL_SIMP_TAC std_ss [] >>
+		  `~chit_ ca (PA dop)` by ( METIS_TAC [chit_lem] ) >>
+		  IMP_RES_TAC mem_cacheable_cl_miss_lem
+		 ]
+	     ]
+	  ,
+	  (* cache changed *)
+	  IMP_RES_TAC not_wt_lem
+	  >| [(* read *)
+	      IMP_RES_TAC ca_cacheable_read_lem >>
+	      IMP_RES_TAC not_chit_not_cdirty_lem >>
+	      IMP_RES_TAC mem_cacheable_read_lem >>
+	      RW_TAC std_ss [MValt_def]
+	      ,
+	      (* clean *)
+	      IMP_RES_TAC ca_cacheable_cl_lem >>
+	      PAT_X_ASSUM ``!pa. x`` (
+	          fn thm => ASSUME_TAC ( SPEC ``PA dop`` thm )
+	      ) >>
+	      REV_FULL_SIMP_TAC std_ss [] >>
+	      IMP_RES_TAC not_chit_not_cdirty_lem >>
+	      RW_TAC std_ss [MValt_def]
+	      >| [(* dirty eviction *)
+		  IMP_RES_TAC mem_cacheable_cl_dirty_lem
+		  ,
+		  (* miss or clean eviction *)
+		  Cases_on `chit_ ca (PA dop)`
+		  >| [(* hit *)
+		      IMP_RES_TAC ca_cacheable_mem >>
+		      PAT_X_ASSUM ``!pa. x`` (
+	                  fn thm => ASSUME_TAC ( SPEC ``PA dop`` thm )
+		      ) >>
+		      REV_FULL_SIMP_TAC std_ss []
+		      ,
+		      (* miss *)
+		      IMP_RES_TAC mem_cacheable_cl_miss_lem
+		     ]
+		 ]
+	     ]
+	 ]
+      ,
+      (* uncacheable *)
+      IMP_RES_TAC ca_uncacheable >>
+      IMP_RES_TAC cl_mem_unchanged >>
+      FULL_SIMP_TAC std_ss [MVcl_lem]
+     ]
+);
+
+
 (*********** finish ************)
 
 val _ = export_theory();

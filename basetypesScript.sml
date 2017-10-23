@@ -300,6 +300,14 @@ val adrs_lem = store_thm("adrs_lem", ``
   FULL_SIMP_TAC std_ss [listTheory.MEM] 
 );
 
+val adrs_lem2 = store_thm("adrs_lem2", ``
+!d pa. pa IN adrs [d] ==>  (pa = PA d)
+``,
+  RW_TAC std_ss [adrs_def] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_MAP] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM] 
+);
+
 val writes_def = Define `writes dl = set (MAP PA (FILTER wt dl))`;
 
 val writes_lem = store_thm("writes_lem", ``
@@ -314,6 +322,16 @@ val writes_lem = store_thm("writes_lem", ``
       fn thm => ASSUME_TAC ( SPEC ``d:dop`` thm )
   ) >>
   FULL_SIMP_TAC std_ss [listTheory.MEM] 
+);
+
+val writes_lem2 = store_thm("writes_lem2", ``
+!d pa. pa IN writes [d] ==>  wt d /\ (PA d = pa)
+``,
+  RW_TAC std_ss [writes_def] >> (
+      FULL_SIMP_TAC std_ss [listTheory.MEM_MAP,
+			    listTheory.MEM_FILTER,
+			    listTheory.MEM]
+  )
 );
 
 val reads_def = Define `reads dl = set (MAP PA (FILTER rd dl))`;
@@ -345,6 +363,32 @@ adrs_writes_lem |> SPEC_ALL |> CONTRAPOS |> GEN_ALL)
 
 val dops_def = Define `dops dl = set dl`;
 
+val cleans_def = Define `cleans dl = set (MAP PA (FILTER cl dl))`;
+
+val not_writes_lem = store_thm("not_writes_lem", ``
+!dl pa. pa IN adrs dl /\ pa NOTIN writes dl ==> 
+    (pa IN reads dl \/ pa IN cleans dl) 
+``,
+  RW_TAC std_ss [adrs_def, writes_def, reads_def, cleans_def, 
+		 listTheory.MEM_MAP] >>
+  Cases_on `y`
+  >| [(* read *)
+      DISJ1_TAC >>
+      EXISTS_TAC ``RD p b`` >>
+      RW_TAC std_ss [listTheory.MEM_FILTER, rd_def]
+      ,
+      (* clean *)
+      PAT_X_ASSUM ``!y. x`` (
+          fn thm => ASSUME_TAC ( SPEC ``WT p c b`` thm )
+      ) >>
+      FULL_SIMP_TAC std_ss [listTheory.MEM_FILTER, wt_def]
+      ,
+      (* clean *)
+      DISJ2_TAC >>
+      EXISTS_TAC ``CL p`` >>
+      RW_TAC std_ss [listTheory.MEM_FILTER, cl_def]
+     ]      
+);
 
 (*********** finish ************)
 
