@@ -546,6 +546,18 @@ val Invic_preserve_lem = store_thm("Invic_preserve_lem", ``
   REWRITE_TAC [Invic_preserve_oblg]
 );
 
+val iCoh_lem = store_thm("iCoh_lem", ``
+!ms As pa. iCoh ms As /\ pa IN As ==> icoh ms pa
+``,
+  REWRITE_TAC [iCoh_oblg]
+);
+
+val iCoh_lem2 = store_thm("iCoh_lem2", ``
+!ms As. iCoh ms As <=> !pa. pa IN As ==> icoh ms pa
+``,
+  REWRITE_TAC [iCoh_oblg2]
+);
+
 val icoh_preserve_lem = store_thm("icoh_preserve_lem", ``
 !ms req ms' pa. icoh ms pa /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
@@ -696,6 +708,12 @@ val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
     ==>
     hw_trans s M NOREQ s')
 `;
+
+val Cv_mem_lem = store_thm("Cv_mem_lem", ``
+!s pa. Cv s (MEM pa) = dmvca s.ms T pa
+``,
+  RW_TAC std_ss [Cv_def, CV_def]
+);
 
 (* hw_trans lemmas *)
 

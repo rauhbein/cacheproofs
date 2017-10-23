@@ -68,6 +68,12 @@ val (cl_trans_rules, cl_trans_ind, cl_trans_cases) = Hol_reln `
     cl_trans s M NOREQ s')
 `;
 
+val cl_Cv_mem_lem = store_thm("cl_Cv_mem_lem", ``
+!s pa. cl_Cv s (MEM pa) = MVcl s.M T pa
+``,
+  RW_TAC std_ss [cl_Cv_def, coreIfTheory.CV_def]
+);
+
 (* cl_trans lemmas *)
 
 val cl_trans_mode_not_eq_lem = store_thm("cl_trans_mode_not_eq_lem", ``
