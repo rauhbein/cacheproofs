@@ -376,6 +376,19 @@ val Rsim_cs_lem = store_thm("Rsim_cs_lem", ``
      ]
 );
 
+val Rsim_exentry_lem = store_thm("Rsim_exentry_lem", ``
+!sc s. Rsim sc s ==> (cl_exentry s <=> exentry sc)
+``,
+  RW_TAC std_ss [Rsim_cs_lem, cl_exentry_def, exentry_def]
+);
+
+val Rsim_exists_lem = store_thm("Rsim_exists_lem", ``
+!sc. ?s. Rsim sc s
+``,
+  RW_TAC std_ss [Rsim_cs_lem] >>
+  EXISTS_TAC ``<| cs := sc.cs; M := dmvalt sc.ms T |>`` >>
+  RW_TAC std_ss [cachememTheory.MVcl_def]
+);
 
 val Rsim_dCoh_lem = store_thm("Rsim_dCoh_lem", ``
 !sc s As. Rsim sc s /\ dCoh sc.ms As ==>
