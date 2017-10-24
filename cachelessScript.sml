@@ -611,15 +611,78 @@ val cl_trans_fetch_pc_lem = store_thm("cl_trans_fetch_pc_lem", ``
 (* fix translation for privileged mode *)
 
 val cl_fixmmu_def = Define `cl_fixmmu s VAs f = 
-!va. va IN VAs ==> (cl_Mmu s va PRIV R = SOME (f va, T))
+!va. va IN VAs ==> 
+     (cl_Mmu s va PRIV R = SOME (f va, T))
+  /\ (!pa c. (cl_Mmu s va PRIV W = SOME (pa,c)) ==> (pa = f va) /\ c)
+  /\ (!pa c. (cl_Mmu s va PRIV EX = SOME (pa,c)) ==> (pa = f va) /\ c)
 `;
 
 val cl_fixmmu_Tr_oblg = store_thm("cl_fixmmu_Tr_oblg", ``
 !s VAs va f. cl_fixmmu s VAs f /\ va IN VAs /\ (cl_mode s = PRIV) ==> 
     (cl_Tr s va = f va)
 ``,
-  RW_TAC std_ss [cl_fixmmu_def, cl_Tr_def, cl_Mmu_def, cl_mode_def,
-		 coreIfTheory.Tr__def]
+  REWRITE_TAC [cl_fixmmu_def, cl_Tr_def, cl_Mmu_def, cl_mode_def,
+	       coreIfTheory.Tr__def] >>
+  REPEAT STRIP_TAC >>
+  RES_TAC >>
+  ASM_REWRITE_TAC [optionTheory.THE_DEF, pairTheory.FST]
+);
+
+val cl_fixmmu_CA_lem = store_thm("cl_fixmmu_CA_lem", ``
+!s va acc pa c VAs f. 
+    cl_fixmmu s VAs f 
+ /\ va IN VAs
+ /\ (cl_Mmu s va PRIV acc = SOME (pa,c))
+	==>
+    c
+``,
+  REWRITE_TAC [cl_fixmmu_def, cl_Mmu_def] >>
+  REPEAT STRIP_TAC >>
+  Cases_on `acc` >> (
+      RES_TAC >>
+      METIS_TAC [optionTheory.SOME_11, pairTheory.PAIR_EQ]
+  )
+);
+
+val cl_fixmmu_MD_lem = store_thm("cl_fixmmu_MD_lem", ``
+!s s' VAs f. 
+    cl_fixmmu s VAs f 
+ /\ (!r. r IN cl_MDVA s VAs ==> (cl_Cv s r = cl_Cv s' r))
+	==>
+    cl_fixmmu s' VAs f
+``,
+  REWRITE_TAC [cl_fixmmu_def, cl_Mmu_def, cl_Cv_def, cl_MDVA_def] >>
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC Mmu_lem >>
+  METIS_TAC []
+);
+
+val abs_cl_trans_fixmmu_CA_oblg = store_thm("abs_cl_trans_fixmmu_CA_oblg", ``
+!s dl s' VAs f. 
+    cl_fixmmu s VAs f 
+ /\ cl_vdeps s SUBSET VAs 
+ /\ abs_cl_trans s PRIV dl s' 
+	==>
+    !d. MEM d dl ==> CA d
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl = []` 
+  >| [(* [] *)
+      FULL_SIMP_TAC list_ss []
+      ,
+      (* [d] *)
+      IMP_RES_TAC abs_cl_req_lem >>
+      RES_TAC >>
+      FULL_SIMP_TAC list_ss [] >>
+      IMP_RES_TAC cl_trans_core_req_lem >>
+      `Dreq (DREQ dop)` by ( REWRITE_TAC [Dreq_def] ) >>
+      IMP_RES_TAC core_req_mmu_Dreq_lem >>
+      FULL_SIMP_TAC std_ss [cl_vdeps_def, pred_setTheory.SUBSET_DEF,
+			    CAreq_def] >>
+      RES_TAC >>
+      IMP_RES_TAC ( cl_fixmmu_CA_lem |> SIMP_RULE std_ss [cl_Mmu_def] ) 
+     ]
 );
 
 (********* bisimulation properties *********)
@@ -646,9 +709,40 @@ val deps_MD_lem = store_thm("deps_MD_lem", ``
      ]
 );
 
+val cl_deps_MD_lem = store_thm("cl_deps_MD_lem", ``
+!s sc. (s.cs = sc.cs)
+    /\ (!pa. pa IN cl_deps s ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (!r. r IN cl_MDVA s (cl_vdeps s) ==> (cl_Cv s r = Cv sc r))
+``,
+  RW_TAC std_ss [cl_Cv_def, Cv_def] >>
+  ASSUME_TAC ( SPEC ``r:resource`` coreIfTheory.res_cases ) >>
+  FULL_SIMP_TAC std_ss []
+  >| [(* MEM pa *)
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC cl_deps_MD_oblg >>
+      RES_TAC >>
+      METIS_TAC []
+      ,
+      (* register *)
+      Cases_on `r` >> (
+          FULL_SIMP_TAC std_ss [coreIfTheory.reg_res_def, coreIfTheory.CV_def]
+      )
+     ]
+);
+
 val deps_vdeps_eq_lem = store_thm("deps_vdeps_eq_lem", ``
 !s sc. (s.cs = sc.cs)
     /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (cl_vdeps s = ca_vdeps sc)
+``,
+  RW_TAC std_ss [cl_vdeps_def, ca_vdeps_def]
+);
+
+val cl_deps_vdeps_eq_lem = store_thm("cl_deps_vdeps_eq_lem", ``
+!s sc. (s.cs = sc.cs)
+    /\ (!pa. pa IN cl_deps s ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
         ==>
     (cl_vdeps s = ca_vdeps sc)
 ``,
@@ -671,6 +765,22 @@ val deps_MD_eq_lem = store_thm("deps_MD_eq_lem", ``
   RES_TAC >>
   REV_FULL_SIMP_TAC std_ss [] 
 );
+
+val cl_deps_MD_eq_lem = store_thm("cl_deps_MD_eq_lem", ``
+!s sc. (s.cs = sc.cs)
+    /\ (!pa. pa IN cl_deps s ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (cl_MDVA s (cl_vdeps s) = MDVA sc (ca_vdeps sc))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC cl_deps_vdeps_eq_lem >>
+  IMP_RES_TAC cl_deps_MD_lem >>
+  FULL_SIMP_TAC  std_ss [cl_MDVA_def, MDVA_def, cl_Cv_def, Cv_def] >>
+  MATCH_MP_TAC MD__lem >>
+  REPEAT STRIP_TAC >>
+  REV_FULL_SIMP_TAC std_ss [] 
+);
+
 
 val deps_Tr_eq_lem = store_thm("deps_Tr_eq_lem", ``
 !s sc. (s.cs = sc.cs)
@@ -698,6 +808,31 @@ val deps_Tr_eq_lem = store_thm("deps_Tr_eq_lem", ``
   REV_FULL_SIMP_TAC std_ss []  
 );
 
+val cl_deps_Tr_eq_lem = store_thm("cl_deps_Tr_eq_lem", ``
+!s sc. (s.cs = sc.cs)
+    /\ (!pa. pa IN cl_deps s ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (!va. va IN cl_vdeps s ==> (cl_Tr s va = ca_Tr sc va))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC cl_deps_vdeps_eq_lem >>
+  IMP_RES_TAC cl_deps_MD_lem >>
+  `cl_MDVA s (cl_vdeps s) = MDVA sc (ca_vdeps sc)` by (
+      IMP_RES_TAC cl_deps_MD_eq_lem >>
+      FULL_SIMP_TAC std_ss []
+  ) >>
+  FULL_SIMP_TAC  std_ss [cl_MDVA_def, MDVA_def, cl_Cv_def, Cv_def, 
+			 cl_Tr_def, ca_Tr_def, coreIfTheory.Tr__def] >>
+  MATCH_MP_TAC (
+      prove(``(x = y) ==> (FST x = FST y)``, PROVE_TAC [])
+  ) >>
+  MATCH_MP_TAC (
+      prove(``(x = y) ==> (THE x = THE y)``, PROVE_TAC [])
+  ) >>
+  `va IN cl_vdeps s` by ( RW_TAC std_ss [] ) >>
+  METIS_TAC [Mmu_lem]  
+);
+
 val deps_eq_oblg = store_thm("deps_eq_oblg", ``
 !s sc. (s.cs = sc.cs)
     /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
@@ -716,6 +851,34 @@ val deps_eq_oblg = store_thm("deps_eq_oblg", ``
   RW_TAC std_ss [pred_setTheory.EXTENSION]
   >| [(* vdeps *)
       FULL_SIMP_TAC std_ss [cl_Tr_def, ca_Tr_def, ca_vdeps_def,
+			    pred_setTheory.IN_GSPEC_IFF] >>
+      METIS_TAC []
+      ,
+      (* MD *)
+      FULL_SIMP_TAC std_ss [cl_vdeps_def, ca_vdeps_def,
+			    pred_setTheory.IN_GSPEC_IFF] >>
+      REV_FULL_SIMP_TAC std_ss []
+     ]
+);
+
+val cl_deps_eq_oblg = store_thm("cl_deps_eq_oblg", ``
+!s sc. (s.cs = sc.cs)
+    /\ (!pa. pa IN cl_deps s ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (cl_deps s = ca_deps sc)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC cl_deps_MD_eq_lem >>
+  IMP_RES_TAC cl_deps_Tr_eq_lem >>
+  FULL_SIMP_TAC std_ss [cl_deps_def, ca_deps_def, cl_Cv_def, Cv_def, 
+			MDVA_def, cl_MDVA_def, coreIfTheory.deps__def,
+		        pred_setTheory.IN_UNION] >>
+  MATCH_MP_TAC (
+      prove(``(A = C) /\ (B = D) ==> (A UNION B = C UNION D)``, PROVE_TAC [])
+  ) >>
+  RW_TAC std_ss [pred_setTheory.EXTENSION]
+  >| [(* vdeps *)
+      FULL_SIMP_TAC std_ss [cl_Tr_def, ca_Tr_def, cl_vdeps_def,
 			    pred_setTheory.IN_GSPEC_IFF] >>
       METIS_TAC []
       ,

@@ -171,6 +171,16 @@ val abs_cl_trans_not_adrs_lem = store_thm("abs_cl_trans_not_adrs_lem", ``
   REWRITE_TAC [abs_cl_trans_not_adrs_oblg]
 );
 
+val abs_cl_trans_fixmmu_CA_lem = store_thm("abs_cl_trans_fixmmu_CA_lem", ``
+!s dl s' VAs f. 
+    cl_fixmmu s VAs f 
+ /\ cl_vdeps s SUBSET VAs 
+ /\ abs_cl_trans s PRIV dl s' 
+	==>
+    !d. MEM d dl ==> CA d
+``,
+  REWRITE_TAC [abs_cl_trans_fixmmu_CA_oblg]
+);
 
 val core_bisim_lem = store_thm("core_bisim_lem", ``
 !s s' sc sc' m dl dlc. 
@@ -204,10 +214,26 @@ val deps_eq_lem = store_thm("deps_eq_lem", ``
   REWRITE_TAC [deps_eq_oblg]
 );
 
+val cl_deps_eq_lem = store_thm("cl_deps_eq_lem", ``
+!s sc. (s.cs = sc.cs)
+    /\ (!pa. pa IN cl_deps s ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (cl_deps s = ca_deps sc)
+``,
+  REWRITE_TAC [cl_deps_eq_oblg]
+);
+
 val ca_vdeps_PC_lem = store_thm("ca_vdeps_PC_lem", ``
 !s. VApc s.cs IN ca_vdeps s
 ``,
   REWRITE_TAC [ca_vdeps_PC_oblg]
+);
+
+val cl_CRex_lem = store_thm("cl_CRex_lem", ``
+!s r. r IN cl_CRex s ==> 
+(?pa. (r = MEM pa)) /\ r IN cl_CR s /\ ?m. cl_Mon s r m EX
+``,
+  REWRITE_TAC [cl_CRex_oblg]
 );
 
 (******** top level proof ********)
@@ -516,6 +542,18 @@ val Inv_user_preserved_thm = store_thm("Inv_user_preserved_thm", ``
 (********* Instantiation: Always Cacheability *********)
 
 val _ = new_constant("Mac", ``:padr set``);
+val _ = new_constant("Kvm", ``:vadr set``);
+val _ = new_constant("Ktr", ``:vadr -> padr``);
+
+val Kcode_exists = store_thm("Kcode_exists", ``
+?Kcode. !va. va IN Kcode ==> va IN Kvm
+``,
+  EXISTS_TAC ``EMPTY:vadr set`` >>
+  RW_TAC std_ss [pred_setTheory.NOT_IN_EMPTY]
+);
+
+val Kcode_spec = new_specification ("Kcode_spec",
+  ["Kcode"], Kcode_exists);
 
 val Ifun_AC_po = Define `Ifun_AC_po = 
 !s. Ifun s ==> 
@@ -533,7 +571,7 @@ val Icode_AC_def = Define `Icode_AC s =
 `; 
 
 val Icm_AC_def = Define `Icm_AC s = 
-dCoh s.ms (Mac DIFF {pa | MEM pa IN CR s})
+   dCoh s.ms (Mac DIFF {pa | MEM pa IN CR s})
 `; 
 
 val Inv_AC_CR_unchanged_lem = store_thm("Inv_AC_CR_unchanged_lem", ``
@@ -651,7 +689,7 @@ val Inv_AC_user_preserved_thm = store_thm("Inv_AC_user_preserved_thm", ``
 val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
 !s' sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
- /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ ca_wrel sc sc' 
  /\ Rsim sc' s'
  /\ cl_Inv s' 
@@ -678,7 +716,7 @@ val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
 val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 !s s' sc sc' n Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
- /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Rsim sc s
  /\ cl_Inv s 
@@ -807,7 +845,7 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 val kernel_wrel_sim_lem = store_thm("kernel_wrel_sim_lem", ``
 !sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
- /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Inv_po
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Inv Icoh Icode Icm sc
@@ -862,7 +900,7 @@ val kernel_wrel_sim_lem = store_thm("kernel_wrel_sim_lem", ``
 val Inv_kernel_preserved_thm = store_thm("Inv_kernel_preserved_thm", ``
 !sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
- /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Inv_po
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Inv Icoh Icode Icm sc
@@ -879,7 +917,7 @@ val Inv_kernel_preserved_thm = store_thm("Inv_kernel_preserved_thm", ``
 val kernel_integrity_sim_thm = store_thm("kernel_integrity_sim_thm", ``
 !s sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
- /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Inv_po
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Inv Icoh Icode Icm sc
@@ -915,7 +953,7 @@ val (Wrel_rules, Wrel_ind, Wrel_cases) = Hol_reln `
 val overall_integrity_thm = store_thm("overall_integrity_thm", ``
 !sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
- /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Inv_po
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Inv Icoh Icode Icm sc
@@ -935,6 +973,179 @@ val overall_integrity_thm = store_thm("overall_integrity_thm", ``
       IMP_RES_TAC Inv_kernel_preserved_thm
      ]      
 );
+
+(********* Instantiation: Always Cachability **********)
+
+val cl_Inv_Mmu_fixed_def = Define `cl_Inv_Mmu_fixed s s' =
+    cl_fixmmu s Kvm Ktr
+ /\ (!r. r IN cl_MDVA s Kvm ==> (cl_Cv s r = cl_Cv s' r))
+`;
+
+val cl_Inv_Mmu_fixed_lem = store_thm("cl_Inv_Mmu_fixed_lem", ``
+!s s'. cl_Inv_Mmu_fixed s s' ==> cl_fixmmu s' Kvm Ktr
+``,
+  RW_TAC std_ss [cl_Inv_Mmu_fixed_def] >>
+  IMP_RES_TAC cl_fixmmu_MD_lem
+);
+
+val ca_Inv_Mmu_fixed_def = Define `ca_Inv_Mmu_fixed s s' =
+    ca_fixmmu s Kvm Ktr
+ /\ (!r. r IN MDVA s Kvm ==> (Cv s r = Cv s' r))
+`;
+
+(* fix MMU so that all va in Kvm are cacheable 
+   only accesses va from KVM
+   corresponding pa are in always cacheable region 
+   resulting CR is in always cacheable region
+*)
+val cl_Icmf_AC_def = Define `cl_Icmf_AC s s' = 
+    cl_Inv_Mmu_fixed s s'
+ /\ cl_vdeps s' SUBSET Kvm
+ /\ cl_deps s' SUBSET Mac
+ /\ ((cl_mode s' = USER) ==> !pa. MEM pa IN cl_CR s' ==> pa IN Mac)
+`; 
+
+(* fix MMU so that all va in Kvm are cacheable 
+   only accesses va from KVM
+   corresponding pa are in always cacheable region 
+   always cacheable region is coherent
+   resulting CR is in always cacheable region
+*)
+val ca_Icmf_AC_def = Define `ca_Icmf_AC s s' = 
+    ca_Inv_Mmu_fixed s s'
+ /\ ca_vdeps s' SUBSET Kvm
+ /\ ca_deps s' SUBSET Mac
+ /\ dCoh s'.ms Mac
+ /\ ((mode s' = USER) ==> !pa. MEM pa IN CR s' ==> pa IN Mac)
+`; 
+
+
+(* fix MMU so that all va in Kvm are cacheable 
+   all va in Kcode map to CRex
+   PC always in Kcode
+   never write CRex
+   resulting CRex not expanding and contains Kcode
+*)
+val cl_Icodef_AC_def = Define `cl_Icodef_AC s s' = 
+    cl_Inv_Mmu_fixed s s'
+ /\ (!va. va IN Kcode ==> MEM (Ktr va) IN cl_CRex s)
+ /\ VApc s'.cs IN Kcode
+ /\ (!pa s'' dl. abs_cl_trans s' PRIV dl s'' /\ MEM pa IN cl_CRex s ==> 
+		 pa NOTIN writes dl)
+(* TODO: no support for ic flush yet, cannot expand cl_CRex *) 
+ /\ ((cl_mode s' = USER) ==> (cl_CRex s' SUBSET cl_CRex s)
+                          /\ (!va. va IN Kcode ==> MEM (Ktr va) IN cl_CRex s'))
+`; 
+
+(* fix MMU so that all va in Kvm are cacheable 
+   all va in Kcode map to CRex
+   PC always in Kcode
+   never write CRex
+   CRex i-coherent and not dirty
+   resulting CRex not expanding and contains Kcode
+*)
+val ca_Icodef_AC_def = Define `ca_Icodef_AC s s' = 
+    ca_Inv_Mmu_fixed s s'
+ /\ (!va. va IN Kcode ==> MEM (Ktr va) IN CRex s)
+ /\ VApc s'.cs IN Kcode
+ /\ (!pa s'' dl. abs_ca_trans s' PRIV dl s'' /\ MEM pa IN CRex s ==> 
+		 pa NOTIN writes dl)
+ /\ (!pa. MEM pa IN CRex s ==> icoh s'.ms pa /\ ~dirty s'.ms pa)
+(* TODO: no support for ic flush yet, cannot expand ca_CRex *) 
+ /\ ((mode s' = USER) ==> (CRex s' SUBSET CRex s)
+                       /\ (!va. va IN Kcode ==> MEM (Ktr va) IN CRex s'))
+`; 
+
+val Rsim_deps_lem = store_thm("Rsim_deps_lem", ``
+!sc s As. Rsim sc s /\ dCoh sc.ms As /\ ca_deps sc SUBSET As ==>
+    (cl_deps s = ca_deps sc)
+``,
+  REPEAT STRIP_TAC >>
+  MATCH_MP_TAC deps_eq_lem >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  ASM_REWRITE_TAC [] >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Rsim_cl_deps_lem = store_thm("Rsim_cl_deps_lem", ``
+!sc s As. Rsim sc s /\ dCoh sc.ms As /\ cl_deps s SUBSET As ==>
+    (cl_deps s = ca_deps sc)
+``,
+  REPEAT STRIP_TAC >>
+  MATCH_MP_TAC cl_deps_eq_lem >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  ASM_REWRITE_TAC [] >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Rsim_deps_cnt_lem = store_thm("Rsim_deps_cnt_lem", ``
+!sc s As. Rsim sc s /\ dCoh sc.ms As /\ ca_deps sc SUBSET As ==>
+    (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Inv_Coh_AC_lem = store_thm("Inv_Coh_AC_lem", ``
+!sc. cm_user_po Icoh_AC Icode_AC Icm_AC
+  /\ Inv Icoh_AC Icode_AC Icm_AC sc
+        ==>
+     dCoh sc.ms Mac
+``,
+  RW_TAC std_ss [cm_user_po_def, Inv_lem] >>
+  FULL_SIMP_TAC std_ss [Icoh_AC_def, Icm_AC_def, dCoh_lem2] >>
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_INTER, pred_setTheory.IN_DIFF] >>
+  Cases_on `pa IN {pa | MEM pa IN CR sc}` >> (
+      FULL_SIMP_TAC std_ss []
+  )
+);
+
+(* discharge proof obligations *)
+
+val Icmf_AC_init_xfer_lem = store_thm("Icmf_AC_init_xfer_lem", ``
+init_cm_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
+``,
+  RW_TAC std_ss [init_cm_xfer_po_def, ca_Icmf_AC_def, cl_Icmf_AC_def] >>
+  IMP_RES_TAC Inv_Coh_AC_lem >>
+  ASM_REWRITE_TAC [] >>
+  FULL_SIMP_TAC std_ss [Inv_lem] >>
+  `cl_CR s = CR sc` by ( IMP_RES_TAC Rsim_CR_eq_lem ) >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  ASM_REWRITE_TAC [ca_Inv_Mmu_fixed_def, cl_Inv_Mmu_fixed_def, 
+		   mode_def, cl_mode_def] >>
+  `cl_fixmmu s Kvm Ktr <=> ca_fixmmu sc Kvm Ktr` by (
+      METIS_TAC [Rsim_fixmmu_lem]
+  ) >>
+  EQ_TAC 
+  >| [(* ==> *)
+      STRIP_TAC >>
+      IMP_RES_TAC Rsim_deps_lem >>
+      IMP_RES_TAC Rsim_deps_cnt_lem >>
+      IMP_RES_TAC deps_vdeps_eq_lem >>
+      RW_TAC std_ss []
+      ,
+      (* ==> *)
+      STRIP_TAC >>
+      IMP_RES_TAC Rsim_cl_deps_lem >>
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC Rsim_deps_cnt_lem >>
+      IMP_RES_TAC deps_vdeps_eq_lem >>
+      FULL_SIMP_TAC std_ss []
+     ]  
+);
+
+ (* /\ init_cm_xfer_po ca_Icodef cl_Icodef *)
+ (* /\ Icmf_xfer_po_def ca_Icmf cl_Icmf *)
+ (* /\ Icodef_xfer_po ca_Icodef cl_Icodef *)
+ (* /\ Icm_f_po ca_Icmf ca_Icodef Icm *)
+ (* /\ cl_Icmf_po cl_Icmf *)
+ (* /\ ca_Icmf_po ca_Icmf *)
+ (* /\ ca_Icodef_po ca_Icodef *)
+
 
 (*********** finish ************)
 

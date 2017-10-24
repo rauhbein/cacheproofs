@@ -2326,17 +2326,21 @@ val hw_trans_fetch_pc_lem = store_thm("hw_trans_fetch_pc_lem", ``
 (* fix translation for privileged mode *)
 
 val ca_fixmmu_def = Define `ca_fixmmu s VAs f = 
-!va. va IN VAs ==> (Mmu s va PRIV R = SOME (f va, T))
+!va. va IN VAs ==> 
+     (Mmu s va PRIV R = SOME (f va, T))
+  /\ (!pa c. (Mmu s va PRIV W = SOME (pa,c)) ==> (pa = f va) /\ c)
+  /\ (!pa c. (Mmu s va PRIV EX = SOME (pa,c)) ==> (pa = f va) /\ c)
 `;
 
 val ca_fixmmu_Tr_oblg = store_thm("ca_fixmmu_Tr_oblg", ``
 !s VAs va f. ca_fixmmu s VAs f /\ va IN VAs /\ (mode s = PRIV) ==> 
     (ca_Tr s va = f va)
 ``,
-  RW_TAC std_ss [ca_fixmmu_def, ca_Tr_def, Mmu_def, mode_def,
-		 coreIfTheory.Tr__def]
+  REWRITE_TAC [ca_fixmmu_def, ca_Tr_def, Mmu_def, mode_def, Tr__def] >>
+  REPEAT STRIP_TAC >>
+  RES_TAC >>
+  ASM_REWRITE_TAC [optionTheory.THE_DEF, pairTheory.FST]
 );
-
 
 (******** cacheaware computation ********)
 
