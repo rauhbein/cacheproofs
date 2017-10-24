@@ -144,6 +144,12 @@ val exentry_exists = prove (``
 val exentry_spec = new_specification ("exentry_spec",
   ["exentry_"], exentry_exists);
 
+val exentry__oblg = store_thm("exentry__oblg", ``
+!c. exentry_ c ==> (Mode c = PRIV)
+``,
+  REWRITE_TAC [exentry_spec]
+);
+
 (***** transition relations *****)
 
 (* touched va, depending on core registers here, as fetch separate 

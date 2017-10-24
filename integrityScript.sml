@@ -804,7 +804,106 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
      ]
 );
 
+val kernel_wrel_sim_lem = store_thm("kernel_wrel_sim_lem", ``
+!sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+    cm_user_po Icoh Icode Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cl_Inv_po
+ /\ cl_II_po cl_Icmf cl_Icodef
+ /\ Inv Icoh Icode Icm sc
+ /\ ca_wrel sc sc'
+        ==>
+?s s'. 
+    Rsim sc s
+ /\ cl_Inv s
+ /\ cl_wrel s s'
+ /\ Rsim sc' s'
+ /\ cl_Inv s' 
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``sc:hw_state`` Rsim_exists_lem ) >>
+  FULL_SIMP_TAC std_ss [ca_wrel_def] >>
+  IMP_RES_TAC Rsim_cl_Inv_lem >>
+  IMP_RES_TAC ca_kcomp_exentry_lem >>
+  IMP_RES_TAC Rsim_exentry_lem >>
+  IMP_RES_TAC cl_kcomp_exists_lem >>
+  PAT_X_ASSUM ``!n. x`` (
+      fn thm => ASSUME_TAC ( SPEC ``n:num`` thm )
+  ) >>
+  FULL_SIMP_TAC std_ss [] >>
+  Cases_on `m = n`
+  >| [(* same length *)
+      RW_TAC std_ss [] >>
+      `Rsim sc' s' /\
+       cl_II cl_Icmf cl_Icodef s s' /\
+       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'` by (
+          METIS_TAC [kernel_bisim_lem]
+      ) >>
+      IMP_RES_TAC Rsim_mode_lem >>
+      `cl_wrel s s'` by ( METIS_TAC [cl_wrel_def] ) >>
+      IMP_RES_TAC cl_Inv_po_def >>
+      METIS_TAC []
+      ,
+      (* shorter cl computation -> contradiction *)
+      `m < n` by ( DECIDE_TAC ) >>
+      RES_TAC >>
+      `?sc''. ca_kcomp sc sc'' m /\ (mode sc'' = PRIV)` by (
+          METIS_TAC [ca_kcomp_shorten_lem]
+      ) >>
+      `Rsim sc'' s'` by ( METIS_TAC [kernel_bisim_lem] ) >>
+      IMP_RES_TAC Rsim_mode_lem >>
+      REV_FULL_SIMP_TAC std_ss [basetypesTheory.mode_distinct]
+     ]
+);
 
+(* Kernel integrity theorem *)
+
+val Inv_kernel_preserved_thm = store_thm("Inv_kernel_preserved_thm", ``
+!sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+    cm_user_po Icoh Icode Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cl_Inv_po
+ /\ cl_II_po cl_Icmf cl_Icodef
+ /\ Inv Icoh Icode Icm sc
+ /\ ca_wrel sc sc'
+        ==>
+    Inv Icoh Icode Icm sc'
+``,
+  REPEAT STRIP_TAC >>
+  MATCH_MP_TAC ca_Inv_rebuild_lem >>
+  METIS_TAC [kernel_wrel_sim_lem]
+);
+
+
+val kernel_integrity_sim_thm = store_thm("kernel_integrity_sim_thm", ``
+!s sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+    cm_user_po Icoh Icode Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cl_Inv_po
+ /\ cl_II_po cl_Icmf cl_Icodef
+ /\ Inv Icoh Icode Icm sc
+ /\ Rsim sc s
+ /\ ca_wrel sc sc'
+        ==>
+?s'. 
+    cl_wrel s s'
+ /\ Rsim sc' s'
+ /\ Inv Icoh Icode Icm sc'
+``,
+  REPEAT STRIP_TAC >>
+  `Inv Icoh Icode Icm sc'` by (
+      IMP_RES_TAC Inv_kernel_preserved_thm
+  ) >>
+  ASM_REWRITE_TAC [] >>
+  `?s' s''. Rsim sc s' /\ cl_wrel s' s'' /\ Rsim sc' s''` by ( 
+      METIS_TAC [kernel_wrel_sim_lem] 
+  ) >>
+  IMP_RES_TAC Rsim_unique_lem >>
+  RW_TAC std_ss [] >>
+  HINT_EXISTS_TAC >>
+  ASM_REWRITE_TAC []
+);
 
 
 (*********** finish ************)

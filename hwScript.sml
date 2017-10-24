@@ -75,6 +75,12 @@ val Mmu_read_fetch_lem = store_thm("Mmu_read_fetch_lem", ``
   REWRITE_TAC [Mmu_read_fetch_oblg]
 );
 
+val exentry__lem = store_thm("exentry__lem", ``
+!c. exentry_ c ==> (Mode c = PRIV)
+``,
+  REWRITE_TAC [exentry__oblg]
+);
+
 val core_req_curr_mode_lem = store_thm("core_req_curr_mode_lem", ``
 !c M mv req c'. core_req (c,M,mv,req,c') ==> (Mode c = M)
 ``,
@@ -752,6 +758,12 @@ val Cv_mem_lem = store_thm("Cv_mem_lem", ``
 !s pa. Cv s (MEM pa) = dmvca s.ms T pa
 ``,
   RW_TAC std_ss [Cv_def, CV_def]
+);
+
+val exentry_lem = store_thm("exentry_lem", ``
+!s. exentry s ==> (mode s = PRIV)
+``,
+  RW_TAC std_ss [exentry_def, mode_def, exentry__lem]
 );
 
 (* hw_trans lemmas *)
@@ -2382,6 +2394,30 @@ ca_kcomp s s' (SUC n)
       METIS_TAC []
      ]      
 );
+
+val ca_kcomp_shorten_lem = store_thm("ca_kcomp_shorten_lem", ``
+!s s' n m. ca_kcomp s s' n /\ m < n ==> 
+    ?s''. ca_kcomp s s'' m /\ (mode s'' = PRIV)
+``,
+  Induct_on `n` 
+  >| [(* n = 0 *)
+      FULL_SIMP_TAC arith_ss []
+      ,
+      (* n -> SUC n *)
+      RW_TAC std_ss [ca_kcomp_SUC_lem] >>
+      IMP_RES_TAC abs_ca_trans_mode_oblg >>
+      Cases_on `m = n`
+      >| [(* m = n *)
+	  METIS_TAC []
+	  ,
+	  (* m <> n *)
+	  `m < n` by ( DECIDE_TAC ) >>
+	  RES_TAC >>
+	  METIS_TAC []
+	 ]	  
+     ]      
+);
+
 
 val ca_wrel_def = Define` ca_wrel s s' = 
 ?n. ca_kcomp s s' n /\ (mode s' = USER)`;

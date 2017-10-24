@@ -74,6 +74,12 @@ val cl_Cv_mem_lem = store_thm("cl_Cv_mem_lem", ``
   RW_TAC std_ss [cl_Cv_def, coreIfTheory.CV_def]
 );
 
+val cl_exentry_lem = store_thm("cl_exentry_lem", ``
+!s. cl_exentry s ==> (cl_mode s = PRIV)
+``,
+  RW_TAC std_ss [cl_exentry_def, cl_mode_def, exentry__lem]
+);
+
 (* cl_trans lemmas *)
 
 val cl_trans_mode_not_eq_lem = store_thm("cl_trans_mode_not_eq_lem", ``

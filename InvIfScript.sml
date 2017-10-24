@@ -160,20 +160,12 @@ val Inv_exists = store_thm("Inv_exists", ``
     (!s Icoh Icode Icm. Inv Icoh Icode Icm s <=> 
 	Ifun s /\ Icoh s /\ Icode s /\ Icm s)
  /\ Ifun_CR_po Ifun /\ Ifun_MD_po Ifun /\ Ifun_Mon_po Ifun
- (* /\ Icoh_CR_po Icoh /\ Icoh_dCoh_po Icoh *)
- (* /\ Icode_CR_po Icode /\ Icode_iCoh_po Icode /\ Icode_isafe_po Icode *)
- (* /\ Icm_po Inv Icm *)
 ``,
   ASSUME_TAC Ifun_exists >>
-  (* ASSUME_TAC Icoh_exists >> *)
-  (* ASSUME_TAC Icode_exists >> *)
   FULL_SIMP_TAC std_ss [] >>
   EXISTS_TAC ``\Icoh Icode Icm s:hw_state. 
 	           Ifun s /\ Icoh s /\ Icode s /\ Icm s`` >>
   EXISTS_TAC ``Ifun:hw_state -> bool`` >>
-  (* EXISTS_TAC ``Icoh:hw_state -> bool`` >> *)
-  (* EXISTS_TAC ``Icode:hw_state -> bool`` >> *)
-  (* EXISTS_TAC ``\s:hw_state. T`` >> *)
   RW_TAC std_ss [(* Icm_po *)]
 );
 
@@ -382,12 +374,26 @@ val Rsim_exentry_lem = store_thm("Rsim_exentry_lem", ``
   RW_TAC std_ss [Rsim_cs_lem, cl_exentry_def, exentry_def]
 );
 
+val Rsim_mode_lem = store_thm("Rsim_mode_lem", ``
+!sc s. Rsim sc s ==> (cl_mode s = mode sc)
+``,
+  RW_TAC std_ss [Rsim_cs_lem, cl_mode_def, mode_def]
+);
+
 val Rsim_exists_lem = store_thm("Rsim_exists_lem", ``
 !sc. ?s. Rsim sc s
 ``,
   RW_TAC std_ss [Rsim_cs_lem] >>
   EXISTS_TAC ``<| cs := sc.cs; M := dmvalt sc.ms T |>`` >>
   RW_TAC std_ss [cachememTheory.MVcl_def]
+);
+
+val Rsim_unique_lem = store_thm("Rsim_unique_lem", ``
+!sc s s'. Rsim sc s /\ Rsim sc s' ==> (s = s')
+``,
+  RW_TAC std_ss [Rsim_cs_lem, cl_state_component_equality] >>
+  FULL_SIMP_TAC std_ss [cachememTheory.MVcl_def] >>
+  RW_TAC std_ss [FUN_EQ_THM]
 );
 
 val Rsim_dCoh_lem = store_thm("Rsim_dCoh_lem", ``
