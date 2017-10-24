@@ -905,6 +905,36 @@ val kernel_integrity_sim_thm = store_thm("kernel_integrity_sim_thm", ``
   ASM_REWRITE_TAC []
 );
 
+(******** overall integrity *********)
+
+val (Wrel_rules, Wrel_ind, Wrel_cases) = Hol_reln `
+   (!s s' req s''. Wrel s s' /\ abs_ca_trans s' USER req s'' ==> Wrel s s'')
+/\ (!s s' s''. Wrel (s:hw_state) s' /\ ca_wrel s' s'' ==> Wrel s s'')
+`;
+
+val overall_integrity_thm = store_thm("overall_integrity_thm", ``
+!sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+    cm_user_po Icoh Icode Icm
+ /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icm
+ /\ cl_Inv_po
+ /\ cl_II_po cl_Icmf cl_Icodef
+ /\ Inv Icoh Icode Icm sc
+ /\ Wrel sc sc'
+        ==>
+    Inv Icoh Icode Icm sc'
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  UNDISCH_TAC ``Wrel sc sc'`` >>
+  SPEC_TAC (``sc':hw_state``,``sc':hw_state``) >>
+  IndDefRules.RULE_INDUCT_THEN Wrel_ind ASSUME_TAC ASSUME_TAC
+  >| [(* USER step *)
+      IMP_RES_TAC Inv_user_preserved_thm
+      ,
+      (* weak kernel transition *)
+      IMP_RES_TAC Inv_kernel_preserved_thm
+     ]      
+);
 
 (*********** finish ************)
 
