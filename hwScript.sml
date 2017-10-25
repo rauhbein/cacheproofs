@@ -1260,6 +1260,75 @@ val hw_trans_dcoh_write_lem = store_thm("hw_trans_dcoh_write_lem", ``
      ]
 );
 
+val hw_trans_progress_lem = store_thm("jw_trans_progress_lem", ``
+!s. ?req s'. hw_trans s (mode s) req s'
+``,
+  RW_TAC std_ss [mode_def] >>
+  ASSUME_TAC ( SPECL [``s.cs``,``dmvca s.ms``] core_req_progress_lem ) >>
+  FULL_SIMP_TAC std_ss [] >>
+  ASSUME_TAC ( SPEC ``req:corereq`` req_cases_lem ) >>
+  FULL_SIMP_TAC std_ss [] 
+  >| [(* Freq *)
+      `?ms'. ms' = msca_trans s.ms req` by ( RW_TAC std_ss [] ) >>
+      `?cs'. core_rcv(c',Mode c',imv s.ms T (Adr req),cs')` by (
+          RW_TAC std_ss [core_rcv_progress_lem]
+      ) >>
+      IMP_RES_TAC core_req_mode_change_lem >>
+      EXISTS_TAC ``req:corereq`` >>
+      EXISTS_TAC ``<|cs := cs'; ms := ms'|>`` >>
+      IMP_RES_TAC Freq_lem >>
+      RW_TAC std_ss [hw_trans_cases] >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def]
+      ) >>
+      METIS_TAC []
+      ,
+      (* Dreq *)
+      IMP_RES_TAC Dreq_cases_lem
+      >| [(* read *)
+	  `?ms'. ms' = msca_trans s.ms req` by ( RW_TAC std_ss [] ) >>
+	  `?cs'. core_rcv(c',Mode c',dmvca s.ms (CAreq req) (Adr req),cs')` by (
+	      RW_TAC std_ss [core_rcv_progress_lem]
+	  ) >>
+	  IMP_RES_TAC core_req_mode_change_lem >>
+	  EXISTS_TAC ``req:corereq`` >>
+	  EXISTS_TAC ``<|cs := cs'; ms := ms'|>`` >>
+	  IMP_RES_TAC Rreq_lem >>
+	  RW_TAC std_ss [hw_trans_cases] >> (
+	      FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, CAreq_def]
+	  ) >>
+	  IMP_RES_TAC rd_lem >>
+	  METIS_TAC []
+	  ,
+	  (* write *)
+	  `?ms'. ms' = msca_trans s.ms req` by ( RW_TAC std_ss [] ) >>
+          EXISTS_TAC ``req:corereq`` >>
+          EXISTS_TAC ``<|cs := c'; ms := ms'|>`` >>
+          IMP_RES_TAC Wreq_lem >>
+	  `~rd dop` by ( METIS_TAC [not_rd_lem] ) >>
+          RW_TAC std_ss [hw_trans_cases] >> (
+              FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+          )
+	  ,
+	  (* clean *)
+	  `?ms'. ms' = msca_trans s.ms req` by ( RW_TAC std_ss [] ) >>
+          EXISTS_TAC ``req:corereq`` >>
+          EXISTS_TAC ``<|cs := c'; ms := ms'|>`` >>
+          IMP_RES_TAC Creq_lem >>
+	  `~rd dop` by ( METIS_TAC [not_rd_lem] ) >>
+          RW_TAC std_ss [hw_trans_cases] >> (
+              FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+          )
+	 ]
+      ,
+      (* NOREQ *)
+      EXISTS_TAC ``req:corereq`` >>
+      EXISTS_TAC ``<|cs := c'; ms := s.ms|>`` >>
+      RW_TAC std_ss [hw_trans_cases] >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+      )
+     ]
+);
+
 (****** Deriveability *******) 
 
 val drvbl_non_def = Define `drvbl_non s s' pa = 
@@ -2187,7 +2256,6 @@ val abs_ca_trans_dcoh_write_oblg = store_thm("abs_ca_trans_dcoh_write_oblg", ``
      ]
 );
 
-
 val abs_ca_trans_drvbl_oblg = store_thm("abs_ca_trans_drvbl_oblg", ``
 !s m dl s' pa. abs_ca_trans s USER dl s' ==> drvbl s s'
 ``,
@@ -2202,6 +2270,26 @@ val abs_ca_trans_switch_oblg = store_thm("abs_ca_trans_switch_oblg", ``
   REPEAT STRIP_TAC >>
   IMP_RES_TAC abs_ca_req_lem >>
   IMP_RES_TAC hw_trans_switch_lem
+);
+
+val abs_ca_progress_oblg = store_thm("abs_ca_progress_oblg", ``
+!s. ?dl s'. abs_ca_trans s (mode s) dl s'
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``s:hw_state`` hw_trans_progress_lem ) >>
+  FULL_SIMP_TAC std_ss [] >>
+  Cases_on `req` >- (
+      (* DREQ *)
+      EXISTS_TAC ``[d:dop]`` >>
+      EXISTS_TAC ``s':hw_state`` >>
+      RW_TAC std_ss [abs_ca_trans_def]
+  ) >> (
+      (* FREQ and NOREQ *)
+      EXISTS_TAC ``[]:dop list`` >>
+      EXISTS_TAC ``s':hw_state`` >>
+      RW_TAC std_ss [abs_ca_trans_def] >>
+      METIS_TAC []
+  )
 );
 
 (* dependencies *)

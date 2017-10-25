@@ -157,6 +157,18 @@ val abs_ca_trans_switch_lem = store_thm("abs_ca_trans_switch_lem", ``
   REWRITE_TAC [abs_ca_trans_switch_oblg]
 );
 
+val abs_ca_progress_lem = store_thm("abs_ca_progress_lem", ``
+!s. ?dl s'. abs_ca_trans s (mode s) dl s'
+``,
+  REWRITE_TAC [abs_ca_progress_oblg]  
+);
+
+val abs_cl_trans_mode_lem = store_thm("abs_cl_trans_mode_lem", ``
+!s m dl s'. abs_cl_trans s m dl s' ==> (cl_mode s = m) 
+``,
+  REWRITE_TAC [abs_cl_trans_mode_oblg]
+);
+
 val abs_cl_trans_not_write_lem = store_thm("abs_cl_trans_not_write_lem", ``
 !s m dl s' pa. abs_cl_trans s m dl s' /\ pa NOTIN writes dl ==> 
     (cl_Cv s' (MEM pa) = cl_Cv s (MEM pa))
@@ -180,6 +192,24 @@ val abs_cl_trans_fixmmu_CA_lem = store_thm("abs_cl_trans_fixmmu_CA_lem", ``
     !d. MEM d dl ==> CA d
 ``,
   REWRITE_TAC [abs_cl_trans_fixmmu_CA_oblg]
+);
+
+val abs_cl_progress_lem = store_thm("abs_cl_progress_lem", ``
+!s. ?dl s'. abs_cl_trans s (cl_mode s) dl s'
+``,
+  REWRITE_TAC [abs_cl_progress_oblg]
+);
+
+val core_bisim_dl_lem = store_thm("core_bisim_dl_lem", ``
+!s s' sc sc' m dl dlc. 
+    abs_cl_trans s m dl s'
+ /\ abs_ca_trans sc m dlc sc'
+ /\ (s.cs = sc.cs)
+ /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+        ==>
+    (dl = dlc)
+``,
+  REWRITE_TAC [core_bisim_dl_oblg]
 );
 
 val core_bisim_lem = store_thm("core_bisim_lem", ``
@@ -686,6 +716,92 @@ val Inv_AC_user_preserved_thm = store_thm("Inv_AC_user_preserved_thm", ``
 
 (*********** kernel integrity ************)
 
+(* some more useful lemmas *)
+
+val Rsim_deps_lem = store_thm("Rsim_deps_lem", ``
+!sc s As. Rsim sc s /\ dCoh sc.ms As /\ ca_deps sc SUBSET As ==>
+    (cl_deps s = ca_deps sc)
+``,
+  REPEAT STRIP_TAC >>
+  MATCH_MP_TAC deps_eq_lem >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  ASM_REWRITE_TAC [] >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Rsim_cl_deps_lem = store_thm("Rsim_cl_deps_lem", ``
+!sc s As. Rsim sc s /\ dCoh sc.ms As /\ cl_deps s SUBSET As ==>
+    (cl_deps s = ca_deps sc)
+``,
+  REPEAT STRIP_TAC >>
+  MATCH_MP_TAC cl_deps_eq_lem >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  ASM_REWRITE_TAC [] >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Rsim_deps_cnt_lem = store_thm("Rsim_deps_cnt_lem", ``
+!sc s As. Rsim sc s /\ dCoh sc.ms As /\ ca_deps sc SUBSET As ==>
+    (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Rsim_ca_step_lem = store_thm("Rsim_ca_step_lem", ``
+!sc s m dl sc'.
+    Rsim sc s
+ /\ dCoh sc.ms (ca_deps sc) 
+ /\ abs_ca_trans sc m dl sc'
+        ==>
+    ?s'. abs_cl_trans s m dl s' 
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``s:cl_state`` abs_cl_progress_lem ) >> 
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  `cl_mode s = m` by (
+      IMP_RES_TAC abs_ca_trans_mode_lem >>
+      FULL_SIMP_TAC std_ss [cl_mode_def, mode_def]
+  ) >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_bisim_dl_lem >>
+  FULL_SIMP_TAC std_ss [] >>
+  HINT_EXISTS_TAC >>
+  ASM_REWRITE_TAC []
+);
+
+val Rsim_cl_step_lem = store_thm("Rsim_cl_step_lem", ``
+!sc s m dl s'.
+    Rsim sc s
+ /\ dCoh sc.ms (ca_deps sc) 
+ /\ abs_cl_trans s m dl s'
+        ==>
+    ?sc'. abs_ca_trans sc m dl sc' 
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC ( SPEC ``sc:hw_state`` abs_ca_progress_lem ) >> 
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  `mode sc = m` by (
+      IMP_RES_TAC abs_cl_trans_mode_lem >>
+      REV_FULL_SIMP_TAC std_ss [cl_mode_def, mode_def]
+  ) >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_bisim_dl_lem >>
+  FULL_SIMP_TAC std_ss [] >>
+  HINT_EXISTS_TAC >>
+  ASM_REWRITE_TAC []
+);
+
+
+(* top level proof *)
+
 val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
 !s' sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
@@ -993,6 +1109,7 @@ val ca_Inv_Mmu_fixed_def = Define `ca_Inv_Mmu_fixed s s' =
  /\ (!r. r IN MDVA s Kvm ==> (Cv s r = Cv s' r))
 `;
 
+
 (* fix MMU so that all va in Kvm are cacheable 
    only accesses va from KVM
    corresponding pa are in always cacheable region 
@@ -1030,7 +1147,9 @@ val cl_Icodef_AC_def = Define `cl_Icodef_AC s s' =
     cl_Inv_Mmu_fixed s s'
  /\ (!va. va IN Kcode ==> MEM (Ktr va) IN cl_CRex s)
  /\ VApc s'.cs IN Kcode
- /\ (!pa s'' dl. abs_cl_trans s' PRIV dl s'' /\ MEM pa IN cl_CRex s ==> 
+ /\ cl_deps s' SUBSET Mac
+ /\ (!pa s'' dl. abs_cl_trans s' PRIV dl s'' 
+              /\ MEM pa IN cl_CRex s ==> 
 		 pa NOTIN writes dl)
 (* TODO: no support for ic flush yet, cannot expand cl_CRex *) 
  /\ ((cl_mode s' = USER) ==> (cl_CRex s' SUBSET cl_CRex s)
@@ -1048,46 +1167,15 @@ val ca_Icodef_AC_def = Define `ca_Icodef_AC s s' =
     ca_Inv_Mmu_fixed s s'
  /\ (!va. va IN Kcode ==> MEM (Ktr va) IN CRex s)
  /\ VApc s'.cs IN Kcode
- /\ (!pa s'' dl. abs_ca_trans s' PRIV dl s'' /\ MEM pa IN CRex s ==> 
+ /\ ca_deps s' SUBSET Mac
+ /\ (!pa s'' dl. abs_ca_trans s' PRIV dl s'' 
+              /\ MEM pa IN CRex s ==> 
 		 pa NOTIN writes dl)
  /\ (!pa. MEM pa IN CRex s ==> icoh s'.ms pa /\ ~dirty s'.ms pa)
 (* TODO: no support for ic flush yet, cannot expand ca_CRex *) 
  /\ ((mode s' = USER) ==> (CRex s' SUBSET CRex s)
                        /\ (!va. va IN Kcode ==> MEM (Ktr va) IN CRex s'))
 `; 
-
-val Rsim_deps_lem = store_thm("Rsim_deps_lem", ``
-!sc s As. Rsim sc s /\ dCoh sc.ms As /\ ca_deps sc SUBSET As ==>
-    (cl_deps s = ca_deps sc)
-``,
-  REPEAT STRIP_TAC >>
-  MATCH_MP_TAC deps_eq_lem >>
-  IMP_RES_TAC Rsim_cs_lem >>
-  ASM_REWRITE_TAC [] >>
-  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
-  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
-);
-
-val Rsim_cl_deps_lem = store_thm("Rsim_cl_deps_lem", ``
-!sc s As. Rsim sc s /\ dCoh sc.ms As /\ cl_deps s SUBSET As ==>
-    (cl_deps s = ca_deps sc)
-``,
-  REPEAT STRIP_TAC >>
-  MATCH_MP_TAC cl_deps_eq_lem >>
-  IMP_RES_TAC Rsim_cs_lem >>
-  ASM_REWRITE_TAC [] >>
-  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
-  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
-);
-
-val Rsim_deps_cnt_lem = store_thm("Rsim_deps_cnt_lem", ``
-!sc s As. Rsim sc s /\ dCoh sc.ms As /\ ca_deps sc SUBSET As ==>
-    (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
-``,
-  REPEAT STRIP_TAC >>
-  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
-  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
-);
 
 val Inv_Coh_AC_lem = store_thm("Inv_Coh_AC_lem", ``
 !sc. cm_user_po Icoh_AC Icode_AC Icm_AC
@@ -1105,6 +1193,12 @@ val Inv_Coh_AC_lem = store_thm("Inv_Coh_AC_lem", ``
 );
 
 (* discharge proof obligations *)
+
+val dCoh_subset_lem = store_thm("dCoh_subset_lem", ``
+!ms As Bs. dCoh ms As /\ Bs SUBSET As ==> dCoh ms Bs
+``,
+  RW_TAC std_ss [pred_setTheory.SUBSET_DEF, dCoh_lem2]
+);
 
 val Icmf_AC_init_xfer_lem = store_thm("Icmf_AC_init_xfer_lem", ``
 init_cm_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
@@ -1138,7 +1232,54 @@ init_cm_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
      ]  
 );
 
- (* /\ init_cm_xfer_po ca_Icodef cl_Icodef *)
+val Icodef_AC_init_xfer_lem = store_thm("Icodef_AC_init_xfer_lem", ``
+init_cm_xfer_po ca_Icodef_AC cl_Icodef_AC Icoh_AC Icode_AC Icm_AC
+``,
+  RW_TAC std_ss [init_cm_xfer_po_def, ca_Icodef_AC_def, cl_Icodef_AC_def] >>
+  IMP_RES_TAC Inv_Coh_AC_lem >>
+  FULL_SIMP_TAC std_ss [Inv_lem] >>
+  `cl_CRex s = CRex sc` by ( IMP_RES_TAC Rsim_CRex_lem ) >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  ASM_REWRITE_TAC [ca_Inv_Mmu_fixed_def, cl_Inv_Mmu_fixed_def, 
+		   mode_def, cl_mode_def] >>
+  `cl_fixmmu s Kvm Ktr <=> ca_fixmmu sc Kvm Ktr` by (
+      METIS_TAC [Rsim_fixmmu_lem]
+  ) >>
+  IMP_RES_TAC Icode_AC_def >>
+  ASM_REWRITE_TAC [pred_setTheory.SUBSET_REFL] >>
+  EQ_TAC 
+  >| [(* ==> *)
+      STRIP_TAC >>
+      IMP_RES_TAC Rsim_deps_lem >>
+      RW_TAC std_ss [] >>
+      IMP_RES_TAC dCoh_subset_lem >>
+      IMP_RES_TAC Rsim_cl_step_lem >>
+      RES_TAC 
+      ,
+      (* ==> *)
+      STRIP_TAC >>
+      IMP_RES_TAC Rsim_cl_deps_lem >>
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC dCoh_subset_lem >>
+      STRIP_TAC
+      >| [(* CRex not written *)
+	  RW_TAC std_ss [] >>
+	  IMP_RES_TAC Rsim_ca_step_lem >>
+	  RES_TAC 
+	  ,
+	  (* iCoh sc /\ isafe *)
+	  NTAC 2 STRIP_TAC >>
+	  `pa IN {pa | MEM pa IN CRex sc}` by (
+	      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+	  ) >>
+	  IMP_RES_TAC iCoh_lem >>
+	  IMP_RES_TAC isafe_CRex_lem >>
+	  ASM_REWRITE_TAC []
+	 ]
+     ]  
+);
+
+
  (* /\ Icmf_xfer_po_def ca_Icmf cl_Icmf *)
  (* /\ Icodef_xfer_po ca_Icodef cl_Icodef *)
  (* /\ Icm_f_po ca_Icmf ca_Icodef Icm *)

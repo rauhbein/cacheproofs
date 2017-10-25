@@ -40,6 +40,15 @@ val CR_def = Define `CR s = CR_(s.cs, dmvca s.ms)`;
 val CRex_def = Define `CRex s = 
 {r | (?pa. r = MEM pa) /\ r IN CR s /\ ?m. Mon s r m EX}`;
 
+val isafe_CRex_lem = store_thm("isafe_CRex_lem", ``
+!s pa. pa IN {pa | MEM pa IN CRex s} /\ isafe s {pa | MEM pa IN CRex s} ==>
+    ~dirty s.ms pa
+``,
+  RW_TAC std_ss [CRex_def, isafe_def] >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  RES_TAC
+);
+
 (* exported theorems *)
 
 val CR_oblg = store_thm("CR_oblg", ``
@@ -655,6 +664,30 @@ val Rsim_Mon_lem = store_thm("Rsim_Mon_lem", ``
   FULL_SIMP_TAC std_ss [cl_Cv_def, Cv_def]
 );
 
+val Rsim_CRex_lem = store_thm("Rsim_CRex_lem", ``
+!sc s Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm
+ /\ Rsim sc s
+ /\ Icoh sc
+ /\ Ifun sc
+        ==>
+    (cl_CRex s = CRex sc)
+``,
+  RW_TAC std_ss [cl_CRex_def, CRex_def, pred_setTheory.EXTENSION,
+		 pred_setTheory.IN_GSPEC_IFF] >>
+  `(cl_CR s = CR sc) /\ (!m. cl_Mon s x m EX <=> Mon sc x m EX)` suffices_by (
+      RW_TAC std_ss []
+  ) >>
+  REPEAT STRIP_TAC
+  >| [(* CR *)
+      IMP_RES_TAC Rsim_CR_eq_lem
+      ,
+      (* Mon *)
+      IMP_RES_TAC Rsim_Mon_lem >>
+      ASM_REWRITE_TAC []
+     ]
+);
+
 val Rsim_fixmmu_lem = store_thm("Rsim_fixmmu_lem", ``
 !sc s VAs f Icoh Icode Icm. 
     cm_user_po Icoh Icode Icm
@@ -694,7 +727,6 @@ val Rsim_cl_Inv_lem = store_thm("Rsim_cl_Inv_lem", ``
   IMP_RES_TAC Rsim_cl_CR_lem >>
   IMP_RES_TAC cl_Inv_spec
 );
-
 
 (* internal invariants *)
 
