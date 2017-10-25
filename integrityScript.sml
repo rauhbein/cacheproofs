@@ -145,6 +145,18 @@ val abs_ca_trans_dcoh_write_lem = store_thm("abs_ca_trans_dcoh_write_lem", ``
   REWRITE_TAC [abs_ca_trans_dcoh_write_oblg]
 );
 
+val abs_ca_trans_dCoh_preserve_lem = 
+store_thm("abs_ca_trans_dCoh_preserve_lem", ``
+!s m dl s' As. 
+    dCoh s.ms As
+ /\ (!d. MEM d dl ==> CA d)
+ /\ abs_ca_trans s m dl s' 
+        ==> 
+    dCoh s'.ms As
+``,
+  REWRITE_TAC [abs_ca_trans_dCoh_preserve_oblg]
+);
+
 val abs_ca_trans_drvbl_lem = store_thm("abs_ca_trans_drvbl_lem", ``
 !s m dl s' pa. abs_ca_trans s USER dl s' ==> drvbl s s'
 ``,
@@ -1109,7 +1121,6 @@ val ca_Inv_Mmu_fixed_def = Define `ca_Inv_Mmu_fixed s s' =
  /\ (!r. r IN MDVA s Kvm ==> (Cv s r = Cv s' r))
 `;
 
-
 (* fix MMU so that all va in Kvm are cacheable 
    only accesses va from KVM
    corresponding pa are in always cacheable region 
@@ -1200,6 +1211,30 @@ val dCoh_subset_lem = store_thm("dCoh_subset_lem", ``
   RW_TAC std_ss [pred_setTheory.SUBSET_DEF, dCoh_lem2]
 );
 
+val Inv_MDVA_Mac_lem = store_thm("Inv_MDVA_Mac_lem", ``
+!sc. 
+    cm_user_po Icoh_AC Icode_AC Icm_AC 
+ /\ Inv Icoh_AC Icode_AC Icm_AC sc 
+        ==> 
+    {pa | MEM pa IN MDVA sc Kvm} SUBSET Mac
+``,
+  RW_TAC std_ss [Inv_lem, Icoh_AC_def] >>
+  `MDVA sc Kvm SUBSET MD sc` by ( 
+      FULL_SIMP_TAC std_ss [MDVA_def, MD_def] >>
+      `Kvm SUBSET UNIV:vadr set` by (
+          FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_UNIV]
+      ) >>
+      RW_TAC std_ss [MD__monotonic_lem]
+  ) >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, 
+		        pred_setTheory.IN_GSPEC_IFF] >>
+  REPEAT STRIP_TAC >>
+  RES_TAC >>
+  IMP_RES_TAC Ifun_MD_lem >>
+  RES_TAC
+);
+
+
 val Icmf_AC_init_xfer_lem = store_thm("Icmf_AC_init_xfer_lem", ``
 init_cm_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
 ``,
@@ -1279,8 +1314,93 @@ init_cm_xfer_po ca_Icodef_AC cl_Icodef_AC Icoh_AC Icode_AC Icm_AC
      ]  
 );
 
+val Icmf_AC_xfer_lem = store_thm("Icmf_AC_xfer_lem", ``
+Icmf_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
+``,
+  RW_TAC std_ss [Icmf_xfer_po_def, ca_Icmf_AC_def, cl_Icmf_AC_def] >>
+  FULL_SIMP_TAC std_ss [ca_II_def, cl_II_def] >>
+  `cl_CR s = CR sc` by ( IMP_RES_TAC Rsim_CR_eq_lem ) >>
+  IMP_RES_TAC Rsim_cs_lem >>
+  ASM_REWRITE_TAC [ca_Inv_Mmu_fixed_def, cl_Inv_Mmu_fixed_def, 
+		   mode_def, cl_mode_def] >>
+  IMP_RES_TAC Inv_MDVA_Mac_lem >>
+  FULL_SIMP_TAC std_ss [Inv_lem] >>
+  `cl_fixmmu s Kvm Ktr <=> ca_fixmmu sc Kvm Ktr` by (
+      METIS_TAC [Rsim_fixmmu_lem]
+  ) >>
+  EQ_TAC 
+  >| [(* ==> *)
+      STRIP_TAC >>
+      `cl_deps s'' = ca_deps sc''` by ( IMP_RES_TAC Rsim_deps_lem ) >>
+      `cl_vdeps s'' = ca_vdeps sc''` by (
+          IMP_RES_TAC Rsim_deps_cnt_lem >>
+	  IMP_RES_TAC deps_vdeps_eq_lem
+      ) >>
+      RW_TAC std_ss []
+      >| [(* Kvm unchanged *)
+	  `cl_Cv s r = Cv sc r` by ( METIS_TAC [Rsim_MDVA_eq_lem] ) >>
+	  `cl_MDVA s Kvm = MDVA sc Kvm` by ( METIS_TAC [Rsim_MDVA_lem] ) >>
+	  IMP_RES_TAC MDVA_lem >>
+	  FULL_SIMP_TAC std_ss [] >>
+	  IMP_RES_TAC dCoh_subset_lem >>
+	  IMP_RES_TAC Rsim_MDVA_eq_dCoh_ca_lem >>
+	  ASM_REWRITE_TAC []
+	  ,
+	  (* cl_CR' in Mac *)
+	  `dCoh sc''.ms {pa | MEM pa IN CR sc''}` by (
+	      RES_TAC >>
+	      `{pa | MEM pa IN CR sc''} SUBSET Mac` by (
+	          FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF,
+				        pred_setTheory.IN_GSPEC_IFF]
+	      ) >>
+	      IMP_RES_TAC dCoh_subset_lem
+	  ) >>
+	  IMP_RES_TAC Rsim_CR_eq_dCoh_ca_lem >>
+	  FULL_SIMP_TAC std_ss []
+	 ]
+      ,
+      (* <== *)
+      STRIP_TAC >>
+      FULL_SIMP_TAC std_ss [ca_Icmf_AC_def, cl_Icmf_AC_def] >>
+      IMP_RES_TAC cl_Inv_Mmu_fixed_lem >>
+      `!d. MEM d dl ==> CA d` by (
+          IMP_RES_TAC abs_cl_trans_fixmmu_CA_lem
+      ) >>
+      IMP_RES_TAC abs_ca_trans_dCoh_preserve_lem >>
+      `cl_deps s'' = ca_deps sc''` by ( IMP_RES_TAC Rsim_cl_deps_lem ) >>
+      `cl_vdeps s'' = ca_vdeps sc''` by (
+          FULL_SIMP_TAC std_ss [] >>
+          IMP_RES_TAC Rsim_deps_cnt_lem >>
+	  IMP_RES_TAC deps_vdeps_eq_lem
+      ) >>
+      FULL_SIMP_TAC std_ss [] >>
+      RW_TAC std_ss []
+      >| [(* Kvm unchanged *)
+	  `Cv sc r = cl_Cv s r` by ( METIS_TAC [Rsim_MDVA_eq_cl_lem] ) >>
+	  `MDVA sc Kvm = cl_MDVA s Kvm` by ( METIS_TAC [Rsim_MDVA_lem] ) >>
+	  IMP_RES_TAC cl_MDVA_lem >>
+	  FULL_SIMP_TAC std_ss [] >>
+	  IMP_RES_TAC dCoh_subset_lem >>
+	  IMP_RES_TAC Rsim_MDVA_eq_dCoh_cl_lem
+	  ,
+	  (* cl_CR' in Mac *)
+	  `dCoh sc''.ms {pa | MEM pa IN cl_CR s''}` by (
+	      RES_TAC >>
+	      `{pa | MEM pa IN cl_CR s''} SUBSET Mac` by (
+	          FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF,
+				        pred_setTheory.IN_GSPEC_IFF]
+	      ) >>
+	      IMP_RES_TAC dCoh_subset_lem
+	  ) >>
+	  IMP_RES_TAC Rsim_CR_eq_dCoh_cl_lem >>
+	  FULL_SIMP_TAC std_ss []
+	 ]
+     ]      
+);
 
- (* /\ Icmf_xfer_po_def ca_Icmf cl_Icmf *)
+
+
+
  (* /\ Icodef_xfer_po ca_Icodef cl_Icodef *)
  (* /\ Icm_f_po ca_Icmf ca_Icodef Icm *)
  (* /\ cl_Icmf_po cl_Icmf *)

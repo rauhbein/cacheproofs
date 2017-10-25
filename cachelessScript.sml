@@ -37,6 +37,13 @@ val cl_MD_lem = store_thm("cl_MD_lem", ``
   RW_TAC std_ss [cl_MD_def, cl_Cv_def, MD__lem]
 );
 
+val cl_MDVA_lem = store_thm("cl_MDVA_lem", ``
+!s s' VAs. (!r. r IN cl_MDVA s VAs ==> (cl_Cv s r = cl_Cv s' r)) ==> 
+    (cl_MDVA s VAs = cl_MDVA s' VAs)
+``,
+  RW_TAC std_ss [cl_MDVA_def, cl_Cv_def, MD__lem]
+);
+
 val (cl_trans_rules, cl_trans_ind, cl_trans_cases) = Hol_reln `
    (!s M dop cs' s'. 
 	rd dop 

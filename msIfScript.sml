@@ -511,6 +511,15 @@ val ic_cacheable_read_oblg = store_thm("ic_cacheable_read_oblg", ``
 val dcoh_def = Define `dcoh ms pa = coh ms.dc ms.mem pa`;
 val dCoh_def = Define `dCoh ms (Rs:padr set) = Coh ms.dc ms.mem Rs`;
 
+val dcoh_oblg = store_thm("dcoh_oblg", ``
+!ms ms' pa. dcoh ms pa /\ (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa)
+        ==>
+    dcoh ms' pa
+``,
+  RW_TAC std_ss [dcoh_def, dw_def, M_def] >>
+  IMP_RES_TAC coh_lem 
+);
+
 val dCoh_oblg = store_thm("dCoh_oblg", ``
 !ms Rs pa. dCoh ms Rs /\ pa IN Rs ==> dcoh ms pa
 ``,

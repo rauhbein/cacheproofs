@@ -559,9 +559,9 @@ val cl_Inv_preserve_po = Define `cl_Inv_preserve_po =
 
 (* some lemmas *)
 
-
-val Rsim_CR_lem = store_thm("Rsim_CR_lem", ``
-!sc s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Rsim sc s /\ Icoh sc ==>
+val Rsim_CR_dCoh_ca_lem = store_thm("Rsim_CR_dCoh_ca_lem", ``
+!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN CR sc}
+         ==>
     (!r. r IN CR sc ==> (cl_Cv s r = Cv sc r))
 ``,
   REPEAT STRIP_TAC >>
@@ -574,13 +574,45 @@ val Rsim_CR_lem = store_thm("Rsim_CR_lem", ``
       FULL_SIMP_TAC std_ss [] >> (
           FULL_SIMP_TAC std_ss [] 
       ) >>
-      IMP_RES_TAC Icoh_dCoh_oblg >>
       `pa IN {pa | MEM pa IN CR sc}` by (
           FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
       ) >>
       IMP_RES_TAC Rsim_dCoh_lem >>
       RW_TAC std_ss [cl_Cv_def, Cv_def, coreIfTheory.CV_def]
      ]
+);
+
+
+val Rsim_CR_dCoh_cl_lem = store_thm("Rsim_CR_dCoh_cl_lem", ``
+!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN cl_CR s}
+         ==>
+    (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sc r))
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `reg_res r`
+  >| [(* register *)
+      FULL_SIMP_TAC std_ss [Rsim_lem]
+      ,
+      (* memory *)
+      ASSUME_TAC ( SPEC ``r:resource`` coreIfTheory.res_cases ) >>
+      FULL_SIMP_TAC std_ss [] >> (
+          FULL_SIMP_TAC std_ss [] 
+      ) >>
+      `pa IN {pa | MEM pa IN cl_CR s}` by (
+          FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+      ) >>
+      IMP_RES_TAC Rsim_dCoh_lem >>
+      RW_TAC std_ss [cl_Cv_def, Cv_def, coreIfTheory.CV_def]
+     ]
+);
+
+val Rsim_CR_lem = store_thm("Rsim_CR_lem", ``
+!sc s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Rsim sc s /\ Icoh sc ==>
+    (!r. r IN CR sc ==> (cl_Cv s r = Cv sc r))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Icoh_dCoh_oblg >>
+  IMP_RES_TAC Rsim_CR_dCoh_ca_lem
 );
 
 val Rsim_cl_CR_lem = store_thm("Rsim_cl_CR_lem", ``
@@ -593,15 +625,84 @@ val Rsim_cl_CR_lem = store_thm("Rsim_cl_CR_lem", ``
   FULL_SIMP_TAC std_ss []
 );
 
+val Rsim_CR_eq_dCoh_ca_lem = store_thm("Rsim_CR_eq_dCoh_ca_lem", ``
+!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN CR sc} 
+        ==>
+    (cl_CR s = CR sc)
+``,
+  REPEAT STRIP_TAC >>
+  MATCH_MP_TAC EQ_SYM >>
+  RW_TAC std_ss [cl_CR_def, CR_def] >>
+  MATCH_MP_TAC CR__lem >>
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_CR_dCoh_ca_lem >> 
+  FULL_SIMP_TAC std_ss [CR_def, cl_Cv_def, Cv_def]
+);
+
+val Rsim_CR_eq_dCoh_cl_lem = store_thm("Rsim_CR_eq_dCoh_cl_lem", ``
+!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN cl_CR s} 
+        ==>
+    (cl_CR s = CR sc)
+``,
+  REPEAT STRIP_TAC >>
+  RW_TAC std_ss [cl_CR_def, CR_def] >>
+  MATCH_MP_TAC CR__lem >>
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_CR_dCoh_cl_lem >> 
+  FULL_SIMP_TAC std_ss [cl_CR_def, cl_Cv_def, Cv_def]
+);
+
 val Rsim_CR_eq_lem = store_thm("Rsim_CR_eq_lem", ``
 !sc s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Rsim sc s /\ Icoh sc ==>
     (cl_CR s = CR sc)
 ``,
-  RW_TAC std_ss [cl_CR_def, CR_def] >>
-  MATCH_MP_TAC CR__lem >>
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC Rsim_cl_CR_lem >> 
-  FULL_SIMP_TAC std_ss [cl_CR_def, cl_Cv_def, Cv_def]
+  IMP_RES_TAC Icoh_dCoh_oblg >>
+  IMP_RES_TAC Rsim_CR_eq_dCoh_ca_lem
+);
+
+val Rsim_MD_dCoh_ca_lem = store_thm("Rsim_MD_dCoh_ca_lem", ``
+!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN MD sc}
+        ==>
+    (cl_MD s = MD sc)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  MATCH_MP_TAC MD_cl_lem >>
+  REPEAT STRIP_TAC >>
+  Cases_on `reg_res r`
+  >| [(* register *)
+      FULL_SIMP_TAC std_ss [Rsim_lem]
+      ,
+      (* MEM *)
+      ASSUME_TAC ( SPEC ``r:resource`` coreIfTheory.res_cases ) >>
+      FULL_SIMP_TAC std_ss [] >> (
+          FULL_SIMP_TAC std_ss [] 
+      )
+     ]
+);
+
+val Rsim_MD_dCoh_cl_lem = store_thm("Rsim_MD_dCoh_cl_lem", ``
+!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN cl_MD s}
+        ==>
+    (cl_MD s = MD sc)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  MATCH_MP_TAC cl_MD_lem >>
+  REPEAT STRIP_TAC >>
+  Cases_on `reg_res r`
+  >| [(* register *)
+      FULL_SIMP_TAC std_ss [Rsim_lem]
+      ,
+      (* MEM *)
+      ASSUME_TAC ( SPEC ``r:resource`` coreIfTheory.res_cases ) >>
+      FULL_SIMP_TAC std_ss [] >> (
+          FULL_SIMP_TAC std_ss [] 
+      )
+     ]
 );
 
 val Rsim_MD_lem = store_thm("Rsim_MD_lem", ``
@@ -616,6 +717,120 @@ val Rsim_MD_lem = store_thm("Rsim_MD_lem", ``
   MATCH_MP_TAC MD_cl_lem >>
   REPEAT STRIP_TAC >>
   IMP_RES_TAC Ifun_MD_oblg >>
+  RES_TAC 
+);
+
+val Rsim_MDVA_eq_dCoh_cl_lem = store_thm("Rsim_MDVA_eq_dCoh_cl_lem", ``
+!sc s VAs. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN cl_MDVA s VAs}
+        ==>
+    (!r. r IN cl_MDVA s VAs ==> (cl_Cv s r = Cv sc r))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  Cases_on `reg_res r`
+  >| [(* register *)
+      FULL_SIMP_TAC std_ss [Rsim_lem]
+      ,
+      (* MEM *)
+      ASSUME_TAC ( SPEC ``r:resource`` coreIfTheory.res_cases ) >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF] >> (
+          FULL_SIMP_TAC std_ss [] 
+      )
+     ]
+);
+
+val Rsim_MDVA_eq_dCoh_ca_lem = store_thm("Rsim_MDVA_eq_dCoh_ca_lem", ``
+!sc s VAs. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN MDVA sc VAs}
+        ==>
+    (!r. r IN MDVA sc VAs ==> (cl_Cv s r = Cv sc r))
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  Cases_on `reg_res r`
+  >| [(* register *)
+      FULL_SIMP_TAC std_ss [Rsim_lem]
+      ,
+      (* MEM *)
+      ASSUME_TAC ( SPEC ``r:resource`` coreIfTheory.res_cases ) >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF] >> (
+          FULL_SIMP_TAC std_ss [] 
+      )
+     ]
+);
+
+val Rsim_MDVA_eq_lem = store_thm("Rsim_MDVA_eq_lem", ``
+!sc s VAs Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm 
+ /\ Rsim sc s /\ Icoh sc /\ Ifun sc 
+        ==>
+    (!r. r IN cl_MDVA s VAs ==> (cl_Cv s r = Cv sc r))
+``,
+  REPEAT STRIP_TAC >>
+  `cl_MDVA s VAs SUBSET cl_MD s` by ( 
+      FULL_SIMP_TAC std_ss [cl_MDVA_def, cl_MD_def] >>
+      `VAs SUBSET UNIV:vadr set` by (
+          FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_UNIV]
+      ) >>
+      RW_TAC std_ss [MD__monotonic_lem]
+  ) >>
+  `cl_MD s = MD sc` by ( IMP_RES_TAC Rsim_MD_lem ) >>
+  IMP_RES_TAC Rsim_CR_lem >>
+  IMP_RES_TAC Ifun_MD_oblg >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Rsim_MDVA_eq_cl_lem = store_thm("Rsim_MDVA_eq_cl_lem", ``
+!sc s VAs Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm 
+ /\ Rsim sc s /\ Icoh sc /\ Ifun sc 
+        ==>
+    (!r. r IN MDVA sc VAs ==> (cl_Cv s r = Cv sc r))
+``,
+  REPEAT STRIP_TAC >>
+  `MDVA sc VAs SUBSET MD sc` by ( 
+      FULL_SIMP_TAC std_ss [MDVA_def, MD_def] >>
+      `VAs SUBSET UNIV:vadr set` by (
+          FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_UNIV]
+      ) >>
+      RW_TAC std_ss [MD__monotonic_lem]
+  ) >>
+  `cl_MD s = MD sc` by ( IMP_RES_TAC Rsim_MD_lem ) >>
+  IMP_RES_TAC Rsim_CR_lem >>
+  IMP_RES_TAC Ifun_MD_oblg >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+);
+
+val Rsim_MDVA_dCoh_cl_lem = store_thm("Rsim_MDVA_dCoh_cl_lem", ``
+!sc s VAs Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm 
+ /\ Rsim sc s /\ Icoh sc /\ Ifun sc 
+        ==>
+    (cl_MDVA s VAs = MDVA sc VAs)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_MDVA_eq_lem >>
+  FULL_SIMP_TAC std_ss [cl_MDVA_def, MDVA_def] >>
+  MATCH_MP_TAC MD__lem >>
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [cl_Cv_def, Cv_def] >>
+  RES_TAC 
+);
+
+val Rsim_MDVA_lem = store_thm("Rsim_MDVA_lem", ``
+!sc s VAs Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm 
+ /\ Rsim sc s /\ Icoh sc /\ Ifun sc 
+        ==>
+    (cl_MDVA s VAs = MDVA sc VAs)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Rsim_MDVA_eq_lem >>
+  FULL_SIMP_TAC std_ss [cl_MDVA_def, MDVA_def] >>
+  MATCH_MP_TAC MD__lem >>
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [cl_Cv_def, Cv_def] >>
   RES_TAC 
 );
 

@@ -74,12 +74,17 @@ val Pc_def = Define `Pc c = c.reg PC`;
 val Mmu_MD_exists = prove (``
 ?(Mmu:core_state # mem_view # vadr # mode # acc -> (padr # bool) option) 
  (MD:core_state # mem_view # vadr set -> resource set).
+(* MD contains all resources that MD and Mmu depend on *)
 !c c' mv mv' VAs. ((!r. r IN MD(c,mv,VAs) ==> (CV c mv r = CV c' mv' r)) ==>
 	       (MD(c,mv,VAs) = MD(c',mv',VAs)) /\	
 	       (!va m ac. va IN VAs ==>
 		          (Mmu(c,mv,va,m,ac) = Mmu(c',mv',va,m,ac))))
+(* register Monitor resources only depend on core state *)
            /\ (!r. reg_res r ==> (r IN MD(c,mv,VAs) <=> r IN MD(c',mv',VAs))) 
+(* all register Monitor resources are coprocessor registers *)
            /\ (!r. reg_res r /\ r IN MD(c,mv,VAs) ==> ?r'. r = COREG r')
+(* MD is monotonically defined set wrt. VAs *)
+           /\ (!VAs'. VAs' SUBSET VAs ==> MD(c,mv,VAs') SUBSET MD(c,mv,VAs))
 (* reads and fetches have same translation for a given address, 
    must be readable in ARM to be executable, 
    NOTE: just used to simplifiy the model, i.e., def of Tr / deps for PC *)
@@ -90,7 +95,8 @@ val Mmu_MD_exists = prove (``
 		NONE:(padr # bool) option`` >>
   EXISTS_TAC ``\(c,mv):core_state # mem_view # vadr set. EMPTY:resource set`` >>
   RW_TAC std_ss [] >>
-  FULL_SIMP_TAC std_ss [pred_setTheory.NOT_IN_EMPTY]
+  FULL_SIMP_TAC std_ss [pred_setTheory.NOT_IN_EMPTY, 
+			pred_setTheory.EMPTY_SUBSET]
 );  
 
 val Mmu_MD_spec = new_specification ("Mmu_MD_spec",
@@ -105,6 +111,11 @@ val Mmu_read_fetch_oblg = store_thm("Mmu_read_fetch_oblg", ``
   METIS_TAC [Mmu_MD_spec]
 );
 
+val MD_monotonic_oblg = store_thm("MD_monotonic_oblg", ``
+!c mv VAs VAs'. VAs SUBSET VAs' ==> MD_(c,mv,VAs) SUBSET MD_(c,mv,VAs')
+``,
+  METIS_TAC [Mmu_MD_spec]
+);
 
 val dummyMon_def = Define `
    (dummyMon (c,mv, MEM pa ,m,ac) = ?va ca. Mmu_(c,mv,va,m,ac) = SOME (pa,ca))
