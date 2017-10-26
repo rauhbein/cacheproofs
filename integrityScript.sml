@@ -864,12 +864,10 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
       IMP_RES_TAC ca_kcomp_0_lem >>
       IMP_RES_TAC cl_II_po_def >>
       FULL_SIMP_TAC std_ss [cm_kernel_po_def, cl_II_def] >>
-      `ca_Icmf sc sc` by (
-	  IMP_RES_TAC Icmf_init_xfer_po_def >>
-	  RW_TAC std_ss []
-      ) >>
+      REV_FULL_SIMP_TAC std_ss [] >>
+      `ca_Icmf sc sc` by ( IMP_RES_TAC Icmf_init_sim_lem ) >>
       RW_TAC std_ss [ca_II_def] >>
-      IMP_RES_TAC Icodef_init_xfer_po_def
+      IMP_RES_TAC Icodef_init_sim_lem
       ,
       (* n -> SUC n *)
       REPEAT GEN_TAC >>
@@ -956,18 +954,16 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	  STRIP_TAC >>
 	  FULL_SIMP_TAC std_ss [cm_kernel_po_def] >>
 	  IMP_RES_TAC cl_II_po_def >>
-	  `ca_Icmf sc sc'` by (
-	      `ca_Icmf sc sc' <=> cl_Icmf s s'` suffices_by (
-	          FULL_SIMP_TAC std_ss [cl_II_def]
-	      ) >>
-	      IMP_RES_TAC Icmf_xfer_po_def
-	  ) >>
-	  RW_TAC std_ss [ca_II_def] >>
 	  `cl_Icmf s s'` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
-	  `ca_Icodef sc sc' <=> cl_Icodef s s'` suffices_by (
-	      FULL_SIMP_TAC std_ss [cl_II_def]
-	  ) >>
-	  IMP_RES_TAC Icodef_xfer_po_def
+	  `ca_Icmf sc sc'` by ( IMP_RES_TAC Icmf_sim_lem ) >>
+	  RW_TAC std_ss [ca_II_def] >>
+	  `cl_Icodef s s'` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
+	  MATCH_MP_TAC Icodef_sim_lem >>
+	  EXISTS_TAC ``s''':hw_state`` >>
+	  EXISTS_TAC ``s:cl_state`` >>
+	  EXISTS_TAC ``s'':cl_state`` >>
+	  EXISTS_TAC ``s':cl_state`` >>
+	  METIS_TAC []
 	 ]
      ]
 );

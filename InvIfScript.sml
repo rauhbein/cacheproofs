@@ -1199,6 +1199,100 @@ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm =
  /\ ca_Icodef_po ca_Icodef Icoh Icode Icm
 `;
 
+val Icmf_init_sim_lem = store_thm("Icmf_init_sim_lem", ``
+!s sc ca_Icmf cl_Icmf Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm 
+ /\ Rsim sc s
+ /\ Inv Icoh Icode Icm sc
+ /\ cl_Inv s
+ /\ Icmf_init_xfer_po ca_Icmf cl_Icmf Icoh Icode Icm
+ /\ cl_Icmf s s
+        ==>
+    ca_Icmf sc sc
+``,
+  RW_TAC std_ss [Icmf_init_xfer_po] >>
+  RES_TAC 
+);
+
+val Icodef_init_sim_lem = store_thm("Icodef_init_sim_lem", ``
+!s sc ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf.
+    cm_user_po Icoh Icode Icm 
+ /\ Rsim sc s
+ /\ Inv Icoh Icode Icm sc
+ /\ cl_Inv s
+ /\ Icodef_init_xfer_po ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf
+ /\ ca_Icmf sc sc
+ /\ cl_Icmf s s
+ /\ cl_Icodef s s
+        ==>
+    ca_Icodef sc sc
+``,
+  RW_TAC std_ss [Icodef_init_xfer_po] >>
+  RES_TAC 
+);
+
+val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
+!sc sc' sc'' s s' s'' n dl Icoh Icode Icm ca_Icmf cl_Icmf ca_Icodef cl_Icodef.
+    cm_user_po Icoh Icode Icm 
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' 
+ /\ cl_II cl_Icmf cl_Icodef s s'
+ /\ cl_kcomp s s' n
+ /\ ca_kcomp sc sc' n
+ /\ abs_cl_trans s' PRIV dl s''
+ /\ abs_ca_trans sc' PRIV dl sc''
+ /\ Rsim sc s
+ /\ Rsim sc' s'
+ /\ Rsim sc'' s''
+ /\ Icmf_xfer_po ca_Icmf cl_Icmf Icoh Icode Icm
+ /\ cl_Icmf s s''
+        ==>
+    ca_Icmf sc sc''
+``,
+  RW_TAC std_ss [Icmf_xfer_po] >> 
+  PAT_X_ASSUM ``!x. y`` (
+      fn thm => ASSUME_TAC (
+		    SPECL [``sc:hw_state``, ``sc':hw_state``,
+			   ``sc'':hw_state``, ``s:cl_state``, 
+			   ``s':cl_state``, ``s'':cl_state``, 
+			   ``n:num``, ``dl:dop list``,
+			   ``ca_Icodef:hw_state -> hw_state -> bool``,
+			   ``cl_Icodef:cl_state -> cl_state -> bool``] thm 
+		)
+  ) >>
+  FULL_SIMP_TAC std_ss []
+);
+
+val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
+!sc sc' sc'' s s' s'' n dl Icoh Icode Icm ca_Icmf cl_Icmf ca_Icodef cl_Icodef.
+    cm_user_po Icoh Icode Icm 
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' 
+ /\ cl_II cl_Icmf cl_Icodef s s'
+ /\ cl_kcomp s s' n
+ /\ ca_kcomp sc sc' n
+ /\ ca_Icmf sc sc''
+ /\ cl_Icmf s s'' 
+ /\ abs_cl_trans s' PRIV dl s''
+ /\ abs_ca_trans sc' PRIV dl sc''
+ /\ Rsim sc s
+ /\ Rsim sc' s'
+ /\ Rsim sc'' s''
+ /\ Icodef_xfer_po ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf
+ /\ cl_Icodef s s''
+        ==>
+    ca_Icodef sc sc''
+``,
+  RW_TAC std_ss [Icodef_xfer_po] >> 
+  PAT_X_ASSUM ``!x. y`` (
+      fn thm => ASSUME_TAC (
+		    SPECL [``sc:hw_state``, ``sc':hw_state``,
+			   ``sc'':hw_state``, ``s:cl_state``, 
+			   ``s':cl_state``, ``s'':cl_state``, 
+			   ``n:num``, ``dl:dop list``] thm 
+		)
+  ) >>
+  FULL_SIMP_TAC std_ss []
+);
+
 (*********** finish ************)
 
 val _ = export_theory();
