@@ -1,0 +1,107 @@
+digraph {
+                graph [pad="0", nodesep="0.3", ranksep="2.4"];
+      		HWPO_drvbl -> userint[label="user step: derivable"];
+		HWPO_exentry -> userint[label="PRIV: exentry"];
+		L_Inv_CR_unchd -> userint[label="I derivable: CR unchd"];
+		L_Inv_pres -> userint[label="user step: Inv preserved"];
+		L_drv_imv_unchd -> userint[label="iCoh isafe notW: imv unchd"];
+		SWPO_CR_notW -> userint[label="Ifun: notW CR"];
+		SWPO_iCoh_isafe -> userint[label="Icode: iCoh isafe CRex"];
+		SWPO_Inv -> userint[label="Inv: Ifun Icoh Icode Icm"];
+
+		SWPO_CR_coreg -> L_Inv_CR_unchd[label="CR odo coreg"];
+		SWPO_CR_notW -> L_Inv_CR_unchd;
+		SWPO_Inv -> L_Inv_CR_unchd;
+		SWPO_Icoh_dCoh -> L_Inv_CR_unchd[label="Icoh: dCoh CR"];
+		L_drv_not_W_unchd -> L_Inv_CR_unchd[label="notW dCoh: Cv unchd"];
+		cache_state_model -> L_drv_not_W_unchd;
+		SWPO_Inv -> L_Inv_pres;
+		L_Ifun_pres -> L_Inv_pres;
+		L_Icoh_pres -> L_Inv_pres;
+		L_Icode_pres -> L_Inv_pres;
+		L_Icm_pres -> L_Inv_pres;
+		cache_state_model -> L_drv_imv_unchd;	   
+
+		HWPO_drvbl -> L_Ifun_pres;
+		SWPO_Inv -> L_Ifun_pres;
+		SWPO_Ifun_CR -> L_Ifun_pres[label="Ifun odo CR"];
+		L_Inv_CR_unchd -> L_Ifun_pres;
+
+		HWPO_drvbl -> L_Icoh_pres;
+		L_Inv_CR_unchd -> L_Icoh_pres;
+		L_Inv_drv_dCoh_CR -> L_Icoh_pres[label="Inv drv: dCoh CR"];
+		SWPO_Inv -> L_Icoh_pres;
+		SWPO_Icoh_dCoh -> L_Icoh_pres;
+		SWPO_Icoh_CR -> L_Icoh_pres[label="Icoh odo Cv/dCoh CR "];
+
+		HWPO_drvbl -> L_Icode_pres;	
+		SWPO_Inv -> L_Icode_pres;	
+		SWPO_iCoh_isafe -> L_Icode_pres;	
+		SWPO_Icode_CRex -> L_Icode_pres[label="Icode odo Cv/iCoh/isafe CRex"];	
+		L_Inv_CR_unchd -> L_Icode_pres;	
+		L_Inv_drv_iCoh -> L_Icode_pres[label="Inv drv: iCoh CRex"];	
+		L_Inv_drv_isafe -> L_Icode_pres[label="Inv drv: isafe CRex"];	
+
+		SWPO_Inv -> L_Inv_drv_dCoh_CR;
+		SWPO_CR_notW -> L_Inv_drv_dCoh_CR;
+		SWPO_Icoh_dCoh -> L_Inv_drv_dCoh_CR;
+		L_drv_notW_dCoh -> L_Inv_drv_dCoh_CR[label="dCoh notw drv: dCoh pres"];
+		L_Inv_drv_CR -> L_Inv_drv_dCoh_CR[label="Inv drv: CR pres"];
+		cache_state_model -> L_drv_notW_dCoh
+		L_Inv_CR_unchd -> L_Inv_drv_CR;
+		SWPO_CR -> L_Inv_drv_CR[label="CR self-contained"];
+
+		SWPO_Inv -> L_Inv_drv_iCoh;
+		SWPO_iCoh_isafe -> L_Inv_drv_iCoh;
+		SWPO_CR_notW -> L_Inv_drv_iCoh;
+		L_Inv_drv_CRex -> L_Inv_drv_iCoh[label="Inv drv: CRex pres"];
+		L_drv_notWX_iCoh -> L_Inv_drv_iCoh[label="notWX iCoh isafe: iCoh pres"];
+
+		L_Inv_CR_unchd -> L_Inv_drv_CRex;
+		L_Inv_drv_CR -> L_Inv_drv_CRex;
+		L_Inv_CR_Mon -> L_Inv_drv_CRex[label="Inv CR unchd: Mon pres"];
+
+		cache_state_model -> L_drv_notWX_iCoh;
+
+		SWPO_Inv -> L_Inv_CR_Mon;
+		SWPO_CR_notW -> L_Inv_CR_Mon;
+		L_MD_Mon -> L_Inv_CR_Mon[label="Mon odo Cv MD"];
+		
+		HWPO_MDVA -> L_MD_Mon[label="Mmu VA odo MD VA"]
+		HWPO_Mon_reg -> L_MD_Mon[label="Mon reg permission odo mode"]
+		HWPO_Mon_mem -> L_MD_Mon[label="Mon mem permission odo Mmu"]
+
+		SWPO_Inv -> L_Inv_drv_isafe;
+		SWPO_CR_notW -> L_Inv_drv_isafe;
+		SWPO_iCoh_isafe -> L_Inv_drv_isafe;
+		L_Inv_drv_CRex -> L_Inv_drv_isafe;
+		L_drv_notW_MD -> L_Inv_drv_isafe[label="notW dCoh MD: MD unchd"];
+		L_Inv_safe -> L_Inv_drv_isafe[label="Inv: safe"];
+
+		cache_state_model -> L_drv_notW_MD;
+
+		L_Inv_dCoh_MD -> L_Inv_safe[label="Inv: dCoh MD"];
+		L_Inv_notW_MD -> L_Inv_safe[label="Inv: notW MD"];
+		L_notW_MD_safe -> L_Inv_safe[label="notW/dCoh MD: safe"];
+
+		SWPO_Inv -> L_Inv_dCoh_MD;
+		SWPO_Icoh_dCoh -> L_Inv_dCoh_MD;
+		SWPO_Ifun_MD -> L_Inv_dCoh_MD[label="Ifun: MD in CR"];
+
+		SWPO_Inv -> L_Inv_notW_MD;
+		SWPO_CR_notW -> L_Inv_notW_MD;
+		SWPO_Ifun_MD -> L_Inv_notW_MD;
+
+		L_MD_Mon -> L_notW_MD_safe;
+		L_drv_MD_unchd -> L_notW_MD_safe[label="notW/dCoh MD: MD unchd"];
+
+		L_drv_MD_regs -> L_drv_MD_unchd[label="Cv MD regs unchd"];
+		L_drv_notW_unchd -> L_drv_MD_unchd[label="notW dCoh: Cv unchd"];
+
+		cache_state_model -> L_drv_notW_unchd
+		HWPO_MD_coregs -> L_drv_MD_regs[label="MD regs odo coregs"]
+
+		HWPO_drvbl -> L_Icm_pres;
+		SWPO_Icm_drvbl -> L_Icm_pres[label="Inv drv: Icm holds"];
+
+	}

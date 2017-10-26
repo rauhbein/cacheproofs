@@ -165,7 +165,7 @@ store_thm("abs_ca_trans_dCoh_preserve_lem", ``
 );
 
 val abs_ca_trans_drvbl_lem = store_thm("abs_ca_trans_drvbl_lem", ``
-!s m dl s' pa. abs_ca_trans s USER dl s' ==> drvbl s s'
+!s dl s'. abs_ca_trans s USER dl s' ==> drvbl s s'
 ``,
   REWRITE_TAC [abs_ca_trans_drvbl_oblg]
 );
@@ -305,7 +305,7 @@ val cl_CRex_lem = store_thm("cl_CRex_lem", ``
 (* user integrity *)
 
 val Inv_MD_Coh_lem = store_thm("Inv_MD_Coh_lem", ``
-!s s' Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Inv Icoh Icode Icm s ==> 
+!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Inv Icoh Icode Icm s ==> 
     dCoh s.ms {pa | MEM pa IN MD s}
 ``,
   REPEAT STRIP_TAC >>
