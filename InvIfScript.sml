@@ -1161,11 +1161,12 @@ val ca_Icmf_Icoh_lem = store_thm("ca_Icmf_Icoh_lem", ``
   RES_TAC
 );
 
-val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm = 
+val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm Icmf = 
 !s s' n. 
     cm_user_po Icoh Icode Icm
  /\ ca_kcomp s s' n 
  /\ Icode s
+ /\ Icmf s s'
  /\ Icodef s s'
         ==>
     ((mode s' = PRIV) ==> icoh s'.ms (ca_Tr s' (VApc s'.cs))
@@ -1174,12 +1175,13 @@ val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm =
 `;
 
 val ca_Icmf_Icode_lem = store_thm("ca_Icmf_Icode_lem", ``
-!s s' Icoh Icode Icm Icmf. 
-    ca_Icodef_po Icmf Icoh Icode Icm
+!s s' Icoh Icode Icm Icmf Icodef. 
+    ca_Icodef_po Icodef Icoh Icode Icm Icmf
  /\ cm_user_po Icoh Icode Icm
  /\ ca_wrel s s'
  /\ Icode s
  /\ Icmf s s'
+ /\ Icodef s s'
         ==>
     Icode s'
 ``,
@@ -1196,7 +1198,7 @@ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm =
  /\ Icm_f_po ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Icmf_po cl_Icmf
  /\ ca_Icmf_po ca_Icmf Icoh Icode Icm
- /\ ca_Icodef_po ca_Icodef Icoh Icode Icm
+ /\ ca_Icodef_po ca_Icodef Icoh Icode Icm ca_Icmf
 `;
 
 val Icmf_init_sim_lem = store_thm("Icmf_init_sim_lem", ``

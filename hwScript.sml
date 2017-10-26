@@ -2639,6 +2639,20 @@ val ca_fixmmu_Tr_oblg = store_thm("ca_fixmmu_Tr_oblg", ``
   ASM_REWRITE_TAC [optionTheory.THE_DEF, pairTheory.FST]
 );
 
+val ca_fixmmu_MD_lem = store_thm("ca_fixmmu_MD_lem", ``
+!s s' VAs f. 
+    ca_fixmmu s VAs f 
+ /\ (!r. r IN MDVA s VAs ==> (Cv s r = Cv s' r))
+	==>
+    ca_fixmmu s' VAs f
+``,
+  REWRITE_TAC [ca_fixmmu_def, Mmu_def, Cv_def, MDVA_def] >>
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC Mmu_lem >>
+  METIS_TAC []
+);
+
 (******** cacheaware computation ********)
 
 val (ca_kcomp_rules, ca_kcomp_ind, ca_kcomp_cases) = Hol_reln `
