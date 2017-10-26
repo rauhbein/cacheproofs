@@ -941,7 +941,7 @@ val icoh_write_other_lem = store_thm("icoh_write_other_lem", ``
 val icoh_preserve_oblg = store_thm("icoh_preserve_oblg", ``
 !ms req ms' pa. icoh ms pa /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
-	     /\ (Freq req ==> ~dirty ms (Adr req))
+	     /\ ~dirty ms pa
         ==>
     icoh ms' pa
 ``,
@@ -1040,7 +1040,7 @@ val imv_fetch_oblg = store_thm("imv_fetch_oblg", ``
      ]
 );
 
-val msca_clean_preserve_lem = store_thm("msca_clean_preserve_lem", ``
+val msca_clean_preserve_oblg = store_thm("msca_clean_preserve_oblg", ``
 !ms pa ms' req. Dreq req /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
 	     /\ ~dirty ms pa
@@ -1109,10 +1109,9 @@ val imv_dreq_lem = store_thm("imv_dreq_lem", ``
     (imv ms' T pa = imv ms T pa)
 ``,
   REPEAT STRIP_TAC >>
-  `~Freq req` by ( METIS_TAC [req_cases_lem] ) >>
   `icoh ms' pa` by ( METIS_TAC [icoh_preserve_oblg] ) >>
   IMP_RES_TAC Dreq_lem >>
-  `~dirty ms' pa` by ( METIS_TAC [msca_clean_preserve_lem] ) >>
+  `~dirty ms' pa` by ( METIS_TAC [msca_clean_preserve_oblg] ) >>
   Cases_on `Wreq req`
   >| [(* write *)
       RES_TAC >>

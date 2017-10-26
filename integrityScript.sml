@@ -175,6 +175,21 @@ val abs_ca_progress_lem = store_thm("abs_ca_progress_lem", ``
   REWRITE_TAC [abs_ca_progress_oblg]  
 );
 
+val abs_ca_trans_icoh_clean_preserve_lem = 
+store_thm("abs_ca_trans_icoh_clean_preserve_lem", ``
+!s m dl s' pa. 
+    abs_ca_trans s m dl s'
+ /\ pa NOTIN writes dl
+ /\ icoh s.ms pa
+ /\ ~dirty s.ms pa
+        ==> 
+    icoh s'.ms pa
+ /\ ~dirty s'.ms pa
+``,
+  REWRITE_TAC [abs_ca_trans_icoh_clean_preserve_oblg]
+);
+
+
 val abs_cl_trans_mode_lem = store_thm("abs_cl_trans_mode_lem", ``
 !s m dl s'. abs_cl_trans s m dl s' ==> (cl_mode s = m) 
 ``,
@@ -1501,9 +1516,7 @@ Icodef_xfer_po ca_Icodef_AC cl_Icodef_AC
 	  NTAC 2 STRIP_TAC >>
 	  FULL_SIMP_TAC std_ss [ca_Icodef_AC_def] >>
 	  RES_TAC >>
-	  (* TODO: need abs_ca lem: 
-	     pa NOTIN writes ==> ~dirty /\ icoh preserved *)
-	  cheat
+	  METIS_TAC [abs_ca_trans_icoh_clean_preserve_lem]
 	  ,
 	  (* CRex equal *)
 	  STRIP_TAC >>
@@ -1529,7 +1542,6 @@ Icodef_xfer_po ca_Icodef_AC cl_Icodef_AC
      ]
 );
 
- (* /\ Icodef_xfer_po ca_Icodef cl_Icodef *)
  (* /\ Icm_f_po ca_Icmf ca_Icodef Icm *)
  (* /\ cl_Icmf_po cl_Icmf *)
  (* /\ ca_Icmf_po ca_Icmf *)
