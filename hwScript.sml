@@ -1471,7 +1471,7 @@ val drvbl_non_def = Define `drvbl_non s s' pa =
 
 (* NOTE: need cleanness here to preserve isafe later *)
 val drvbl_rd_def = Define `drvbl_rd s s' pa = 
-   Mon s (MEM pa) USER R 
+   (Mon s (MEM pa) USER R \/ MEM pa IN MD s)
 /\ (M s'.ms pa = M s.ms pa)
 /\ (dw s'.ms pa <> dw s.ms pa ==> 
         ~dhit s.ms pa /\ ~dirty s'.ms pa /\ (dcnt s'.ms pa = M s.ms pa))
@@ -1829,7 +1829,7 @@ val drvbl_Coh_mem_lem = store_thm("drvbl_Coh_mem_lem", ``
   PAT_X_ASSUM ``!pa. X \/ Y \/ Z`` (
       fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
   ) >>
-  FULL_SIMP_TAC std_ss [drvbl_non_def, drvbl_rd_def, drvbl_wt_def]
+  FULL_SIMP_TAC std_ss [drvbl_non_def(* , drvbl_rd_def *), drvbl_wt_def]
   >| [(* eviction *)
       Cases_on `dw s'.ms pa = dw s.ms pa`
       >| [(* cache unchanged *)
@@ -1874,15 +1874,18 @@ val drvbl_Coh_mem_lem = store_thm("drvbl_Coh_mem_lem", ``
       (* read *)
       Cases_on `dw s'.ms pa = dw s.ms pa`
       >| [(* cache and memory unchanged *)
-	  IMP_RES_TAC dmvca_lem
+	  FULL_SIMP_TAC std_ss [drvbl_rd_def] >> (
+	      IMP_RES_TAC dmvca_lem
+	  )
 	  ,
 	  (* only cache changed *)
-	  RES_TAC >>
-	  `dhit s'.ms pa` by ( 
-	      CCONTR_TAC >>
-	      FULL_SIMP_TAC std_ss [double_not_dhit_lem]
-	  ) >>
-	  RW_TAC std_ss [dmvca_hit_lem, dmvca_miss_lem]
+	  FULL_SIMP_TAC std_ss [drvbl_rd_def] >> (
+	      `dhit s'.ms pa` by ( 
+	          CCONTR_TAC >>
+		  IMP_RES_TAC double_not_dhit_lem
+	      ) >>
+	      RW_TAC std_ss [dmvca_hit_lem, dmvca_miss_lem]
+	  )
 	 ]
       ,
       (* write -> not possible *)
@@ -1944,19 +1947,21 @@ val drvbl_rd_dcoh_lem = store_thm("drvbl_rd_dcoh", ``
 !s s' pa. drvbl_rd s s' pa /\ dcoh s.ms pa ==> dcoh s'.ms pa
 ``,
   REPEAT STRIP_TAC >>
-  FULL_SIMP_TAC std_ss [drvbl_rd_def] >>
   Cases_on `dw s'.ms pa = dw s.ms pa`
   >| [(* cache and memory unchanged *)
-      IMP_RES_TAC dcoh_unchanged_lem
+      FULL_SIMP_TAC std_ss [drvbl_rd_def] >> (
+          IMP_RES_TAC dcoh_unchanged_lem
+      )
       ,
       (* only cache changed *)
-      RES_TAC >>
-      `dcnt s'.ms pa = M s'.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
-      `dhit s'.ms pa` by (
-          CCONTR_TAC >>
-	  FULL_SIMP_TAC std_ss [double_not_dhit_lem]
-      ) >>
-      IMP_RES_TAC dcoh_equal_lem
+      FULL_SIMP_TAC std_ss [drvbl_rd_def] >> (
+	  `dcnt s'.ms pa = M s'.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
+	  `dhit s'.ms pa` by (
+              CCONTR_TAC >>
+	      IMP_RES_TAC double_not_dhit_lem
+	  ) >>
+	  IMP_RES_TAC dcoh_equal_lem
+      )
      ]
 );
 
