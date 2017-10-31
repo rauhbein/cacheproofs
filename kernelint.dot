@@ -1,0 +1,82 @@
+digraph {
+                graph [pad="0", nodesep="0.5", ranksep="4.5"];
+      		Inv_kernel_preserved_thm -> kernel_integrity_sim_thm[label="kernel comp: Inv pres"];
+      		kernel_wrel_sim_lem -> kernel_integrity_sim_thm[label="exists sim cl comp"];
+		Rsim_unique_lem -> kernel_integrity_sim_thm[label="Rsim is functional"];
+
+		kernel_wrel_sim_lem -> Inv_kernel_preserved_thm;
+		ca_Inv_rebuild_lem -> Inv_kernel_preserved_thm[label="Rsim cl_Inv ca_II: Inv pres"];
+		
+		Rsim_exists_lem -> kernel_wrel_sim_lem[label="exists sim cl state"];
+		Rsim_cl_Inv_lem -> kernel_wrel_sim_lem[label="Rsim Inv: cl_Inv"];
+		Rsim_exentry_lem -> kernel_wrel_sim_lem[label="Rsim exentry xfer"];
+		cl_kcomp_exists_lem -> kernel_wrel_sim_lem[label="exists cl comp <= n"];
+		kernel_bisim_lem -> kernel_wrel_sim_lem[label="sim: Rsim ca_II cl_II"]
+		Rsim_mode_lem -> kernel_wrel_sim_lem[label="Rsim mode xfer"];
+		cl_Inv_po -> kernel_wrel_sim_lem[label="cl_Inv pres"];
+
+		Icm_f_po -> ca_Inv_rebuild_lem[label="ca_II ca comp: Icm pres"];
+		Inv_oblg -> ca_Inv_rebuild_lem[label="Inv: 4 parts"];
+		ca_Icmf_Icoh_lem -> ca_Inv_rebuild_lem[label="ca comp ca_Icmf: Icoh pres"];
+		Ifun_Icoh_lem -> ca_Inv_rebuild_lem[label="Rsim Icoh: cl_Inv iff Ifun"];
+		ca_Icmf_Icode_lem -> ca_Inv_rebuild_lem[label="ca comp ca_Icmf ca_Icodef: Icode pres"] 	      
+
+		ca_Icmf_po -> ca_Icmf_Icoh_lem[label="dCoh deps + final Icoh"];
+
+		ca_Icodef_po -> ca_Icmf_Icode_lem[label="icoh clean PC + final Icode"];
+
+		cl_Inv_spec -> Ifun_Icoh_lem[label="cl_Inv defined by Rsim on CR + Ifun"];
+		Rsim_cl_CR_lem -> Ifun_Icoh_lem[label="Rsim Icoh: Cv CR coupled"];
+
+		Icoh_dCoh_oblg -> Rsim_cl_CR_lem[label="Icoh: dCoh CR"];
+		dCoh_alt_lem -> Rsim_cl_CR_lem[label="dCoh: Cv = Mv"];
+
+		cache_state_model -> dCoh_alt_lem;
+
+		Inv_oblg -> Rsim_cl_Inv_lem;
+		Rsim_cl_CR_lem -> Rsim_cl_Inv_lem;
+		cl_Inv_spec -> Rsim_cl_Inv_lem;
+		
+		abs_cl_progress_oblg ->	cl_kcomp_exists_lem[label="exists cl next state"];
+
+		cl_II_po -> kernel_bisim_lem[label="cl_II proven"];
+		Icmf_init_sim_lem -> kernel_bisim_lem[label="init Inv cl_Icmf Rsim: ca_Icmf"];
+		Icodef_init_sim_lem -> kernel_bisim_lem[label="init Inv cl_Icmf ca_Icmf cl_Icodef Rsim: ca_Icodef"];
+		abs_ca_trans_mode_oblg -> kernel_bisim_lem[label="m = current mode"];
+		Inv_oblg -> kernel_bisim_lem;
+		ca_Icmf_po -> kernel_bisim_lem;
+		dCoh_alt_lem -> kernel_bisim_lem;
+		ca_deps_pc_oblg -> kernel_bisim_lem[label="trans PC in ca_deps"];
+		ca_vdeps_PC_oblg -> kernel_bisim_lem[label="PC in ca_vdeps"];
+		deps_Tr_eq_lem -> kernel_bisim_lem[label="ca_deps coupled core eq: vdeps trans eq"];
+		ca_Icodef_po -> kernel_bisim_lem;
+		imv_dmv_lem -> kernel_bisim_lem[label="icoh dcoh clean: imv = dmv"];
+		cl_Icmf_po -> kernel_bisim_lem[label="cl comp: all dops cacheable"];
+		core_bisim_oblg -> kernel_bisim_lem[label="core eq dl eq same writes"];
+		abs_ca_trans_dcoh_write_oblg -> kernel_bisim_lem[label="ca writes: dcoh"];
+		abs_cl_trans_not_write_oblg -> kernel_bisim_lem[label="cl not writes: Cv unchd"];
+		abs_ca_trans_dmvalt_not_write_oblg -> kernel_bisim_lem[label="ca not writes: Mv unchd"];
+		abs_cl_trans_not_adrs_oblg -> kernel_bisim_lem[label="cl others: Cv unchd"];
+		abs_ca_trans_dmvalt_oblg -> kernel_bisim_lem[label="ca others: Mv unchd"];
+		Icmf_sim_lem -> kernel_bisim_lem[label="Rsim cl_Icmf: ca_Icmf"];
+		Icodef_sim_lem -> kernel_bisim_lem[label="Rsim cl_Icmf ca_Icmf cl_Icodef: ca_Icodef"];
+
+		Icmf_init_xfer_po -> Icmf_init_sim_lem[label="Rsim Inv cl_Inv: cl_Icmf iff ca_Icmf"]; 
+		Icmf_xfer_po -> Icmf_sim_lem[label="Rsim ca_II cl_II: cl_Icmf iff ca_Icmf"]; 
+		Icodef_init_xfer_po -> Icodef_init_sim_lem[label="Rsim Inv cl_Inv cl_Icmf ca_Icmf: cl_Icodef iff ca_Icodef"]; 
+		Icodef_xfer_po -> Icodef_sim_lem[label="Rsim ca_II cl_II cl_Icmf ca_Icmf: cl_Icodef iff ca_Icodef"]; 
+
+		deps_vdeps_eq_oblg -> deps_Tr_eq_lem[label="Cv deps coupled: same vdeps"]; 
+		deps_MD_lem -> deps_Tr_eq_lem[label="Cv deps coupled: same Cv MDVA vdeps"]; 
+		deps_MD_eq_lem -> deps_Tr_eq_lem[label="Cv MDVA deps coupled: same MDVA vdeps"]; 
+		Mmu_oblg -> deps_Tr_eq_lem[label="Cv MDVA coupled: same Mmu VA"]; 
+
+		ca_deps_MD_oblg -> deps_MD_lem[label="MDVA vdeps in deps"];
+
+		deps_vdeps_eq_oblg -> deps_MD_eq_lem;
+		deps_MD_lem -> deps_MD_eq_lem;
+		MD_oblg -> deps_MD_eq_lem[label="MD self-contained"];
+		
+		cache_state_model -> imv_dmv_lem;
+
+	}
