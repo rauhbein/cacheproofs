@@ -122,6 +122,14 @@ val core_req_mmu_Freq_lem = store_thm("core_req_mmu_Freq_lem", ``
   REWRITE_TAC [core_req_mmu_Freq_oblg]
 );
 
+val core_req_mmu_Ireq_lem = store_thm("core_req_mmu_Ireq_lem", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ Ireq req ==> 
+    ?va. va IN vdeps_ c 
+      /\ (Mmu_(c,mv,va,M,R) = SOME (Adr req, T))
+``,
+  REWRITE_TAC [core_req_mmu_Ireq_oblg]
+);
+
 val core_req_mmu_Dreq_lem = store_thm("core_req_mmu_Dreq_lem", ``
 !c M mv req c'. core_req (c,M,mv,req,c') /\ Dreq req ==> 
     ?va. va IN vdeps_ c 
@@ -215,6 +223,14 @@ val msca_FREQ_unchanged_lem = store_thm("msca_FREQ_unchanged_lem", ``
 !pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa)
 ``,
   REWRITE_TAC [msca_FREQ_unchanged_oblg]
+);
+
+val msca_ICFR_unchanged_lem = store_thm("msca_ICFR_unchanged_lem", ``
+!ms pa ms'. (ms' = msca_trans ms (ICFR pa)) 
+    ==>
+!pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa)
+``,
+  REWRITE_TAC [msca_ICFR_unchanged_oblg]
 );
 
 val msca_write_val_lem = store_thm("msca_write_val_lem", ``
@@ -456,6 +472,23 @@ val ic_cacheable_read_lem = store_thm("ic_cacheable_read_lem", ``
   REWRITE_TAC [ic_cacheable_read_oblg]
 );
 
+(* instruction cache flush *)
+
+val ic_cacheable_cl_other_lem = store_thm("ic_cacheable_cl_other_lem", ``
+!ms pa ms' pa'. (ms' = msca_trans ms (ICFR pa')) /\ (pa <> pa') ==>
+    (iw ms' pa = iw ms pa)
+``,
+  REWRITE_TAC [ic_cacheable_cl_other_oblg]
+);
+
+val ic_cacheable_cl_lem = store_thm("ic_cacheable_cl_lem", ``
+!ms pa ms'. (ms' = msca_trans ms (ICFR pa)) /\ (iw ms' pa <> iw ms pa) 
+        ==>
+    ~ihit ms' pa
+``,
+  REWRITE_TAC [ic_cacheable_cl_oblg]
+);
+
 (* Coherency *)
 
 val dcoh_lem = store_thm("dcoh_lem", ``
@@ -658,6 +691,14 @@ val imv_fetch_lem = store_thm("imv_fetch_lem", ``
   REWRITE_TAC [imv_fetch_oblg]
 );
 
+val imv_flush_lem = store_thm("imv_flush_lem", ``
+!ms pa ms' req. icoh ms pa /\ Ireq req /\ (ms' = msca_trans ms req)
+        ==>
+    (imv ms' T pa = imv ms T pa)
+``,
+  REWRITE_TAC [imv_flush_oblg]
+);
+
 val imv_preserve_lem = store_thm("imv_preserve_lem", ``
 !ms req ms' pa. icoh ms pa /\ dcoh ms pa /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
@@ -684,6 +725,13 @@ val core_req_mmu_lem = store_thm("core_req_mmu_lem", ``
       (* Freq *)
       IMP_RES_TAC core_req_mmu_Freq_lem >>
       IMP_RES_TAC Freq_lem >>
+      RW_TAC std_ss [Acc_def, CAreq_def] >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+      ,
+      (* Ireq *)
+      IMP_RES_TAC core_req_mmu_Ireq_lem >>
+      IMP_RES_TAC Ireq_lem >>
       RW_TAC std_ss [Acc_def, CAreq_def] >>
       HINT_EXISTS_TAC >>
       ASM_REWRITE_TAC []
@@ -754,6 +802,18 @@ val MDVA_lem = store_thm("MDVA_lem", ``
   RW_TAC std_ss [MDVA_def, Cv_def, MD__lem]
 );
 
+val Cv_mem_lem = store_thm("Cv_mem_lem", ``
+!s pa. Cv s (MEM pa) = dmvca s.ms T pa
+``,
+  RW_TAC std_ss [Cv_def, CV_def]
+);
+
+val exentry_lem = store_thm("exentry_lem", ``
+!s. exentry s ==> (mode s = PRIV)
+``,
+  RW_TAC std_ss [exentry_def, mode_def, exentry__lem]
+);
+
 val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
    (!s M dop cs' s'. 
 	rd dop 
@@ -777,6 +837,12 @@ val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
      /\ core_rcv (cs', M, imv s.ms T pa, s'.cs)
     ==>
     hw_trans s M (FREQ pa) s')
+/\ (!s M pa s'. 
+        (M = Mode s.cs)
+     /\ core_req (s.cs, M, dmvca s.ms, ICFR pa, s'.cs) 
+     /\ (s'.ms = msca_trans s.ms (ICFR pa))
+    ==>
+    hw_trans s M (ICFR pa) s')
 /\ (!s M s'. 
         (M = Mode s.cs)
      /\ core_req (s.cs, M, dmvca s.ms, NOREQ, s'.cs)
@@ -784,18 +850,6 @@ val (hw_trans_rules, hw_trans_ind, hw_trans_cases) = Hol_reln `
     ==>
     hw_trans s M NOREQ s')
 `;
-
-val Cv_mem_lem = store_thm("Cv_mem_lem", ``
-!s pa. Cv s (MEM pa) = dmvca s.ms T pa
-``,
-  RW_TAC std_ss [Cv_def, CV_def]
-);
-
-val exentry_lem = store_thm("exentry_lem", ``
-!s. exentry s ==> (mode s = PRIV)
-``,
-  RW_TAC std_ss [exentry_def, mode_def, exentry__lem]
-);
 
 (* hw_trans lemmas *)
 
@@ -827,6 +881,20 @@ val hw_trans_fetch_lem = store_thm("hw_trans_fetch_lem", ``
   FULL_SIMP_TAC std_ss [corereq_11] >>
   RW_TAC std_ss [] >>
   HINT_EXISTS_TAC >>
+  RW_TAC std_ss []
+);
+
+val hw_trans_flush_lem = store_thm("hw_trans_flush_lem", ``
+!s M req s'. Ireq req /\ hw_trans s M req s' ==>
+    core_req (s.cs, M, dmvca s.ms, req, s'.cs) 
+ /\ (s'.ms = msca_trans s.ms req)
+``,
+  NTAC 5 STRIP_TAC >>
+  IMP_RES_TAC Ireq_lem >>
+  IMP_RES_TAC hw_trans_cases >> (
+      FULL_SIMP_TAC std_ss [corereq_distinct]
+  ) >>
+  FULL_SIMP_TAC std_ss [corereq_11] >>
   RW_TAC std_ss []
 );
 
@@ -971,12 +1039,19 @@ val hw_trans_not_Dreq_lem = store_thm("hw_trans_not_Dreq_lem", ``
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
-  `Freq req \/ (req = NOREQ)` by ( METIS_TAC [req_cases_lem] ) 
+  `Freq req \/ Ireq req \/ (req = NOREQ)` by ( METIS_TAC [req_cases_lem] ) 
   >| [(* fetch *)
       IMP_RES_TAC hw_trans_fetch_lem >>
       IMP_RES_TAC Freq_lem >>
       FULL_SIMP_TAC std_ss [] >>
       IMP_RES_TAC msca_FREQ_unchanged_lem >>
+      REV_FULL_SIMP_TAC std_ss []
+      ,
+      (* fetch *)
+      IMP_RES_TAC hw_trans_flush_lem >>
+      IMP_RES_TAC Ireq_lem >>
+      FULL_SIMP_TAC std_ss [] >>
+      IMP_RES_TAC msca_ICFR_unchanged_lem >>
       REV_FULL_SIMP_TAC std_ss []
       ,
       (* NOREQ *)
@@ -1010,6 +1085,10 @@ val hw_trans_mon_lem = store_thm("hw_trans_mon_lem", ``
       ,
       (* Freq *)
       IMP_RES_TAC hw_trans_fetch_lem >> 
+      IMP_RES_TAC core_req_mem_req_lem
+      ,
+      (* Ireq *)
+      IMP_RES_TAC hw_trans_flush_lem >> 
       IMP_RES_TAC core_req_mem_req_lem
      ]
 );
@@ -1054,6 +1133,10 @@ val hw_trans_mode_lem = store_thm("hw_trans_mode_lem", ``
       IMP_RES_TAC core_req_mode_lem >>
       IMP_RES_TAC core_rcv_mode_lem >>
       FULL_SIMP_TAC std_ss []
+      ,
+      (* Ireq *)
+      IMP_RES_TAC hw_trans_flush_lem >> 
+      IMP_RES_TAC core_req_mode_lem
      ]
 );
 
@@ -1084,6 +1167,10 @@ val hw_trans_coreg_lem = store_thm("hw_trans_coreg_lem", ``
       IMP_RES_TAC core_req_user_coreg_lem >>
       IMP_RES_TAC core_rcv_user_coreg_lem >>
       RW_TAC std_ss []
+      ,
+      (* Ireq *)
+      IMP_RES_TAC hw_trans_flush_lem >>
+      IMP_RES_TAC core_req_user_coreg_lem
       ,
       (* Dreq *)
       IMP_RES_TAC Dreq_cases_lem 
@@ -1130,6 +1217,15 @@ val hw_trans_progress_lem = store_thm("jw_trans_progress_lem", ``
           FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def]
       ) >>
       METIS_TAC []
+      ,
+      (* Ireq *)
+      `?ms'. ms' = msca_trans s.ms req` by ( RW_TAC std_ss [] ) >>
+      EXISTS_TAC ``req:corereq`` >>
+      EXISTS_TAC ``<|cs := c'; ms := ms'|>`` >>
+      IMP_RES_TAC Ireq_lem >>
+      RW_TAC std_ss [hw_trans_cases] >> (
+          FULL_SIMP_TAC std_ss [corereq_distinct, Adr_def, Dop_def]
+      )
       ,
       (* Dreq *)
       IMP_RES_TAC Dreq_cases_lem
@@ -1275,6 +1371,11 @@ val hw_trans_user_MD_lem = store_thm("hw_trans_user_MD_lem", ``
       ) >>
       IMP_RES_TAC core_rcv_user_MD_reg_lem >>
       RW_TAC std_ss []
+      ,
+      (* Ireq *)
+      IMP_RES_TAC hw_trans_flush_lem >>
+      IMP_RES_TAC core_req_user_MD_reg_lem >>
+      FULL_SIMP_TAC std_ss [CV_reg_lem]
       ,
       (* Dreq *)
       IMP_RES_TAC Dreq_cases_lem 
@@ -1455,6 +1556,12 @@ store_thm("hw_trans_icoh_clean_preserve_lem", ``
 	  IMP_RES_TAC Freq_lem >>
 	  FULL_SIMP_TAC std_ss [] >>
 	  IMP_RES_TAC msca_FREQ_unchanged_lem >>
+	  METIS_TAC [dirty_lem]
+	  ,
+	  (* Ireq *)
+	  IMP_RES_TAC Ireq_lem >>
+	  FULL_SIMP_TAC std_ss [] >>
+	  IMP_RES_TAC msca_ICFR_unchanged_lem >>
 	  METIS_TAC [dirty_lem]
 	 ]
      ]
@@ -1701,28 +1808,50 @@ val drvbl_lem = store_thm("drvbl_lem", ``
 	  `!pa. iw s'.ms pa = iw s.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
 	  IMP_RES_TAC drvbl_ic_unchanged_lem
 	  ,
-	  (* fetch *)
+	  (* fetch or flush *)
 	  IMP_RES_TAC hw_trans_mon_lem >>
-	  IMP_RES_TAC not_NOREQ_lem >>
-	  IMP_RES_TAC hw_trans_fetch_lem >>
-	  IMP_RES_TAC Freq_lem >>
-	  FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
-	  RW_TAC std_ss [drvbl_ic_def] >>
-	  Cases_on `pa' = pa`
-	  >| [(* fetched address *)
-	      RW_TAC std_ss [] >>
-	      DISJ2_TAC >>
-	      REWRITE_TAC [drvbl_ic_ex_def] >>
-	      STRIP_TAC >- ( ASM_REWRITE_TAC [] ) >>
-	      STRIP_TAC >>
-	      IMP_RES_TAC ic_cacheable_read_lem >>
-	      ASM_REWRITE_TAC []
+	  IMP_RES_TAC not_NOREQ_lem
+	  >| [(* fetch *)
+	      IMP_RES_TAC hw_trans_fetch_lem >>
+	      IMP_RES_TAC Freq_lem >>
+	      FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
+	      RW_TAC std_ss [drvbl_ic_def] >>
+	      Cases_on `pa' = pa`
+	      >| [(* fetched address *)
+	          RW_TAC std_ss [] >>
+	          DISJ2_TAC >>
+	          REWRITE_TAC [drvbl_ic_ex_def] >>
+	          STRIP_TAC >- ( ASM_REWRITE_TAC [] ) >>
+	          STRIP_TAC >>
+	          IMP_RES_TAC ic_cacheable_read_lem >>
+	          ASM_REWRITE_TAC []
+	          ,
+	          (* other address *)
+	          DISJ1_TAC >>
+	          REWRITE_TAC [drvbl_ic_non_def] >>
+	          STRIP_TAC >>
+	          IMP_RES_TAC ic_cacheable_other_lem
+		 ]
 	      ,
-	      (* other address *)
+	      (* flush *)
+	      IMP_RES_TAC hw_trans_flush_lem >>
+	      IMP_RES_TAC Ireq_lem >>
+	      FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
+	      RW_TAC std_ss [drvbl_ic_def] >>
 	      DISJ1_TAC >>
-	      REWRITE_TAC [drvbl_ic_non_def] >>
-	      STRIP_TAC >>
-	      IMP_RES_TAC ic_cacheable_other_lem
+	      Cases_on `pa' = pa`
+	      >| [(* fetched address *)
+		  FULL_SIMP_TAC std_ss [] >>
+	          IMP_RES_TAC msca_ICFR_lem >>
+	          REWRITE_TAC [drvbl_ic_non_def] >>
+	          STRIP_TAC >>
+	          IMP_RES_TAC ic_cacheable_cl_lem
+	          ,
+	          (* other address *)
+	          REWRITE_TAC [drvbl_ic_non_def] >>
+	          STRIP_TAC >>
+	          IMP_RES_TAC ic_cacheable_cl_other_lem
+	         ]
 	     ]
 	 ]
      ]
@@ -2223,7 +2352,8 @@ val drvbl_iCoh_mem_lem = store_thm("drvbl_iCoh_mem_lem", ``
 val abs_ca_trans_def = Define `
    (abs_ca_trans s m [] s' = hw_trans s m NOREQ s' 
 			  \/ ?pa. hw_trans s m (FREQ pa) s')
-/\ (abs_ca_trans s m (d::ds) s' = hw_trans s m (DREQ d) s' /\ (ds = []))
+/\ (abs_ca_trans s m ((DOP d)::ds) s' = hw_trans s m (DREQ d) s' /\ (ds = []))
+/\ (abs_ca_trans s m ((IFL pa)::ds) s' = hw_trans s m (ICFR pa) s' /\ (ds = []))
 `;
 
 val abs_ca_distinct_dl_lem = store_thm("abs_ca_distinct_dl_lem", ``
@@ -2237,8 +2367,10 @@ val abs_ca_distinct_dl_lem = store_thm("abs_ca_distinct_dl_lem", ``
       )
       ,
       (* non-empty *)
-      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
-      RW_TAC std_ss [listTheory.ALL_DISTINCT_SING]
+      Cases_on `h` >> (
+          FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+          RW_TAC std_ss [listTheory.ALL_DISTINCT_SING]
+      )
      ]
 );
 
@@ -2246,7 +2378,8 @@ val abs_ca_req_lem = store_thm("abs_ca_req_lem", ``
 !s m dl s'. abs_ca_trans s m dl s' ==> 
     ?req. hw_trans s m req s' 
        /\ (dl <> [] ==> Adr req IN adrs dl /\ 
-		        ?dop. (req = DREQ dop) /\ (dl = [dop]))
+		        (   (?dop. (req = DREQ dop) /\ (dl = [DOP dop]))
+	                 \/ (?pa. (req = ICFR pa) /\ (dl = [IFL pa]))))
        /\ ((dl = []) ==> (Freq req \/ (req = NOREQ)))
 ``,
   REPEAT STRIP_TAC >>
@@ -2258,9 +2391,11 @@ val abs_ca_req_lem = store_thm("abs_ca_req_lem", ``
       )
       ,
       (* non-empty *)
-      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >> 
-      HINT_EXISTS_TAC >>
-      RW_TAC list_ss [Adr_def, adrs_def]
+      Cases_on `h` >> (
+         FULL_SIMP_TAC std_ss [abs_ca_trans_def] >> 
+         HINT_EXISTS_TAC >>
+	 RW_TAC list_ss [Adr_def, adrs_def, opd_def, PA_def]
+      )
      ] 
 );
 
@@ -2297,15 +2432,21 @@ val abs_ca_trans_not_write_oblg = store_thm("abs_ca_trans_not_write_oblg", ``
       ASM_REWRITE_TAC []
       ,
       (* non-empty *)
-      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
-      REV_FULL_SIMP_TAC list_ss [] >>
-      IMP_RES_TAC writes_lem >>
-      RW_TAC std_ss [Cv_def, CV_def] >>
-      MATCH_MP_TAC hw_trans_dmv_lem >>
-      EXISTS_TAC ``m:mode`` >>
-      EXISTS_TAC ``DREQ h:corereq`` >>
-      RW_TAC std_ss [Wreq_def, Adr_def] >>
-      METIS_TAC []
+      Cases_on `h` >> (
+          FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+          REV_FULL_SIMP_TAC list_ss [] >>
+          IMP_RES_TAC writes_lem >>
+          RW_TAC std_ss [Cv_def, CV_def] >>
+          MATCH_MP_TAC hw_trans_dmv_lem >>
+          EXISTS_TAC ``m:mode`` )
+      >| [(* DREQ *)
+	  EXISTS_TAC ``DREQ d:corereq`` >>
+          FULL_SIMP_TAC list_ss [opd_def, Wreq_def, Adr_def]
+	  ,
+	  (* ICFR *)
+	  EXISTS_TAC ``ICFR p:corereq`` >>
+          FULL_SIMP_TAC list_ss [opd_def, Wreq_def, Adr_def]
+	 ]
      ]
 );
 
@@ -2361,19 +2502,21 @@ store_thm("abs_ca_trans_dmvalt_not_write_oblg", ``
       ,
       (* non-empty *)
       IMP_RES_TAC abs_ca_req_lem >>
-      FULL_SIMP_TAC list_ss [] >>
-      IMP_RES_TAC writes_lem >>
-      IMP_RES_TAC adrs_lem2 >>
-      FULL_SIMP_TAC std_ss [] >>
-      IMP_RES_TAC hw_trans_dmvalt_not_write_lem >>
-      FULL_SIMP_TAC std_ss [Adr_def, Wreq_def]
+      FULL_SIMP_TAC list_ss [] >> (
+          FULL_SIMP_TAC std_ss [] >>
+          IMP_RES_TAC writes_lem >>
+          IMP_RES_TAC adrs_lem2 >>
+          FULL_SIMP_TAC std_ss [] >>
+          IMP_RES_TAC hw_trans_dmvalt_not_write_lem >>
+          FULL_SIMP_TAC std_ss [Adr_def, Wreq_def, opd_def, PA_def]
+      )
      ]
 );
 
 val abs_ca_trans_dcoh_write_oblg = store_thm("abs_ca_trans_dcoh_write_oblg", ``
 !s m dl s' pa. 
     abs_ca_trans s m dl s'
- /\ (!d. MEM d dl ==> CA d)
+ /\ (!d. MEM d dl ==> CA (opd d))
  /\ pa IN writes dl 
         ==> 
     dcoh s'.ms pa
@@ -2385,12 +2528,22 @@ val abs_ca_trans_dcoh_write_oblg = store_thm("abs_ca_trans_dcoh_write_oblg", ``
       ,
       (* non-empty *)
       IMP_RES_TAC abs_ca_req_lem >>
-      FULL_SIMP_TAC list_ss [] >>
-      IMP_RES_TAC writes_lem2 >>
-      `Wreq (DREQ h)` by ( ASM_REWRITE_TAC [Wreq_def] ) >>
-      `CAreq (DREQ h)` by ( ASM_REWRITE_TAC [CAreq_def] ) >>
-      IMP_RES_TAC hw_trans_dcoh_write_lem >>
-      REV_FULL_SIMP_TAC std_ss [Adr_def]
+      FULL_SIMP_TAC list_ss []
+      >| [(* DREQ *)
+	  FULL_SIMP_TAC std_ss [] >>
+	  IMP_RES_TAC writes_lem2 >>
+	  RES_TAC >>
+	  FULL_SIMP_TAC std_ss [opd_def] >>
+	  `Wreq (DREQ dop)` by ( ASM_REWRITE_TAC [Wreq_def] ) >>
+	  `CAreq (DREQ dop)` by ( METIS_TAC [CAreq_def, opd_def] ) >>
+	  IMP_RES_TAC hw_trans_dcoh_write_lem >>
+	  REV_FULL_SIMP_TAC std_ss [Adr_def]
+	  ,
+	  (* ICFR *)
+	  FULL_SIMP_TAC std_ss [] >>
+	  IMP_RES_TAC writes_lem2 >>
+	  FULL_SIMP_TAC std_ss [wt_def, opd_def]
+	 ]
      ]
 );
 
@@ -2398,7 +2551,7 @@ val abs_ca_trans_dCoh_preserve_oblg =
 store_thm("abs_ca_trans_dCoh_preserve_oblg", ``
 !s m dl s' As. 
     dCoh s.ms As
- /\ (!d. MEM d dl ==> CA d)
+ /\ (!d. MEM d dl ==> CA (opd d))
  /\ abs_ca_trans s m dl s' 
         ==> 
     dCoh s'.ms As
@@ -2425,9 +2578,10 @@ store_thm("abs_ca_trans_dCoh_preserve_oblg", ``
 	 ]
       ,
       (* non-empty *)
-      FULL_SIMP_TAC list_ss [] >>
-      `CAreq req` by ( FULL_SIMP_TAC list_ss [CAreq_def] ) >>
-      IMP_RES_TAC hw_trans_dCoh_preserve_lem
+      FULL_SIMP_TAC list_ss [] >> (
+          `CAreq req` by ( FULL_SIMP_TAC list_ss [CAreq_def, opd_def] ) >>
+	  IMP_RES_TAC hw_trans_dCoh_preserve_lem
+      )
      ]
 );
 
@@ -2453,18 +2607,29 @@ val abs_ca_progress_oblg = store_thm("abs_ca_progress_oblg", ``
   REPEAT STRIP_TAC >>
   ASSUME_TAC ( SPEC ``s:hw_state`` hw_trans_progress_lem ) >>
   FULL_SIMP_TAC std_ss [] >>
-  Cases_on `req` >- (
-      (* DREQ *)
-      EXISTS_TAC ``[d:dop]`` >>
+  Cases_on `req`
+  >| [(* DREQ *)
+      EXISTS_TAC ``[DOP d:mop]`` >>
       EXISTS_TAC ``s':hw_state`` >>
       RW_TAC std_ss [abs_ca_trans_def]
-  ) >> (
-      (* FREQ and NOREQ *)
-      EXISTS_TAC ``[]:dop list`` >>
+      ,
+      (* FREQ *)
+      EXISTS_TAC ``[]:mop list`` >>
       EXISTS_TAC ``s':hw_state`` >>
       RW_TAC std_ss [abs_ca_trans_def] >>
       METIS_TAC []
-  )
+      ,
+      (* ICFR *)
+      EXISTS_TAC ``[IFL p:mop]`` >>
+      EXISTS_TAC ``s':hw_state`` >>
+      RW_TAC std_ss [abs_ca_trans_def]
+      ,
+      (* NOREQ *)
+      EXISTS_TAC ``[]:mop list`` >>
+      EXISTS_TAC ``s':hw_state`` >>
+      RW_TAC std_ss [abs_ca_trans_def] >>
+      METIS_TAC []
+     ]
 );
 
 val abs_ca_trans_icoh_clean_preserve_oblg = 
@@ -2495,14 +2660,15 @@ store_thm("abs_ca_trans_icoh_clean_preserve_oblg", ``
       ) >>
       METIS_TAC [hw_trans_icoh_clean_preserve_lem]
       ,
-      (* Dreq *)
-      FULL_SIMP_TAC std_ss [] >>
-      FULL_SIMP_TAC list_ss [] >>
-      IMP_RES_TAC writes_lem >>
-      `Wreq req ==> pa <> Adr req` by (
-          FULL_SIMP_TAC std_ss [Wreq_def, Adr_def]
-      ) >>
-      METIS_TAC [hw_trans_icoh_clean_preserve_lem]
+      (* Dreq or Ireq *)
+      FULL_SIMP_TAC std_ss [] >> (
+          FULL_SIMP_TAC list_ss [] >>
+          IMP_RES_TAC writes_lem >>
+          `Wreq req ==> pa <> Adr req` by (
+              FULL_SIMP_TAC std_ss [Wreq_def, Adr_def, opd_def]
+          ) >>
+          METIS_TAC [hw_trans_icoh_clean_preserve_lem]
+      )
      ]
 );
 
@@ -2571,21 +2737,30 @@ val ca_deps_reads_oblg = store_thm("ca_deps_reads_oblg", ``
 			    listTheory.MEM]
       ,
       (* non-empty *)
-      FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
-      REV_FULL_SIMP_TAC list_ss [] >>
-      IMP_RES_TAC reads_lem >>
-      IMP_RES_TAC hw_trans_core_req_lem >>
-      IMP_RES_TAC core_req_curr_mode_lem >>
-      `Dreq (DREQ h)` by ( FULL_SIMP_TAC std_ss [Dreq_def] ) >>
-      IMP_RES_TAC core_req_mmu_Dreq_lem >>
-      RW_TAC std_ss [ca_deps_def, coreIfTheory.deps__def, 
-		     pred_setTheory.IN_UNION] >>
-      DISJ1_TAC >>
-      `~wt h` by ( FULL_SIMP_TAC std_ss [not_wt_lem] ) >>
-      FULL_SIMP_TAC std_ss [Acc_def, Adr_def] >>
-      RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, coreIfTheory.Tr__def] >>
-      HINT_EXISTS_TAC >>
-      RW_TAC std_ss []
+      Cases_on `h`
+      >| [(* Dreq *)
+	  FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+	  REV_FULL_SIMP_TAC list_ss [] >>
+	  IMP_RES_TAC reads_lem >>
+          IMP_RES_TAC hw_trans_core_req_lem >>
+          IMP_RES_TAC core_req_curr_mode_lem >>
+          `Dreq (DREQ d)` by ( FULL_SIMP_TAC std_ss [Dreq_def, opd_def] ) >>
+          IMP_RES_TAC core_req_mmu_Dreq_lem >>
+          RW_TAC std_ss [ca_deps_def, coreIfTheory.deps__def, 
+           		 pred_setTheory.IN_UNION] >>
+          DISJ1_TAC >>
+          `~wt d` by ( FULL_SIMP_TAC std_ss [not_wt_lem, opd_def] ) >>
+          FULL_SIMP_TAC std_ss [Acc_def, Adr_def, opd_def] >>
+          RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, coreIfTheory.Tr__def] >>
+          HINT_EXISTS_TAC >>
+          RW_TAC std_ss []
+	  ,
+	  (* Ireq *)
+	  FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+	  REV_FULL_SIMP_TAC list_ss [] >>
+	  IMP_RES_TAC reads_lem >>
+	  FULL_SIMP_TAC std_ss [rd_def, opd_def]
+	 ]
      ]
 );
 

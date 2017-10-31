@@ -144,7 +144,7 @@ store_thm("abs_ca_trans_dmvalt_not_write_lem", ``
 val abs_ca_trans_dcoh_write_lem = store_thm("abs_ca_trans_dcoh_write_lem", ``
 !s m dl s' pa. 
     abs_ca_trans s m dl s'
- /\ (!d. MEM d dl ==> CA d)
+ /\ (!d. MEM d dl ==> CA (opd d))
  /\ pa IN writes dl 
         ==> 
     dcoh s'.ms pa
@@ -156,7 +156,7 @@ val abs_ca_trans_dCoh_preserve_lem =
 store_thm("abs_ca_trans_dCoh_preserve_lem", ``
 !s m dl s' As. 
     dCoh s.ms As
- /\ (!d. MEM d dl ==> CA d)
+ /\ (!d. MEM d dl ==> CA (opd d))
  /\ abs_ca_trans s m dl s' 
         ==> 
     dCoh s'.ms As
@@ -223,7 +223,7 @@ val abs_cl_trans_fixmmu_CA_lem = store_thm("abs_cl_trans_fixmmu_CA_lem", ``
  /\ cl_vdeps s SUBSET VAs 
  /\ abs_cl_trans s PRIV dl s' 
 	==>
-    !d. MEM d dl ==> CA d
+    !d. MEM d dl ==> CA (opd d)
 ``,
   REWRITE_TAC [abs_cl_trans_fixmmu_CA_oblg]
 );
@@ -254,7 +254,7 @@ val core_bisim_lem = store_thm("core_bisim_lem", ``
  /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
  /\ (cl_Cv s (MEM (cl_Tr s (VApc s.cs))) = imv sc.ms T (ca_Tr sc (VApc sc.cs)))
  /\ (cl_deps s = ca_deps sc)
- /\ (!d. MEM d dl ==> CA d)
+ /\ (!d. MEM d dl ==> CA (opd d))
         ==>
     (s'.cs = sc'.cs)
  /\ (dl = dlc)
@@ -899,7 +899,7 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
       `Rsim s''' s'' /\
        ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc s'''` by ( METIS_TAC [] ) >>
       MATCH_MP_TAC (
-          prove(``(A /\ (dl':dop list = dl)) /\ (A /\ (dl' = dl) ==> B) ==> 
+          prove(``(A /\ (dl':mop list = dl)) /\ (A /\ (dl' = dl) ==> B) ==> 
 		  A /\ B``, PROVE_TAC [])
       ) >>
       STRIP_TAC 
@@ -940,7 +940,7 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	      ASM_REWRITE_TAC []
 	  ) >>
 	  `cl_deps s'' = ca_deps s'''` by ( IMP_RES_TAC deps_eq_lem ) >>
-	  `!d. MEM d dl ==> CA d` by (
+	  `!d. MEM d dl ==> CA (opd d)` by (
 	      IMP_RES_TAC cl_II_po_def >>
 	      FULL_SIMP_TAC std_ss [cm_kernel_po_def, cl_II_def] >>
 	      IMP_RES_TAC cl_Icmf_po_def
@@ -1421,7 +1421,7 @@ Icmf_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
       STRIP_TAC >>
       FULL_SIMP_TAC std_ss [ca_Icmf_AC_def, cl_Icmf_AC_def] >>
       IMP_RES_TAC cl_Inv_Mmu_fixed_lem >>
-      `!d. MEM d dl ==> CA d` by (
+      `!d. MEM d dl ==> CA (opd d)` by (
           IMP_RES_TAC abs_cl_trans_fixmmu_CA_lem
       ) >>
       IMP_RES_TAC abs_ca_trans_dCoh_preserve_lem >>

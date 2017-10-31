@@ -211,6 +211,8 @@ val core_Mon_mem_po = Define `core_Mon_mem_po trans =
     (Dreq req ==> (?va. va IN vdeps_ c /\ 
 		  (Mmu_(c,mv,va,M,Acc req) = SOME (Adr req, CAreq req))))
  /\ (Freq req ==> (Mmu_(c,mv,VApc c,M,EX) = SOME (Adr req, T)))
+ /\ (Ireq req ==> (?va. va IN vdeps_ c /\ 
+		  (Mmu_(c,mv,va,M,R) = SOME (Adr req, T))))
 `;
 
 (* reg unchanged if no Mon permission *)
@@ -275,7 +277,8 @@ val core_req_exists = prove (``
       FULL_SIMP_TAC std_ss [mode_distinct]
       ,
       (* memory monitor *)
-      RW_TAC std_ss [core_Mon_mem_po, dummy_cr_def, Dreq_def, Freq_def]
+      RW_TAC std_ss [core_Mon_mem_po, dummy_cr_def, 
+		     Dreq_def, Freq_def, Ireq_def]
       ,
       (* reg monitor *)
       RW_TAC std_ss [core_Mon_reg_po, dummy_cr_def]
@@ -454,6 +457,19 @@ val core_req_mmu_Freq_oblg = store_thm("core_req_mmu_Freq_oblg", ``
   ASSUME_TAC core_req_spec >>
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC core_Mon_mem_po
+);
+
+val core_req_mmu_Ireq_oblg = store_thm("core_req_mmu_Ireq_oblg", ``
+!c M mv req c'. core_req (c,M,mv,req,c') /\ Ireq req ==> 
+    ?va. va IN vdeps_ c 
+      /\ (Mmu_(c,mv,va,M,R) = SOME (Adr req, T))
+``,
+  REPEAT STRIP_TAC >>
+  ASSUME_TAC core_req_spec >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC core_Mon_mem_po >>
+  HINT_EXISTS_TAC >>
+  ASM_REWRITE_TAC []
 );
 
 val core_req_mmu_Dreq_oblg = store_thm("core_req_mmu_Dreq_oblg", ``

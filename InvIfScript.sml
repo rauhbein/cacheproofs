@@ -1133,7 +1133,7 @@ val Icm_f_po = Define `Icm_f_po Icmf Icodef Icoh Icode Icm =
 val cl_Icmf_po = Define `cl_Icmf_po Icmf = 
 !s s' s'' n dl. cl_kcomp s s' n /\ abs_cl_trans s' PRIV dl s'' /\ Icmf s s'
         ==>
-    (!d. MEM d dl ==> CA d)
+    (!d. MEM d dl ==> CA (opd d))
 `;
 
 val ca_Icmf_po = Define `ca_Icmf_po Icmf Icoh Icode Icm = 
@@ -1256,7 +1256,7 @@ val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
 		    SPECL [``sc:hw_state``, ``sc':hw_state``,
 			   ``sc'':hw_state``, ``s:cl_state``, 
 			   ``s':cl_state``, ``s'':cl_state``, 
-			   ``n:num``, ``dl:dop list``,
+			   ``n:num``, ``dl:mop list``,
 			   ``ca_Icodef:hw_state -> hw_state -> bool``,
 			   ``cl_Icodef:cl_state -> cl_state -> bool``] thm 
 		)
@@ -1289,7 +1289,7 @@ val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
 		    SPECL [``sc:hw_state``, ``sc':hw_state``,
 			   ``sc'':hw_state``, ``s:cl_state``, 
 			   ``s':cl_state``, ``s'':cl_state``, 
-			   ``n:num``, ``dl:dop list``] thm 
+			   ``n:num``, ``dl:mop list``] thm 
 		)
   ) >>
   FULL_SIMP_TAC std_ss []
