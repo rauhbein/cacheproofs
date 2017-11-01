@@ -98,37 +98,6 @@ val Ifun_CR_exists = prove (``
      ]
 );  
 
-
-(* val Ifun_exists = store_thm("Ifun_exists", `` *)
-(* ?Ifun. Ifun_CR_po Ifun /\ Ifun_MD_po Ifun /\ Ifun_Mon_po Ifun *)
-(* ``, *)
-(*   EXISTS_TAC ``\s. MD s SUBSET CR s  *)
-(*                 /\ !r. r IN CR s ==> ~Mon s r USER W`` >> *)
-(*   RW_TAC std_ss [Ifun_CR_po, Ifun_MD_po, Ifun_Mon_po] >> *)
-(*   IMP_RES_TAC CR_oblg >> *)
-(*   EQ_TAC  *)
-(*   >| [(* ==> *) *)
-(*       STRIP_TAC >> *)
-(*       `!r. r IN MD s ==> (Cv s r = Cv s' r)` by ( *)
-(*           REPEAT STRIP_TAC >> *)
-(* 	  IMP_RES_TAC pred_setTheory.SUBSET_DEF >> *)
-(* 	  RES_TAC *)
-(*       ) >> *)
-(*       IMP_RES_TAC MD_lem >> *)
-(*       METIS_TAC [Mon_lem] *)
-(*       , *)
-(*       (* <== *) *)
-(*       STRIP_TAC >> *)
-(*       `!r. r IN MD s' ==> (Cv s' r = Cv s r)` by ( *)
-(*           REPEAT STRIP_TAC >> *)
-(* 	  IMP_RES_TAC pred_setTheory.SUBSET_DEF >> *)
-(* 	  FULL_SIMP_TAC std_ss [] *)
-(*       ) >> *)
-(*       IMP_RES_TAC MD_lem >> *)
-(*       METIS_TAC [Mon_lem] *)
-(*      ] *)
-(* ); *)
-
 val Ifun_CR_spec = new_specification ("Ifun_CR_spec",
   ["CR_", "Ifun_"], Ifun_CR_exists);
 
