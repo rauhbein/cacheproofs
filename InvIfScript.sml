@@ -1136,8 +1136,9 @@ val Icmf_init_xfer_po = Define `Icmf_init_xfer_po caI clI Icoh Icode Icm =
  /\ Rsim sc s
  /\ Inv Icoh Icode Icm sc
  /\ cl_Inv s
+ /\ clI s s
         ==>
-    (caI sc sc <=> clI s s)
+    caI sc sc
 `;
 
 val Icodef_init_xfer_po = 
@@ -1149,8 +1150,9 @@ Define `Icodef_init_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
  /\ ca_Icmf sc sc
  /\ cl_Icmf s s
  /\ cl_Inv s
+ /\ clI s s
         ==>
-    (caI sc sc <=> clI s s)
+    caI sc sc
 `;
 
 val Icmf_xfer_po = Define `Icmf_xfer_po caI clI Icoh Icode Icm =
@@ -1165,8 +1167,9 @@ val Icmf_xfer_po = Define `Icmf_xfer_po caI clI Icoh Icode Icm =
  /\ Rsim sc s
  /\ Rsim sc' s'
  /\ Rsim sc'' s''
+ /\ clI s s''
         ==>
-    (caI sc sc'' <=> clI s s'')
+    caI sc sc''
 `;
 
 
@@ -1185,8 +1188,9 @@ Define `Icodef_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
  /\ Rsim sc s
  /\ Rsim sc' s'
  /\ Rsim sc'' s''
+ /\ clI s s''
         ==>
-    (caI sc sc'' <=> clI s s'')
+    caI sc sc''
 `;
 
 (* functional cm condition on cacheless model,
@@ -1248,13 +1252,15 @@ val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm Icmf =
 (*   RES_TAC *)
 (* ); *)
 
-val Inv_rebuild_po = Define `Inv_rebuild_po Icmf Icodef Icoh Icode Icm =
-!sc sc' s. 
+val Inv_rebuild_po = Define `
+Inv_rebuild_po Icoh Icode Icm ca_Icmf ca_Icodef cl_Icmf cl_Icodef =
+!sc sc' s s'. 
     cm_user_po Icoh Icode Icm 
- /\ ca_II Icoh Icode Icm Icmf Icodef sc sc'
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
+ /\ cl_II cl_Icmf cl_Icodef s s'
  /\ ca_wrel sc sc'
- /\ Rsim sc' s
- /\ cl_Inv s
+ /\ Rsim sc' s'
+ /\ cl_Inv s'
         ==> 
     Ifun sc' /\ Icoh sc' /\ Icode sc'
 `;
@@ -1277,7 +1283,7 @@ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm =
  /\ cl_Icmf_po cl_Icmf
  /\ ca_Icmf_po ca_Icmf Icoh Icode Icm
  /\ ca_Icodef_po ca_Icodef Icoh Icode Icm ca_Icmf
- /\ Inv_rebuild_po ca_Icmf ca_Icodef Icoh Icode Icm
+ /\ Inv_rebuild_po Icoh Icode Icm ca_Icmf ca_Icodef cl_Icmf cl_Icodef
  /\ Icm_f_po ca_Icmf ca_Icodef Icoh Icode Icm
 `;
 
