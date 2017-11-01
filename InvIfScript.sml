@@ -11,28 +11,167 @@ val _ = new_theory "InvIf";
 
 (*********** software proof obligations ***********)
 
-(* critical resources *)
+(* critical resources and invariant obligations *)
 
-val CR_exists = prove (``
-?CR:core_state # mem_view -> resource set.
-!c c' mv mv'. ((!r. r IN CR(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	       (CR(c,mv) = CR(c',mv')))
-	   /\ (!r. reg_res r /\ r IN CR(c,mv) ==> ?r'. r = COREG r')
+val Ifun_CR_po = Define `Ifun_CR_po I CR =
+!c c' mv mv'. I(c,mv) ==>
+    ((!r. r IN CR(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
+        (CR(c,mv) = CR(c',mv')) /\ I(c',mv'))
+ /\ (!r. reg_res r /\ r IN CR(c,mv) ==> ?r'. r = COREG r')
+`;
+
+val Ifun_CR_po2 = Define `Ifun_CR_po2 I CR =
+!c c' mv mv'. I(c,mv) ==>
+    ((!r. r IN CR(c',mv') ==> (CV c' mv' r = CV c mv r)) ==>
+        (CR(c',mv') = CR(c,mv)) /\ I(c',mv'))
+ /\ (!r. reg_res r /\ r IN CR(c,mv) ==> ?r'. r = COREG r')
+`;
+
+(* val Ifun_CR_po = Define `Ifun_CR_po I CR = *)
+(* !c c' mv mv'. (!r. r IN CR(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>  *)
+(*     (I(c,mv) <=> I(c',mv')) *)
+(* `;  *)
+
+val Ifun_MD_po = Define `Ifun_MD_po I CR =
+!c mv. I(c,mv) ==> MD_(c,mv,UNIV:vadr set) SUBSET CR(c,mv)
+`; 
+
+val Ifun_Mon_po = Define `Ifun_Mon_po I CR =
+!c mv r. I(c,mv) /\ r IN CR(c,mv) ==> ~Mon_(c,mv,r,USER,W)
+`; 
+
+val Ifun_CR_exists = prove (``
+?CR:core_state # mem_view -> resource set
+ Ifun:core_state # mem_view -> bool.
+    Ifun_CR_po Ifun CR
+ /\ Ifun_CR_po2 Ifun CR
+ /\ Ifun_MD_po Ifun CR
+ /\ Ifun_Mon_po Ifun CR
 ``,
-  EXISTS_TAC ``\ (c,mv):core_state # mem_view. EMPTY:resource set`` >>
-  RW_TAC std_ss [] >>
-  FULL_SIMP_TAC std_ss [pred_setTheory.NOT_IN_EMPTY]
+  Q.ABBREV_TAC `Cr = \(c,mv):core_state # mem_view. MD_(c,mv,UNIV:vadr set)` >>
+  EXISTS_TAC ``Cr:core_state # mem_view -> resource set`` >>
+  EXISTS_TAC ``\(c,mv). MD_(c,mv,UNIV:vadr set) SUBSET Cr(c,mv) 
+                /\ !r. r IN Cr(c,mv) ==> ~Mon_(c,mv,r,USER,W)`` >>
+  Q.UNABBREV_TAC `Cr` >>
+  RW_TAC std_ss [Ifun_Mon_po, Ifun_CR_po2, Ifun_MD_po, Ifun_CR_po]
+  >| [(* CR = CR' *)
+      IMP_RES_TAC MD__lem
+      ,
+      (* MD SUBSET CR *)
+      FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_REFL]
+      ,
+      (* ~W CR *)
+      RES_TAC >>
+      IMP_RES_TAC MD__lem >>
+      IMP_RES_TAC Mon__lem >>
+      FULL_SIMP_TAC std_ss []
+      ,
+      (* CR coreg *)
+      `(!r. reg_res r /\ r IN MD_ (c,mv,UNIV:vadr set) ==> 
+            ?r'. r = COREG r')` by (
+          METIS_TAC [coreIfTheory.Mmu_MD_spec]
+      ) >>
+      RES_TAC >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+      ,
+      (* CR = CR' *)
+      IMP_RES_TAC MD__lem
+      ,
+      (* MD SUBSET CR *)
+      FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_REFL]
+      ,
+      (* ~W CR *)
+      RES_TAC >>
+      IMP_RES_TAC MD__lem >>
+      IMP_RES_TAC Mon__lem >>
+      FULL_SIMP_TAC std_ss []
+      ,
+      (* CR coreg *)
+      `(!r. reg_res r /\ r IN MD_ (c,mv,UNIV:vadr set) ==> 
+            ?r'. r = COREG r')` by (
+          METIS_TAC [coreIfTheory.Mmu_MD_spec]
+      ) >>
+      RES_TAC >>
+      HINT_EXISTS_TAC >>
+      ASM_REWRITE_TAC []
+     ]
 );  
 
-val CR_spec = new_specification ("CR_spec",
-  ["CR_"], CR_exists);
 
+(* val Ifun_exists = store_thm("Ifun_exists", `` *)
+(* ?Ifun. Ifun_CR_po Ifun /\ Ifun_MD_po Ifun /\ Ifun_Mon_po Ifun *)
+(* ``, *)
+(*   EXISTS_TAC ``\s. MD s SUBSET CR s  *)
+(*                 /\ !r. r IN CR s ==> ~Mon s r USER W`` >> *)
+(*   RW_TAC std_ss [Ifun_CR_po, Ifun_MD_po, Ifun_Mon_po] >> *)
+(*   IMP_RES_TAC CR_oblg >> *)
+(*   EQ_TAC  *)
+(*   >| [(* ==> *) *)
+(*       STRIP_TAC >> *)
+(*       `!r. r IN MD s ==> (Cv s r = Cv s' r)` by ( *)
+(*           REPEAT STRIP_TAC >> *)
+(* 	  IMP_RES_TAC pred_setTheory.SUBSET_DEF >> *)
+(* 	  RES_TAC *)
+(*       ) >> *)
+(*       IMP_RES_TAC MD_lem >> *)
+(*       METIS_TAC [Mon_lem] *)
+(*       , *)
+(*       (* <== *) *)
+(*       STRIP_TAC >> *)
+(*       `!r. r IN MD s' ==> (Cv s' r = Cv s r)` by ( *)
+(*           REPEAT STRIP_TAC >> *)
+(* 	  IMP_RES_TAC pred_setTheory.SUBSET_DEF >> *)
+(* 	  FULL_SIMP_TAC std_ss [] *)
+(*       ) >> *)
+(*       IMP_RES_TAC MD_lem >> *)
+(*       METIS_TAC [Mon_lem] *)
+(*      ] *)
+(* ); *)
+
+val Ifun_CR_spec = new_specification ("Ifun_CR_spec",
+  ["CR_", "Ifun_"], Ifun_CR_exists);
 
 val CR__lem = store_thm("CR__lem", ``
-!c c' mv mv'. ((!r. r IN CR_(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-	       (CR_(c,mv) = CR_(c',mv')))
+!c c' mv mv'. 
+    Ifun_(c,mv)
+ /\ (!r. r IN CR_(c,mv) ==> (CV c mv r = CV c' mv' r))
+        ==>
+    (CR_(c,mv) = CR_(c',mv'))
 ``,
-  REWRITE_TAC [CR_spec]
+  ASSUME_TAC Ifun_CR_spec >>
+  FULL_SIMP_TAC std_ss [Ifun_CR_po]
+);  
+
+val CR__lem2 = store_thm("CR__lem2", ``
+!c c' mv mv'. 
+    Ifun_(c',mv')
+ /\ (!r. r IN CR_(c,mv) ==> (CV c mv r = CV c' mv' r))
+        ==>
+    (CR_(c,mv) = CR_(c',mv'))
+``,
+  ASSUME_TAC Ifun_CR_spec >>
+  FULL_SIMP_TAC std_ss [Ifun_CR_po2]
+);  
+
+val Ifun__lem = store_thm("Ifun__lem", ``
+!c c' mv mv'. (!r. r IN CR_(c,mv) ==> (CV c mv r = CV c' mv' r))
+        ==>
+    (Ifun_(c,mv) <=> Ifun_(c',mv'))
+``,
+  ASSUME_TAC Ifun_CR_spec >>
+  REPEAT STRIP_TAC >>
+  EQ_TAC 
+  >| [(* ==> *)
+      FULL_SIMP_TAC std_ss [Ifun_CR_po] >>
+      STRIP_TAC >>
+      RES_TAC 
+      ,
+      (* <== *)
+      FULL_SIMP_TAC std_ss [Ifun_CR_po2] >>
+      STRIP_TAC >>
+      RES_TAC 
+     ]
 );  
 
 val CR_def = Define `CR s = CR_(s.cs, dmvca s.ms)`;
@@ -49,23 +188,26 @@ val isafe_CRex_lem = store_thm("isafe_CRex_lem", ``
   RES_TAC
 );
 
+val Ifun_def = Define `Ifun s = Ifun_(s.cs, dmvca s.ms)`;
+
 (* exported theorems *)
 
 val CR_oblg = store_thm("CR_oblg", ``
-!s s'. (!r. r IN CR s ==> (Cv s r = Cv s' r)) ==> (CR s = CR s')
+!s s'. Ifun s /\ (!r. r IN CR s ==> (Cv s r = Cv s' r)) ==> (CR s = CR s')
 ``,
-  RW_TAC std_ss [Cv_def, CR_def] >>
-  IMP_RES_TAC CR_spec
+  RW_TAC std_ss [Cv_def, CR_def, Ifun_def] >>
+  IMP_RES_TAC CR__lem
 );
 
 val CR_coreg_oblg = store_thm("CR_coreg_oblg", ``
-!s s' r. reg_res r /\ r IN CR s /\ (s'.cs.coreg = s.cs.coreg) ==> 
+!s s' r. Ifun s /\ reg_res r /\ r IN CR s /\ (s'.cs.coreg = s.cs.coreg) ==> 
     (Cv s r = Cv s' r) 
 ``,
+  ASSUME_TAC Ifun_CR_spec >>
   REPEAT STRIP_TAC >>
-  FULL_SIMP_TAC std_ss [CR_def] >>
-  IMP_RES_TAC CR_spec >>
-  RW_TAC std_ss [Cv_def, coreIfTheory.CV_def]
+  FULL_SIMP_TAC std_ss [CR_def, Ifun_def, Ifun_CR_po, Cv_def] >>
+  RES_TAC >>
+  RW_TAC std_ss [coreIfTheory.CV_def]
 );
 
 val CRex_oblg = store_thm("CRex_oblg", ``
@@ -79,22 +221,9 @@ val CRex_oblg = store_thm("CRex_oblg", ``
   ASM_REWRITE_TAC []
 );
 
-(* Integrity obligations *)
-
-val Ifun_CR_po = Define `Ifun_CR_po I =
-!s s'. (!r. r IN CR s ==> (Cv s r = Cv s' r)) ==> (I s <=> I s')
-`; 
-
-val Ifun_MD_po = Define `Ifun_MD_po I =
-!s. I s ==> MD s SUBSET CR s
-`; 
-
-val Ifun_Mon_po = Define `Ifun_Mon_po I =
-!s r. I s /\ r IN CR s ==> ~Mon s r USER W
-`; 
-
 val Icoh_CR_po = Define `Icoh_CR_po I = 
-!s s'. dCoh s.ms {pa | MEM pa IN CR s} 
+!s s'. Ifun s 
+    /\ dCoh s.ms {pa | MEM pa IN CR s} 
     /\ dCoh s'.ms {pa | MEM pa IN CR s'}
     /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))
         ==>
@@ -102,11 +231,12 @@ val Icoh_CR_po = Define `Icoh_CR_po I =
 `;
 
 val Icoh_dCoh_po = Define `Icoh_dCoh_po I = 
-!s. I s ==> dCoh s.ms {pa | MEM pa IN CR s}
+!s. Ifun s /\ I s ==> dCoh s.ms {pa | MEM pa IN CR s}
 `;
 
 val Icode_CR_po = Define `Icode_CR_po I = 
-!s s'. iCoh s.ms {pa | MEM pa IN CRex s}
+!s s'. Ifun s
+    /\ iCoh s.ms {pa | MEM pa IN CRex s}
     /\ iCoh s'.ms {pa | MEM pa IN CRex s'}
     /\ isafe s {pa | MEM pa IN CRex s}
     /\ isafe s' {pa | MEM pa IN CRex s'}
@@ -116,56 +246,29 @@ val Icode_CR_po = Define `Icode_CR_po I =
 `;
 
 val Icode_iCoh_po = Define `Icode_iCoh_po I = 
-!s. I s ==> iCoh s.ms {pa | MEM pa IN CRex s}
+!s. Ifun s /\ I s ==> iCoh s.ms {pa | MEM pa IN CRex s}
 `;
 
 val Icode_isafe_po = Define `Icode_isafe_po I = 
-!s. I s ==> isafe s {pa | MEM pa IN CRex s}
+!s. Ifun s /\ I s ==> isafe s {pa | MEM pa IN CRex s}
 `;
 
 val Icm_po = Define `Icm_po I Icm =
 !s s'. I s /\ drvbl s s' ==> Icm s'
 `;
 
-val Ifun_exists = store_thm("Ifun_exists", ``
-?Ifun. Ifun_CR_po Ifun /\ Ifun_MD_po Ifun /\ Ifun_Mon_po Ifun
-``,
-  EXISTS_TAC ``\s. MD s SUBSET CR s 
-                /\ !r. r IN CR s ==> ~Mon s r USER W`` >>
-  RW_TAC std_ss [Ifun_CR_po, Ifun_MD_po, Ifun_Mon_po] >>
-  IMP_RES_TAC CR_oblg >>
-  EQ_TAC 
-  >| [(* ==> *)
-      STRIP_TAC >>
-      `!r. r IN MD s ==> (Cv s r = Cv s' r)` by (
-          REPEAT STRIP_TAC >>
-	  IMP_RES_TAC pred_setTheory.SUBSET_DEF >>
-	  RES_TAC
-      ) >>
-      IMP_RES_TAC MD_lem >>
-      METIS_TAC [Mon_lem]
-      ,
-      (* <== *)
-      STRIP_TAC >>
-      `!r. r IN MD s' ==> (Cv s' r = Cv s r)` by (
-          REPEAT STRIP_TAC >>
-	  IMP_RES_TAC pred_setTheory.SUBSET_DEF >>
-	  FULL_SIMP_TAC std_ss []
-      ) >>
-      IMP_RES_TAC MD_lem >>
-      METIS_TAC [Mon_lem]
-     ]
-);
-
 val Icoh_exists = store_thm("Icoh_exists", ``
-?Icoh. Icoh_CR_po Icoh /\ Icoh_dCoh_po Icoh 
+?Icoh. Icoh_CR_po Icoh /\ Icoh_dCoh_po Icoh
 ``,
   EXISTS_TAC ``\s. dCoh s.ms {pa | MEM pa IN CR s}`` >>
   RW_TAC std_ss [Icoh_dCoh_po, Icoh_CR_po]
 );
 
 val Icode_exists = store_thm("Icode_exists", ``
-?Icode. Icode_CR_po Icode /\ Icode_iCoh_po Icode /\ Icode_isafe_po Icode
+?Icode. 
+   Icode_CR_po Icode
+/\ Icode_iCoh_po Icode
+/\ Icode_isafe_po Icode
 ``,
   EXISTS_TAC ``\s. iCoh s.ms {pa | MEM pa IN CRex s}
                 /\ isafe s {pa | MEM pa IN CRex s}`` >>
@@ -173,26 +276,22 @@ val Icode_exists = store_thm("Icode_exists", ``
 );
 
 val Inv_exists = store_thm("Inv_exists", ``
-?Inv Ifun.
+?Inv.
     (!s Icoh Icode Icm. Inv Icoh Icode Icm s <=> 
 	Ifun s /\ Icoh s /\ Icode s /\ Icm s)
- /\ Ifun_CR_po Ifun /\ Ifun_MD_po Ifun /\ Ifun_Mon_po Ifun
 ``,
-  ASSUME_TAC Ifun_exists >>
-  FULL_SIMP_TAC std_ss [] >>
   EXISTS_TAC ``\Icoh Icode Icm s:hw_state. 
 	           Ifun s /\ Icoh s /\ Icode s /\ Icm s`` >>
-  EXISTS_TAC ``Ifun:hw_state -> bool`` >>
-  RW_TAC std_ss [(* Icm_po *)]
+  RW_TAC std_ss []
 );
 
 val Inv_spec = new_specification ("Inv_spec",
-  ["Inv", "Ifun"(* , "Icoh", "Icode", "Icm" *)], Inv_exists);
+  ["Inv"(* , "Icoh", "Icode", "Icm" *)], Inv_exists);
 
 val cm_user_po = Define `cm_user_po Icoh Icode Icm = 
-   Icoh_CR_po Icoh 
-/\ Icoh_dCoh_po Icoh 
-/\ Icode_CR_po Icode 
+   Icoh_CR_po Icoh
+/\ Icoh_dCoh_po Icoh
+/\ Icode_CR_po Icode
 /\ Icode_iCoh_po Icode 
 /\ Icode_isafe_po Icode
 /\ Icm_po (Inv Icoh Icode Icm) Icm
@@ -203,17 +302,15 @@ val cm_user_po = Define `cm_user_po Icoh Icode Icm =
 val Ifun_CR_oblg = store_thm("Ifun_CR_oblg", ``
 !s s'. (!r. r IN CR s ==> (Cv s r = Cv s' r)) ==> (Ifun s <=> Ifun s')
 ``,
-  REPEAT STRIP_TAC >>
-  ASSUME_TAC Inv_spec >>
-  FULL_SIMP_TAC std_ss [] >>
-  IMP_RES_TAC Ifun_CR_po  
+  RW_TAC std_ss [CR_def, Ifun_def, Cv_def] >>
+  IMP_RES_TAC Ifun__lem  
 ); 
 
 val Ifun_MD_oblg = store_thm("Ifun_MD_oblg", ``
 !s r. Ifun s /\ r IN MD s ==> r IN CR s
 ``,
-  REPEAT STRIP_TAC >>
-  ASSUME_TAC Inv_spec >>
+  RW_TAC std_ss [MD_def, CR_def, Ifun_def] >>
+  ASSUME_TAC Ifun_CR_spec >>
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC Ifun_MD_po >>
   FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
@@ -222,9 +319,8 @@ val Ifun_MD_oblg = store_thm("Ifun_MD_oblg", ``
 val Ifun_Mon_oblg = store_thm("Ifun_Mon_oblg", ``
 !s r. Ifun s /\ r IN CR s ==> ~Mon s r USER W
 ``,
-  REPEAT GEN_TAC >>
-  STRIP_TAC >>
-  ASSUME_TAC Inv_spec >>
+  RW_TAC std_ss [MD_def, CR_def, Ifun_def, Mon_def] >>
+  ASSUME_TAC Ifun_CR_spec >>
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC Ifun_Mon_po 
 ); 
@@ -232,6 +328,7 @@ val Ifun_Mon_oblg = store_thm("Ifun_Mon_oblg", ``
 val Icoh_CR_oblg = store_thm("Icoh_CR_oblg", ``
 !s s' Icoh Icode Icm.
        cm_user_po Icoh Icode Icm  
+    /\ Ifun s
     /\ dCoh s.ms {pa | MEM pa IN CR s} 
     /\ dCoh s'.ms {pa | MEM pa IN CR s'}
     /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))
@@ -244,7 +341,7 @@ val Icoh_CR_oblg = store_thm("Icoh_CR_oblg", ``
 ); 
 
 val Icoh_dCoh_oblg = store_thm("Icoh_dCoh_oblg", ``
-!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Icoh s ==> 
+!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Ifun s /\ Icoh s ==> 
     dCoh s.ms {pa | MEM pa IN CR s}
 ``,
   REPEAT STRIP_TAC >>
@@ -255,6 +352,7 @@ val Icoh_dCoh_oblg = store_thm("Icoh_dCoh_oblg", ``
 val Icode_CR_oblg = store_thm("Icode_CR_oblg", ``
 !s s' Icoh Icode Icm. 
        cm_user_po Icoh Icode Icm 
+    /\ Ifun s
     /\ iCoh s.ms {pa | MEM pa IN CRex s}
     /\ iCoh s'.ms {pa | MEM pa IN CRex s'}
     /\ isafe s {pa | MEM pa IN CRex s}
@@ -269,7 +367,7 @@ val Icode_CR_oblg = store_thm("Icode_CR_oblg", ``
 );
 
 val Icode_iCoh_oblg = store_thm("Icode_iCoh_oblg", ``
-!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Icode s ==> 
+!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Ifun s /\ Icode s ==> 
     iCoh s.ms {pa | MEM pa IN CRex s}
 ``,
   REPEAT STRIP_TAC >>
@@ -278,7 +376,7 @@ val Icode_iCoh_oblg = store_thm("Icode_iCoh_oblg", ``
 );
 
 val Icode_isafe_oblg = store_thm("Icode_isafe_oblg", ``
-!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Icode s ==> 
+!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Ifun s /\ Icode s ==> 
     isafe s {pa | MEM pa IN CRex s}
 ``,
   REPEAT STRIP_TAC >>
@@ -466,20 +564,22 @@ val Rsim_icoh_Cv_lem = store_thm("Rsim_icoh_lem", ``
 
 val cl_CR_def = Define `cl_CR s = CR_(s.cs, MVcl s.M)`;
 
+val cl_Inv_def = Define `cl_Inv s = Ifun_(s.cs, MVcl s.M)`;
+
 val cl_CR_lem = store_thm("cl_CR_lem", ``
-!s sca. (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sca r)) ==>
+!s sca. cl_Inv s /\ (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sca r)) ==>
     (cl_CR s = CR sca)
 ``,
-  RW_TAC std_ss [cl_CR_def, CR_def, cl_Cv_def, Cv_def] >>
-  IMP_RES_TAC CR_spec
+  RW_TAC std_ss [cl_CR_def, CR_def, cl_Cv_def, Cv_def, cl_Inv_def] >>
+  IMP_RES_TAC CR__lem
 );
 
 val CR_cl_lem = store_thm("CR_cl_lem", ``
-!s sca. (!r. r IN CR sca ==> (cl_Cv s r = Cv sca r)) ==>
+!s sca. Ifun sca /\ (!r. r IN CR sca ==> (cl_Cv s r = Cv sca r)) ==>
     (cl_CR s = CR sca)
 ``,
-  RW_TAC std_ss [cl_CR_def, CR_def, cl_Cv_def, Cv_def] >>
-  METIS_TAC [CR_spec]
+  RW_TAC std_ss [cl_CR_def, CR_def, cl_Cv_def, Cv_def, Ifun_def] >>
+  METIS_TAC [CR__lem]
 );
 
 val cl_CRex_def = Define `cl_CRex s = 
@@ -515,32 +615,13 @@ val MD_cl_lem = store_thm("CR_cl_lem", ``
 
 (* software invariants *)
 
-val cl_Inv_exists = store_thm("cl_Inv_exists", ``
-?cl_Inv.
+val cl_Inv_spec = store_thm("cl_Inv_spec", ``
 !s sca. (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sca r)) ==>
     (cl_Inv s <=> Ifun sca)
 ``,
-  EXISTS_TAC ``\s.
-      !sca. (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sca r)) ==> Ifun sca`` >>
-  RW_TAC std_ss [] >>
-  EQ_TAC
-  >| [(* ==> *)
-      REPEAT STRIP_TAC >>
-      PAT_X_ASSUM ``!sca'. x ==> Ifun sca'`` (
-          fn thm => ASSUME_TAC ( SPEC ``sca:hw_state`` thm )
-      ) >>
-      FULL_SIMP_TAC std_ss []
-      ,
-      (* <== *)
-      REPEAT STRIP_TAC >>
-      IMP_RES_TAC cl_CR_lem >>
-      FULL_SIMP_TAC std_ss [] >>
-      IMP_RES_TAC Ifun_CR_oblg
-     ]
+  RW_TAC std_ss [cl_CR_def, cl_Inv_def, Ifun_def, cl_Cv_def, Cv_def] >>
+  IMP_RES_TAC Ifun__lem
 );
-
-val cl_Inv_spec = new_specification ("cl_Inv_spec",
-  ["cl_Inv"], cl_Inv_exists);
 
 val cl_Inv_preserve_po = Define `cl_Inv_preserve_po =
 !s s'. cl_Inv s /\ cl_wrel s s' ==> cl_Inv s'
@@ -607,7 +688,12 @@ val Rsim_CR_dCoh_cl_lem = store_thm("Rsim_CR_dCoh_cl_lem", ``
 );
 
 val Rsim_CR_lem = store_thm("Rsim_CR_lem", ``
-!sc s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Rsim sc s /\ Icoh sc ==>
+!sc s Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm
+ /\ Rsim sc s
+ /\ Ifun sc
+ /\ Icoh sc 
+        ==>
     (!r. r IN CR sc ==> (cl_Cv s r = Cv sc r))
 ``,
   REPEAT STRIP_TAC >>
@@ -615,45 +701,58 @@ val Rsim_CR_lem = store_thm("Rsim_CR_lem", ``
   IMP_RES_TAC Rsim_CR_dCoh_ca_lem
 );
 
-val Rsim_cl_CR_lem = store_thm("Rsim_cl_CR_lem", ``
-!sc s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Rsim sc s /\ Icoh sc ==>
-    (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sc r))
-``,
-  REPEAT STRIP_TAC >>
-  IMP_RES_TAC Rsim_CR_lem >>
-  IMP_RES_TAC CR_cl_lem >>
-  FULL_SIMP_TAC std_ss []
-);
+(* NOTE: cannot transfer Icoh and Ifun separately in new version *)
+(* val Rsim_cl_CR_lem = store_thm("Rsim_cl_CR_lem", `` *)
+(* !sc s Icoh Icode Icm.  *)
+(*     cm_user_po Icoh Icode Icm *)
+(*  /\ Rsim sc s *)
+(*  /\ cl_Inv s *)
+(*  /\ Icoh sc *)
+(*         ==> *)
+(*     (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sc r)) *)
+(* ``, *)
+(*   REPEAT STRIP_TAC >> *)
+(*   IMP_RES_TAC Rsim_CR_lem >> *)
+(*   IMP_RES_TAC CR_cl_lem >> *)
+(*   FULL_SIMP_TAC std_ss [] *)
+(* ); *)
 
 val Rsim_CR_eq_dCoh_ca_lem = store_thm("Rsim_CR_eq_dCoh_ca_lem", ``
-!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN CR sc} 
+!sc s. Rsim sc s /\ Ifun sc /\ dCoh sc.ms {pa | MEM pa IN CR sc} 
         ==>
     (cl_CR s = CR sc)
 ``,
   REPEAT STRIP_TAC >>
   MATCH_MP_TAC EQ_SYM >>
-  RW_TAC std_ss [cl_CR_def, CR_def] >>
+  FULL_SIMP_TAC std_ss [cl_CR_def, CR_def, Ifun_def] >>
   MATCH_MP_TAC CR__lem >>
+  ASM_REWRITE_TAC [] >>
   REPEAT STRIP_TAC >>
   IMP_RES_TAC Rsim_CR_dCoh_ca_lem >> 
   FULL_SIMP_TAC std_ss [CR_def, cl_Cv_def, Cv_def]
 );
 
 val Rsim_CR_eq_dCoh_cl_lem = store_thm("Rsim_CR_eq_dCoh_cl_lem", ``
-!sc s. Rsim sc s /\ dCoh sc.ms {pa | MEM pa IN cl_CR s} 
+!sc s. Rsim sc s /\ cl_Inv s /\ dCoh sc.ms {pa | MEM pa IN cl_CR s} 
         ==>
     (cl_CR s = CR sc)
 ``,
   REPEAT STRIP_TAC >>
-  RW_TAC std_ss [cl_CR_def, CR_def] >>
+  FULL_SIMP_TAC std_ss [cl_CR_def, CR_def, cl_Inv_def] >>
   MATCH_MP_TAC CR__lem >>
+  ASM_REWRITE_TAC [] >>
   REPEAT STRIP_TAC >>
   IMP_RES_TAC Rsim_CR_dCoh_cl_lem >> 
   FULL_SIMP_TAC std_ss [cl_CR_def, cl_Cv_def, Cv_def]
 );
 
 val Rsim_CR_eq_lem = store_thm("Rsim_CR_eq_lem", ``
-!sc s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Rsim sc s /\ Icoh sc ==>
+!sc s Icoh Icode Icm. 
+    cm_user_po Icoh Icode Icm
+ /\ Rsim sc s
+ /\ Ifun sc
+ /\ Icoh sc
+        ==>
     (cl_CR s = CR sc)
 ``,
   REPEAT STRIP_TAC >>
@@ -935,7 +1034,7 @@ val Rsim_Mon_lem = store_thm("Rsim_Mon_lem", ``
 );
 
 val Rsim_CRex_dCoh_ca_lem = store_thm("Rsim_CRex_dCoh_ca_lem", ``
-!sc s. Rsim sc s 
+!sc s. Rsim sc s /\ Ifun sc
     /\ dCoh sc.ms {pa | MEM pa IN CR sc} 
     /\ dCoh sc.ms {pa | MEM pa IN MD sc}
         ==>
@@ -957,7 +1056,7 @@ val Rsim_CRex_dCoh_ca_lem = store_thm("Rsim_CRex_dCoh_ca_lem", ``
 );
 
 val Rsim_CRex_dCoh_cl_lem = store_thm("Rsim_CRex_dCoh_cl_lem", ``
-!sc s. Rsim sc s 
+!sc s. Rsim sc s /\ cl_Inv s
     /\ dCoh sc.ms {pa | MEM pa IN cl_CR s} 
     /\ dCoh sc.ms {pa | MEM pa IN cl_MD s}
         ==>
@@ -1017,16 +1116,17 @@ val Rsim_fixmmu_lem = store_thm("Rsim_fixmmu_lem", ``
   METIS_TAC []
 );
 
-val Ifun_Icoh_lem = store_thm("Ifun_Icoh_lem", ``
-!s sc Icoh Icode Icm. Rsim sc s /\ cm_user_po Icoh Icode Icm /\ Icoh sc
-        ==> 
-    (Ifun sc <=> cl_Inv s)
-``,
-  REPEAT STRIP_TAC >>
-  MATCH_MP_TAC EQ_SYM >>
-  MATCH_MP_TAC cl_Inv_spec >>
-  IMP_RES_TAC Rsim_cl_CR_lem
-);
+(* NOTE: cannot transfer Ifun and Icoh separately in new version *)
+(* val Ifun_Icoh_lem = store_thm("Ifun_Icoh_lem", `` *)
+(* !s sc Icoh Icode Icm. Rsim sc s /\ cm_user_po Icoh Icode Icm /\ Icoh sc *)
+(*         ==>  *)
+(*     (Ifun sc <=> cl_Inv s) *)
+(* ``, *)
+(*   REPEAT STRIP_TAC >> *)
+(*   MATCH_MP_TAC EQ_SYM >> *)
+(*   MATCH_MP_TAC cl_Inv_spec >> *)
+(*   IMP_RES_TAC Rsim_cl_CR_lem *)
+(* ); *)
 
 val Rsim_cl_Inv_lem = store_thm("Rsim_cl_Inv_lem", ``
 !s sc Icoh Icode Icm. 
@@ -1038,8 +1138,9 @@ val Rsim_cl_Inv_lem = store_thm("Rsim_cl_Inv_lem", ``
 ``,
   REPEAT STRIP_TAC >>
   FULL_SIMP_TAC std_ss [Inv_oblg] >>
-  IMP_RES_TAC Rsim_cl_CR_lem >>
-  IMP_RES_TAC cl_Inv_spec
+  IMP_RES_TAC Rsim_CR_lem >>
+  FULL_SIMP_TAC std_ss [Ifun_def, cl_Inv_def, cl_Cv_def, Cv_def, CR_def] >>
+  METIS_TAC [Ifun__lem]
 );
 
 (* internal invariants *)
@@ -1119,15 +1220,6 @@ Define `Icodef_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
     (caI sc sc'' <=> clI s s'')
 `;
 
-val Icm_f_po = Define `Icm_f_po Icmf Icodef Icoh Icode Icm =
-!sc sc'. 
-    cm_user_po Icoh Icode Icm 
- /\ ca_II Icoh Icode Icm Icmf Icodef sc sc'
- /\ ca_wrel sc sc'
-        ==> 
-    Icm sc'
-`;
-
 (* functional cm condition on cacheless model,
    need to ensure that all memory accesses are cacheable *)
 val cl_Icmf_po = Define `cl_Icmf_po Icmf = 
@@ -1143,23 +1235,22 @@ val ca_Icmf_po = Define `ca_Icmf_po Icmf Icoh Icode Icm =
  /\ Icoh s
  /\ Icmf s s'
         ==>
-    ((mode s' = PRIV) ==> dCoh s'.ms (ca_deps s'))
- /\ ((mode s' = USER) ==> Icoh s')
+    dCoh s'.ms (ca_deps s')
 `;
 
-val ca_Icmf_Icoh_lem = store_thm("ca_Icmf_Icoh_lem", ``
-!s s' Icoh Icode Icm Icmf. 
-    ca_Icmf_po Icmf Icoh Icode Icm
- /\ cm_user_po Icoh Icode Icm
- /\ ca_wrel s s'
- /\ Icoh s
- /\ Icmf s s'
-        ==>
-    Icoh s'
-``,
-  RW_TAC std_ss [ca_wrel_def, ca_Icmf_po] >>
-  RES_TAC
-);
+(* val ca_Icmf_Icoh_lem = store_thm("ca_Icmf_Icoh_lem", `` *)
+(* !s s' Icoh Icode Icm Icmf.  *)
+(*     ca_Icmf_po Icmf Icoh Icode Icm *)
+(*  /\ cm_user_po Icoh Icode Icm *)
+(*  /\ ca_wrel s s' *)
+(*  /\ Icoh s *)
+(*  /\ Icmf s s' *)
+(*         ==> *)
+(*     Icoh s' *)
+(* ``, *)
+(*   RW_TAC std_ss [ca_wrel_def, ca_Icmf_po] >> *)
+(*   RES_TAC *)
+(* ); *)
 
 val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm Icmf = 
 !s s' n. 
@@ -1169,25 +1260,44 @@ val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm Icmf =
  /\ Icmf s s'
  /\ Icodef s s'
         ==>
-    ((mode s' = PRIV) ==> icoh s'.ms (ca_Tr s' (VApc s'.cs))
-                       /\ ~dirty s'.ms (ca_Tr s' (VApc s'.cs)))
- /\ ((mode s' = USER) ==> Icode s')
+    icoh s'.ms (ca_Tr s' (VApc s'.cs))
+ /\ ~dirty s'.ms (ca_Tr s' (VApc s'.cs))
 `;
 
-val ca_Icmf_Icode_lem = store_thm("ca_Icmf_Icode_lem", ``
-!s s' Icoh Icode Icm Icmf Icodef. 
-    ca_Icodef_po Icodef Icoh Icode Icm Icmf
- /\ cm_user_po Icoh Icode Icm
- /\ ca_wrel s s'
- /\ Icode s
- /\ Icmf s s'
- /\ Icodef s s'
-        ==>
-    Icode s'
-``,
-  RW_TAC std_ss [ca_wrel_def, ca_Icodef_po] >>
-  RES_TAC
-);
+(* val ca_Icmf_Icode_lem = store_thm("ca_Icmf_Icode_lem", `` *)
+(* !s s' Icoh Icode Icm Icmf Icodef.  *)
+(*     ca_Icodef_po Icodef Icoh Icode Icm Icmf *)
+(*  /\ cm_user_po Icoh Icode Icm *)
+(*  /\ ca_wrel s s' *)
+(*  /\ Icode s *)
+(*  /\ Icmf s s' *)
+(*  /\ Icodef s s' *)
+(*         ==> *)
+(*     Icode s' *)
+(* ``, *)
+(*   RW_TAC std_ss [ca_wrel_def, ca_Icodef_po] >> *)
+(*   RES_TAC *)
+(* ); *)
+
+val Inv_rebuild_po = Define `Inv_rebuild_po Icmf Icodef Icoh Icode Icm =
+!sc sc' s. 
+    cm_user_po Icoh Icode Icm 
+ /\ ca_II Icoh Icode Icm Icmf Icodef sc sc'
+ /\ ca_wrel sc sc'
+ /\ Rsim sc' s
+ /\ cl_Inv s
+        ==> 
+    Ifun sc' /\ Icoh sc' /\ Icode sc'
+`;
+
+val Icm_f_po = Define `Icm_f_po Icmf Icodef Icoh Icode Icm =
+!sc sc'. 
+    cm_user_po Icoh Icode Icm 
+ /\ ca_II Icoh Icode Icm Icmf Icodef sc sc'
+ /\ ca_wrel sc sc'
+        ==> 
+    Icm sc'
+`;
 
 val cm_kernel_po_def = Define `
 cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm =
@@ -1195,10 +1305,11 @@ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm =
  /\ Icodef_init_xfer_po ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf
  /\ Icmf_xfer_po ca_Icmf cl_Icmf Icoh Icode Icm
  /\ Icodef_xfer_po ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf
- /\ Icm_f_po ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Icmf_po cl_Icmf
  /\ ca_Icmf_po ca_Icmf Icoh Icode Icm
  /\ ca_Icodef_po ca_Icodef Icoh Icode Icm ca_Icmf
+ /\ Inv_rebuild_po ca_Icmf ca_Icodef Icoh Icode Icm
+ /\ Icm_f_po ca_Icmf ca_Icodef Icoh Icode Icm
 `;
 
 val Icmf_init_sim_lem = store_thm("Icmf_init_sim_lem", ``
