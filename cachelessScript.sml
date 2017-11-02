@@ -573,6 +573,45 @@ val abs_cl_progress_oblg = store_thm("abs_cl_progress_oblg", ``
      ]
 );
 
+val abs_cl_unique_oblg = store_thm("abs_cl_unique_oblg", ``
+!s m dl dl' s' s''. abs_cl_trans s m dl s' /\ abs_cl_trans s m dl' s'' ==>
+    (s'' = s') /\ (dl' = dl)
+``,
+  NTAC 7 STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC abs_cl_req_lem >>
+  `req' = req` by (
+      IMP_RES_TAC cl_trans_core_req_lem >>
+      IMP_RES_TAC core_req_det_lem
+  ) >>
+  FULL_SIMP_TAC std_ss [] >>
+  Cases_on `dl = []` 
+  >| [(* Fetch or NOREQ *)
+      Cases_on `dl' = []`
+      >| [(* Fetch or NOREQ *)
+	  Cases_on `Freq req'`
+	  >| [(* Fetch *)
+	      IMP_RES_TAC Freq_lem >>
+	      REV_FULL_SIMP_TAC std_ss [corereq_distinct] >> 
+	      FULL_SIMP_TAC std_ss [] >>
+	      IMP_RES_TAC cl_trans_fetch_lem >>
+	      IMP_RES_TAC core_req_det_lem >>
+	      RW_TAC std_ss [] >>
+	      IMP_RES_TAC core_rcv_det_lem >>
+	      (* RW_TAC std_ss [cachelessTheory.cl_state_component_equality] >> *)
+	      cheat
+	      ,
+	      cheat
+	      ]
+	  ,
+	  cheat
+	 ]
+      ,
+      cheat
+     ]
+);
+
+
 (* dependencies *)
 
 val cl_Tr_def = Define `cl_Tr s va = Tr_ s.cs (MVcl s.M) va`;
