@@ -148,6 +148,13 @@ val CR_def = Define `CR s = CR_(s.cs, dmvca s.ms)`;
 val CRex_def = Define `CRex s = 
 {r | (?pa. r = MEM pa) /\ r IN CR s /\ ?m. Mon s r m EX}`;
 
+val iCoh_CRex_lem = store_thm("iCoh_CRex_lem", ``
+!sc. iCoh sc.ms {pa | MEM pa IN CRex sc} <=>
+     !pa. MEM pa IN CRex sc ==> icoh sc.ms pa
+``,
+  RW_TAC std_ss [iCoh_lem2, pred_setTheory.IN_GSPEC_IFF]
+);
+
 val isafe_CRex_lem = store_thm("isafe_CRex_lem", ``
 !s pa. pa IN {pa | MEM pa IN CRex s} /\ isafe s {pa | MEM pa IN CRex s} ==>
     ~dirty s.ms pa
@@ -155,6 +162,23 @@ val isafe_CRex_lem = store_thm("isafe_CRex_lem", ``
   RW_TAC std_ss [CRex_def, isafe_def] >>
   FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
   RES_TAC
+);
+
+val isafe_CRex_lem2 = store_thm("isafe_CRex_lem2", ``
+!sc. isafe sc {pa | MEM pa IN CRex sc} <=>
+     !pa. MEM pa IN CRex sc ==> ~dirty sc.ms pa
+``,
+  GEN_TAC >>
+  EQ_TAC 
+  >| [(* ==> *)
+      NTAC 3 STRIP_TAC >> 
+      MATCH_MP_TAC isafe_CRex_lem >>
+      RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+      ,
+      (* <== *)
+      RW_TAC std_ss [isafe_def] >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+     ]
 );
 
 val Ifun_def = Define `Ifun s = Ifun_(s.cs, dmvca s.ms)`;
@@ -589,6 +613,13 @@ val cl_Inv_spec = store_thm("cl_Inv_spec", ``
     (cl_Inv s <=> Ifun sca)
 ``,
   RW_TAC std_ss [cl_CR_def, cl_Inv_def, Ifun_def, cl_Cv_def, Cv_def] >>
+  IMP_RES_TAC Ifun__lem
+);
+
+val Ifun_xfer_lem = store_thm("Ifun_xfer_lem", ``
+!sc s. cl_Inv s /\ (!r. r IN cl_CR s ==> (cl_Cv s r = Cv sc r)) ==> Ifun sc
+``,
+  RW_TAC std_ss [cl_Inv_def, Ifun_def, cl_CR_def, cl_Cv_def, Cv_def] >>
   IMP_RES_TAC Ifun__lem
 );
 

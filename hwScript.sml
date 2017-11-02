@@ -511,6 +511,12 @@ val dCoh_lem2 = store_thm("dCoh_lem2", ``
   REWRITE_TAC [dCoh_oblg2]
 );
 
+val dCoh_subset_lem = store_thm("dCoh_subset_lem", ``
+!ms As Bs. dCoh ms As /\ Bs SUBSET As ==> dCoh ms Bs
+``,
+  RW_TAC std_ss [pred_setTheory.SUBSET_DEF, dCoh_lem2]
+);
+
 val dCoh_alt_lem = store_thm("dCoh_alt_lem", ``
 !ms Rs. dCoh ms Rs 
             <=> 
