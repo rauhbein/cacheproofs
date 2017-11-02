@@ -2119,9 +2119,17 @@ val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
      ]
 );
 
-val only_CA_def = Define `only_CA s pa =
-!va m ac c. (Mmu s va m ac = SOME (pa,c)) ==> (c = T)
+val only_CA__def = Define `only_CA_ (cs,mv) pa =
+!va m ac c. (Mmu_(cs,mv,va,m,ac) = SOME (pa,c)) ==> (c = T)
 `;
+
+val only_CA_def = Define `only_CA s pa = only_CA_ (s.cs, dmvca s.ms) pa`;
+
+val only_CA_lem = store_thm("only_CA_lem", ``
+!s pa. only_CA s pa <=> (!va m ac c. (Mmu s va m ac = SOME (pa,c)) ==> (c = T))
+``,
+  RW_TAC std_ss [only_CA_def, only_CA__def, Mmu_def]
+);
 
 val drvbl_dCoh_cacheable_lem = store_thm("drvbl_dCoh_cacheable_lem", ``
 !s s' As. drvbl s s' 	
@@ -2163,7 +2171,7 @@ val drvbl_dCoh_cacheable_lem = store_thm("drvbl_dCoh_cacheable_lem", ``
 		  (* ~dirty' *)
 		  RES_TAC
 		  >| [(* uncacheable alias *)
-		      IMP_RES_TAC only_CA_def >>
+		      IMP_RES_TAC only_CA_lem >>
 		      FULL_SIMP_TAC std_ss []
 		      ,
 		      (* WT case *)

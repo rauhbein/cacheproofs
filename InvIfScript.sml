@@ -1228,10 +1228,11 @@ val ca_Icmf_po = Define `ca_Icmf_po Icmf Icoh Icode Icm =
 val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm Icmf = 
 !s s' n. 
     cm_user_po Icoh Icode Icm
+ /\ Inv Icoh Icode Icm s
  /\ ca_kcomp s s' n 
- /\ Icode s
  /\ Icmf s s'
  /\ Icodef s s'
+ /\ (mode s' = PRIV)
         ==>
     icoh s'.ms (ca_Tr s' (VApc s'.cs))
  /\ ~dirty s'.ms (ca_Tr s' (VApc s'.cs))
@@ -1256,9 +1257,13 @@ val Inv_rebuild_po = Define `
 Inv_rebuild_po Icoh Icode Icm ca_Icmf ca_Icodef cl_Icmf cl_Icodef =
 !sc sc' s s'. 
     cm_user_po Icoh Icode Icm 
+ /\ Inv Icoh Icode Icm sc
+ /\ cl_Inv s
+ /\ Rsim sc s
  /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
  /\ cl_II cl_Icmf cl_Icodef s s'
  /\ ca_wrel sc sc'
+ /\ cl_wrel s s'
  /\ Rsim sc' s'
  /\ cl_Inv s'
         ==> 
