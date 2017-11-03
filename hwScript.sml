@@ -2686,6 +2686,103 @@ store_thm("abs_ca_trans_icoh_clean_preserve_oblg", ``
      ]
 );
 
+val hw_state_comp_eq = store_thm("hw_state_comp_eq", ``
+!s s'. (s = s') <=> (s.cs = s'.cs) /\ (s.ms = s'.ms)
+``,
+  REPEAT GEN_TAC >>
+  ASSUME_TAC (SPEC ``s:hw_state``(TypeBase.nchotomy_of ``:hw_state``)) >>
+  ASSUME_TAC (SPEC ``s':hw_state``(TypeBase.nchotomy_of ``:hw_state``)) >>
+  FULL_SIMP_TAC std_ss (TypeBase.accessors_of ``:hw_state``) >>
+  RW_TAC std_ss [TypeBase.one_one_of ``:hw_state``]
+);
+
+val abs_ca_unique_oblg = store_thm("abs_ca_unique_oblg", ``
+!s m dl dl' s' s''. abs_ca_trans s m dl s' /\ abs_ca_trans s m dl' s'' ==>
+    (s'' = s') /\ (dl' = dl)
+``,
+  NTAC 7 STRIP_TAC >>
+  IMP_RES_TAC abs_ca_req_lem >>
+  `req' = req` by (
+      IMP_RES_TAC hw_trans_core_req_lem >>
+      IMP_RES_TAC core_req_det_lem
+  ) >>
+  FULL_SIMP_TAC std_ss [] >>
+  Cases_on `dl = []` 
+  >| [(* Fetch or NOREQ *)
+      Cases_on `dl' = []`
+      >| [(* Fetch or NOREQ *)
+	  Cases_on `Freq req'`
+	  >| [(* Fetch *)
+	      IMP_RES_TAC Freq_lem >>
+	      REV_FULL_SIMP_TAC std_ss [corereq_distinct] >> 
+	      FULL_SIMP_TAC std_ss [] >>
+	      IMP_RES_TAC hw_trans_fetch_lem >>
+	      IMP_RES_TAC core_req_det_lem >>
+	      RW_TAC std_ss [] >>
+	      IMP_RES_TAC core_rcv_det_lem >>
+	      METIS_TAC [hw_state_comp_eq]
+	      ,
+	      (* NOREQ *)
+	      REV_FULL_SIMP_TAC std_ss [corereq_distinct] >> 
+	      FULL_SIMP_TAC std_ss [] >> 
+	      IMP_RES_TAC hw_trans_noreq_lem >>
+	      IMP_RES_TAC core_req_det_lem >>
+	      METIS_TAC [hw_state_comp_eq]
+	      ]
+	  ,
+	  (* no match -> contradiction *)
+	  METIS_TAC [corereq_distinct, Freq_lem]
+	 ]
+      ,
+      Cases_on `dl' = []`
+      >| [(* no match -> contradiction *)
+	  FULL_SIMP_TAC std_ss [Freq_lem, corereq_distinct] >> (
+	      FULL_SIMP_TAC std_ss [corereq_distinct, Freq_def]
+	  )
+	  ,
+	  (* DREQ or ICFR *)
+	  Cases_on `?dop. req = DREQ dop`
+	  >| [(* DREQ *)
+	      FULL_SIMP_TAC std_ss [corereq_distinct] >> (
+	          FULL_SIMP_TAC std_ss [corereq_distinct, mop_11, corereq_11]
+	      ) >>
+	      RW_TAC std_ss [] >>
+	      Cases_on `dop`
+	      >| [(* read *)
+		  IMP_RES_TAC hw_trans_read_lem >>
+		  FULL_SIMP_TAC std_ss [Rreq_def, rd_def] >>
+		  IMP_RES_TAC core_req_det_lem >>
+		  RW_TAC std_ss [] >>
+		  IMP_RES_TAC core_rcv_det_lem >>
+		  METIS_TAC [hw_state_comp_eq]
+		  ,
+		  (* write *)
+		  IMP_RES_TAC hw_trans_write_lem >>
+		  FULL_SIMP_TAC std_ss [Wreq_def, wt_def] >>
+		  IMP_RES_TAC core_req_det_lem >>
+		  METIS_TAC [hw_state_comp_eq]
+		  ,
+		  (* clean *)
+		  IMP_RES_TAC hw_trans_clean_lem >>
+		  FULL_SIMP_TAC std_ss [Creq_def, cl_def] >>
+		  IMP_RES_TAC core_req_det_lem >>
+		  METIS_TAC [hw_state_comp_eq]
+		 ]
+	      ,
+	      (* ICFR *)
+	      FULL_SIMP_TAC std_ss [corereq_distinct] >> (
+	          FULL_SIMP_TAC std_ss [corereq_distinct, mop_11, corereq_11]
+	      ) >>
+	      RW_TAC std_ss [] >>
+	      IMP_RES_TAC hw_trans_flush_lem >>
+	      FULL_SIMP_TAC std_ss [Ireq_def] >>
+	      IMP_RES_TAC core_req_det_lem >>
+	      METIS_TAC [hw_state_comp_eq]
+	     ]	      
+	 ]
+     ]
+);
+
 (* dependencies *)
 
 val ca_Tr_def = Define `ca_Tr s va = Tr_ s.cs (dmvca s.ms) va`;

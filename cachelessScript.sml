@@ -573,6 +573,17 @@ val abs_cl_progress_oblg = store_thm("abs_cl_progress_oblg", ``
      ]
 );
 
+
+val cl_state_comp_eq = store_thm("cl_state_comp_eq", ``
+!s s'. (s = s') <=> (s.cs = s'.cs) /\ (s.M = s'.M)
+``,
+  REPEAT GEN_TAC >>
+  ASSUME_TAC (SPEC ``s:cl_state``(TypeBase.nchotomy_of ``:cl_state``)) >>
+  ASSUME_TAC (SPEC ``s':cl_state``(TypeBase.nchotomy_of ``:cl_state``)) >>
+  FULL_SIMP_TAC std_ss (TypeBase.accessors_of ``:cl_state``) >>
+  RW_TAC std_ss [TypeBase.one_one_of ``:cl_state``]
+);
+
 val abs_cl_unique_oblg = store_thm("abs_cl_unique_oblg", ``
 !s m dl dl' s' s''. abs_cl_trans s m dl s' /\ abs_cl_trans s m dl' s'' ==>
     (s'' = s') /\ (dl' = dl)
@@ -598,16 +609,66 @@ val abs_cl_unique_oblg = store_thm("abs_cl_unique_oblg", ``
 	      IMP_RES_TAC core_req_det_lem >>
 	      RW_TAC std_ss [] >>
 	      IMP_RES_TAC core_rcv_det_lem >>
-	      (* RW_TAC std_ss [cachelessTheory.cl_state_component_equality] >> *)
-	      cheat
+	      METIS_TAC [cl_state_comp_eq]
 	      ,
-	      cheat
+	      (* NOREQ *)
+	      REV_FULL_SIMP_TAC std_ss [corereq_distinct] >> 
+	      FULL_SIMP_TAC std_ss [] >> 
+	      IMP_RES_TAC cl_trans_noreq_lem >>
+	      IMP_RES_TAC core_req_det_lem >>
+	      METIS_TAC [cl_state_comp_eq]
 	      ]
 	  ,
-	  cheat
+	  (* no match -> contradiction *)
+	  METIS_TAC [corereq_distinct, Freq_lem]
 	 ]
       ,
-      cheat
+      Cases_on `dl' = []`
+      >| [(* no match -> contradiction *)
+	  FULL_SIMP_TAC std_ss [Freq_lem, corereq_distinct] >> (
+	      FULL_SIMP_TAC std_ss [corereq_distinct, Freq_def]
+	  )
+	  ,
+	  (* DREQ or ICFR *)
+	  Cases_on `?dop. req = DREQ dop`
+	  >| [(* DREQ *)
+	      FULL_SIMP_TAC std_ss [corereq_distinct] >> (
+	          FULL_SIMP_TAC std_ss [corereq_distinct, mop_11, corereq_11]
+	      ) >>
+	      RW_TAC std_ss [] >>
+	      Cases_on `dop`
+	      >| [(* read *)
+		  IMP_RES_TAC cl_trans_read_lem >>
+		  FULL_SIMP_TAC std_ss [Rreq_def, rd_def] >>
+		  IMP_RES_TAC core_req_det_lem >>
+		  RW_TAC std_ss [] >>
+		  IMP_RES_TAC core_rcv_det_lem >>
+		  METIS_TAC [cl_state_comp_eq]
+		  ,
+		  (* write *)
+		  IMP_RES_TAC cl_trans_write_lem >>
+		  FULL_SIMP_TAC std_ss [Wreq_def, wt_def] >>
+		  IMP_RES_TAC core_req_det_lem >>
+		  METIS_TAC [cl_state_comp_eq]
+		  ,
+		  (* clean *)
+		  IMP_RES_TAC cl_trans_clean_lem >>
+		  FULL_SIMP_TAC std_ss [Creq_def, cl_def] >>
+		  IMP_RES_TAC core_req_det_lem >>
+		  METIS_TAC [cl_state_comp_eq]
+		 ]
+	      ,
+	      (* ICFR *)
+	      FULL_SIMP_TAC std_ss [corereq_distinct] >> (
+	          FULL_SIMP_TAC std_ss [corereq_distinct, mop_11, corereq_11]
+	      ) >>
+	      RW_TAC std_ss [] >>
+	      IMP_RES_TAC cl_trans_flush_lem >>
+	      FULL_SIMP_TAC std_ss [Ireq_def] >>
+	      IMP_RES_TAC core_req_det_lem >>
+	      METIS_TAC [cl_state_comp_eq]
+	     ]	      
+	 ]
      ]
 );
 
