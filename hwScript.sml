@@ -3025,27 +3025,22 @@ val ca_kcomp_shorten_lem = store_thm("ca_kcomp_shorten_lem", ``
 );
 
 
-val ca_wrel_def = Define` ca_wrel s s' = 
-?n. ca_kcomp s s' n /\ (mode s' = USER)`;
+val ca_wrel_def = Define` ca_wrel s s' n = 
+ca_kcomp s s' n /\ (mode s' = USER)`;
 
 val ca_wrel_exentry_lem = store_thm("ca_wrel_exentry_lem", ``
-!s s'. ca_wrel s s' ==> exentry s
+!s s' n. ca_wrel s s' n ==> exentry s
 ``,
   RW_TAC std_ss [ca_wrel_def] >>
   IMP_RES_TAC ca_kcomp_exentry_lem
 );
 
 val ca_wrel_mode_lem = store_thm("ca_wrel_mode_lem", ``
-!s s'. ca_wrel s s' ==> (mode s = PRIV) /\ (mode s' = USER)
+!s s' n. ca_wrel s s' n ==> (mode s = PRIV) /\ (mode s' = USER)
 ``,
-  RW_TAC std_ss [ca_wrel_def]
-  >| [(* PRIV *)
-      IMP_RES_TAC ca_kcomp_exentry_lem >>
-      FULL_SIMP_TAC std_ss [exentry_def, mode_def, exentry_spec]
-      ,
-      (* USER *)
-      ASM_REWRITE_TAC []
-     ]      
+  RW_TAC std_ss [ca_wrel_def] >>
+  IMP_RES_TAC ca_kcomp_exentry_lem >>
+  FULL_SIMP_TAC std_ss [exentry_def, mode_def, exentry_spec]
 );
 
 

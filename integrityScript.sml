@@ -695,18 +695,18 @@ val Rsim_cl_step_lem = store_thm("Rsim_cl_step_lem", ``
 (* top level proof *)
 
 val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
-!s s' sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+!s s' sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef n. 
     cm_user_po Icoh Icode Icm
  /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ Inv Icoh Icode Icm sc
  /\ cl_Inv s
  /\ Rsim sc s
- /\ ca_wrel sc sc' 
- /\ cl_wrel s s' 
+ /\ ca_wrel sc sc' n
+ /\ cl_wrel s s' n
  /\ Rsim sc' s'
  /\ cl_Inv s' 
- /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
- /\ cl_II cl_Icmf cl_Icodef s s'
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
+ /\ cl_II cl_Icmf cl_Icodef s s' n
         ==>
     Inv Icoh Icode Icm sc'
 ``,
@@ -728,8 +728,8 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
  /\ ca_kcomp sc sc' n
         ==>
     Rsim sc' s'
- /\ cl_II cl_Icmf cl_Icodef s s' 
- /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
+ /\ cl_II cl_Icmf cl_Icodef s s' n
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
 ``,
   Induct_on `n`
   >| [(* n = 0 *)
@@ -740,7 +740,7 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
       IMP_RES_TAC cl_II_po_def >>
       FULL_SIMP_TAC std_ss [cm_kernel_po_def, cl_II_def] >>
       REV_FULL_SIMP_TAC std_ss [] >>
-      `ca_Icmf sc sc` by ( IMP_RES_TAC Icmf_init_sim_lem ) >>
+      `ca_Icmf sc sc 0` by ( IMP_RES_TAC Icmf_init_sim_lem ) >>
       RW_TAC std_ss [ca_II_def] >>
       IMP_RES_TAC Icodef_init_sim_lem
       ,
@@ -750,7 +750,7 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
       IMP_RES_TAC cl_II_po_def >>
       FULL_SIMP_TAC std_ss [cl_kcomp_SUC_lem, ca_kcomp_SUC_lem] >>
       `Rsim s''' s'' /\
-       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc s'''` by ( METIS_TAC [] ) >>
+       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc s''' n` by ( METIS_TAC [] ) >>
       MATCH_MP_TAC (
           prove(``(A /\ (dl':mop list = dl)) /\ (A /\ (dl' = dl) ==> B) ==> 
 		  A /\ B``, PROVE_TAC [])
@@ -829,10 +829,10 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	  STRIP_TAC >>
 	  FULL_SIMP_TAC std_ss [cm_kernel_po_def] >>
 	  IMP_RES_TAC cl_II_po_def >>
-	  `cl_Icmf s s'` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
-	  `ca_Icmf sc sc'` by ( IMP_RES_TAC Icmf_sim_lem ) >>
+	  `cl_Icmf s s' (SUC n)` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
+	  `ca_Icmf sc sc' (SUC n)` by ( IMP_RES_TAC Icmf_sim_lem ) >>
 	  RW_TAC std_ss [ca_II_def] >>
-	  `cl_Icodef s s'` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
+	  `cl_Icodef s s' (SUC n)` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
 	  MATCH_MP_TAC Icodef_sim_lem >>
 	  EXISTS_TAC ``s''':hw_state`` >>
 	  EXISTS_TAC ``s:cl_state`` >>
@@ -844,22 +844,22 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 );
 
 val kernel_wrel_sim_lem = store_thm("kernel_wrel_sim_lem", ``
-!sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+!sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef n. 
     cm_user_po Icoh Icode Icm
  /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Inv_po
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Inv Icoh Icode Icm sc
- /\ ca_wrel sc sc'
+ /\ ca_wrel sc sc' n
         ==>
 ?s s'. 
     Rsim sc s
  /\ cl_Inv s
- /\ cl_wrel s s'
+ /\ cl_wrel s s' n
  /\ Rsim sc' s'
  /\ cl_Inv s' 
- /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'
- /\ cl_II cl_Icmf cl_Icodef s s'
+ /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
+ /\ cl_II cl_Icmf cl_Icodef s s' n
 ``,
   REPEAT STRIP_TAC >>
   ASSUME_TAC ( SPEC ``sc:hw_state`` Rsim_exists_lem ) >>
@@ -876,12 +876,12 @@ val kernel_wrel_sim_lem = store_thm("kernel_wrel_sim_lem", ``
   >| [(* same length *)
       RW_TAC std_ss [] >>
       `Rsim sc' s' /\
-       cl_II cl_Icmf cl_Icodef s s' /\
-       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc'` by (
+       cl_II cl_Icmf cl_Icodef s s' m /\
+       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' m` by (
           METIS_TAC [kernel_bisim_lem]
       ) >>
       IMP_RES_TAC Rsim_mode_lem >>
-      `cl_wrel s s'` by ( METIS_TAC [cl_wrel_def] ) >>
+      `cl_wrel s s' m` by ( METIS_TAC [cl_wrel_def] ) >>
       IMP_RES_TAC cl_Inv_po_def >>
       METIS_TAC []
       ,
@@ -900,13 +900,13 @@ val kernel_wrel_sim_lem = store_thm("kernel_wrel_sim_lem", ``
 (* Kernel integrity theorem *)
 
 val Inv_kernel_preserved_thm = store_thm("Inv_kernel_preserved_thm", ``
-!sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+!sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef n. 
     cm_user_po Icoh Icode Icm
  /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Inv_po
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Inv Icoh Icode Icm sc
- /\ ca_wrel sc sc'
+ /\ ca_wrel sc sc' n
         ==>
     Inv Icoh Icode Icm sc'
 ``,
@@ -917,17 +917,17 @@ val Inv_kernel_preserved_thm = store_thm("Inv_kernel_preserved_thm", ``
 
 
 val kernel_integrity_sim_thm = store_thm("kernel_integrity_sim_thm", ``
-!s sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
+!s sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef n. 
     cm_user_po Icoh Icode Icm
  /\ cm_kernel_po cl_Icmf cl_Icodef ca_Icmf ca_Icodef Icoh Icode Icm
  /\ cl_Inv_po
  /\ cl_II_po cl_Icmf cl_Icodef
  /\ Inv Icoh Icode Icm sc
  /\ Rsim sc s
- /\ ca_wrel sc sc'
+ /\ ca_wrel sc sc' n
         ==>
 ?s'. 
-    cl_wrel s s'
+    cl_wrel s s' n
  /\ Rsim sc' s'
  /\ Inv Icoh Icode Icm sc'
 ``,
@@ -936,7 +936,7 @@ val kernel_integrity_sim_thm = store_thm("kernel_integrity_sim_thm", ``
       IMP_RES_TAC Inv_kernel_preserved_thm
   ) >>
   ASM_REWRITE_TAC [] >>
-  `?s' s''. Rsim sc s' /\ cl_wrel s' s'' /\ Rsim sc' s''` by ( 
+  `?s' s''. Rsim sc s' /\ cl_wrel s' s'' n /\ Rsim sc' s''` by ( 
       METIS_TAC [kernel_wrel_sim_lem] 
   ) >>
   IMP_RES_TAC Rsim_unique_lem >>
@@ -949,7 +949,7 @@ val kernel_integrity_sim_thm = store_thm("kernel_integrity_sim_thm", ``
 
 val (Wrel_rules, Wrel_ind, Wrel_cases) = Hol_reln `
    (!s s' req s''. Wrel s s' /\ abs_ca_trans s' USER req s'' ==> Wrel s s'')
-/\ (!s s' s''. Wrel (s:hw_state) s' /\ ca_wrel s' s'' ==> Wrel s s'')
+/\ (!s s' s'' n. Wrel (s:hw_state) s' /\ ca_wrel s' s'' n ==> Wrel s s'')
 `;
 
 val overall_integrity_thm = store_thm("overall_integrity_thm", ``

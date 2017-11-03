@@ -1398,28 +1398,23 @@ val cl_kcomp_exists_lem = store_thm("cl_kcomp_exists_lem", ``
 );
 
 
-val cl_wrel_def = Define` cl_wrel s s' = 
-?n. cl_kcomp s s' n /\ (cl_mode s' = USER)`;
+val cl_wrel_def = Define` cl_wrel s s' n = 
+cl_kcomp s s' n /\ (cl_mode s' = USER)`;
 
 val cl_wrel_exentry_lem = store_thm("cl_wrel_exentry_lem", ``
-!s s'. cl_wrel s s' ==> cl_exentry s
+!s s' n. cl_wrel s s' n ==> cl_exentry s
 ``,
   RW_TAC std_ss [cl_wrel_def] >>
   IMP_RES_TAC cl_kcomp_exentry_lem
 );
 
 val cl_wrel_mode_lem = store_thm("cl_wrel_mode_lem", ``
-!s s'. cl_wrel s s' ==> (cl_mode s = PRIV) /\ (cl_mode s' = USER)
+!s s' n. cl_wrel s s' n ==> (cl_mode s = PRIV) /\ (cl_mode s' = USER)
 ``,
-  RW_TAC std_ss [cl_wrel_def]
-  >| [(* PRIV *)
-      IMP_RES_TAC cl_kcomp_exentry_lem >>
-      FULL_SIMP_TAC std_ss [cl_exentry_def, cl_mode_def, 
-			    coreIfTheory.exentry_spec]
-      ,
-      (* USER *)
-      ASM_REWRITE_TAC []
-     ]      
+  RW_TAC std_ss [cl_wrel_def] >>
+  IMP_RES_TAC cl_kcomp_exentry_lem >>
+  FULL_SIMP_TAC std_ss [cl_exentry_def, cl_mode_def, 
+			coreIfTheory.exentry_spec]
 );
 
 

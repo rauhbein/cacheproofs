@@ -237,7 +237,7 @@ val Inv_AC_kernel_lem = store_thm("Inv_AC_kernel_lem", ``
    corresponding pa are in always cacheable region 
    resulting CR is in always cacheable region
 *)
-val cl_Icmf_AC_def = Define `cl_Icmf_AC s s' = 
+val cl_Icmf_AC_def = Define `cl_Icmf_AC s s' (n:num) = 
     cl_Inv_Mmu_fixed s s'
  /\ cl_vdeps s' SUBSET Kvm
  /\ cl_deps s' SUBSET Mac
@@ -249,7 +249,7 @@ val cl_Icmf_AC_def = Define `cl_Icmf_AC s s' =
    always cacheable region is coherent
    resulting CR is in always cacheable region
 *)
-val ca_Icmf_AC_def = Define `ca_Icmf_AC s s' = 
+val ca_Icmf_AC_def = Define `ca_Icmf_AC s s' (n:num) = 
     ca_Inv_Mmu_fixed s s'
  /\ ca_vdeps s' SUBSET Kvm
  /\ ca_deps s' SUBSET Mac
@@ -263,7 +263,7 @@ val ca_Icmf_AC_def = Define `ca_Icmf_AC s s' =
    never write CRex
    resulting CRex not expanding (or fixed) and contains Kcode
 *)
-val cl_Icodef_AC_def = Define `cl_Icodef_AC s s' = 
+val cl_Icodef_AC_def = Define `cl_Icodef_AC s s' (n:num) = 
     VApc s'.cs IN Kcode
  /\ (!pa s'' dl. abs_cl_trans s' PRIV dl s'' 
               /\ MEM pa IN cl_CRex s ==> 
@@ -278,7 +278,7 @@ val cl_Icodef_AC_def = Define `cl_Icodef_AC s s' =
    CRex i-coherent and not dirty
    resulting CRex not expanding (or fixed) and contains Kcode
 *)
-val ca_Icodef_AC_def = Define `ca_Icodef_AC s s' = 
+val ca_Icodef_AC_def = Define `ca_Icodef_AC s s' (n:num) = 
     VApc s'.cs IN Kcode
  /\ (!pa s'' dl. abs_ca_trans s' PRIV dl s'' 
               /\ MEM pa IN CRex s ==> 
@@ -518,7 +518,7 @@ Inv_rebuild_po Icoh_AC Icode_AC Icm_AC
                ca_Icmf_AC ca_Icodef_AC cl_Icmf_AC cl_Icodef_AC
 ``,
   REWRITE_TAC [Inv_rebuild_po_def] >>
-  NTAC 6 STRIP_TAC >>
+  NTAC 7 STRIP_TAC >>
   MATCH_MP_TAC (
       prove(``A /\ (A ==> B) /\ (A /\ B ==> C) ==> A /\ B /\ C``, PROVE_TAC [])
   ) >>
@@ -586,13 +586,13 @@ val discharge_kernel_AC_lem = store_thm("discharge_kernel_AC_lem", ``
 );
 
 val Inv_kernel_preserved_AC_thm = store_thm("Inv_kernel_preserved_AC_thm", ``
-!sc sc'. 
+!sc sc' n. 
     cl_Inv_po
  /\ Ifun_AC_user_po
  /\ Ifun_AC_kernel_po
  /\ cl_II_po cl_Icmf_AC cl_Icodef_AC
  /\ Inv Icoh_AC Icode_AC Icm_AC sc
- /\ ca_wrel sc sc'
+ /\ ca_wrel sc sc' n
         ==>
     Inv Icoh_AC Icode_AC Icm_AC sc'
 ``, 
@@ -605,17 +605,17 @@ val Inv_kernel_preserved_AC_thm = store_thm("Inv_kernel_preserved_AC_thm", ``
 );
 
 val kernel_integrity_sim_AC_thm = store_thm("kernel_integrity_sim_AC_thm", ``
-!s sc sc'. 
+!s sc sc' n. 
     cl_Inv_po
  /\ Ifun_AC_user_po
  /\ Ifun_AC_kernel_po
  /\ cl_II_po cl_Icmf_AC cl_Icodef_AC
  /\ Inv Icoh_AC Icode_AC Icm_AC sc
  /\ Rsim sc s
- /\ ca_wrel sc sc'
+ /\ ca_wrel sc sc' n
         ==>
 ?s'. 
-    cl_wrel s s'
+    cl_wrel s s' n
  /\ Rsim sc' s'
  /\ Inv Icoh_AC Icode_AC Icm_AC sc'
 ``,
