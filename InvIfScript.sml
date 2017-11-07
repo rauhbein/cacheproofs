@@ -1190,14 +1190,19 @@ Define `Icodef_init_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
 val Icmf_xfer_po = Define `Icmf_xfer_po caI clI Icoh Icode Icm =
 !sc sc' sc'' s s' s'' n dl ca_Icodef cl_Icodef. 
     cm_user_po Icoh Icode Icm 
- /\ ca_II Icoh Icode Icm caI ca_Icodef sc sc' n
- /\ cl_II clI cl_Icodef s s' n
+ /\ Rsim sc s
+ /\ (!m sm scm. 
+        m <= n
+     /\ cl_kcomp s sm m
+     /\ ca_kcomp sc scm m
+            ==>
+        Rsim scm sm
+     /\ ca_II Icoh Icode Icm caI ca_Icodef sc scm m
+     /\ cl_II clI cl_Icodef s sm m)
  /\ cl_kcomp s s' n 
  /\ ca_kcomp sc sc' n
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
- /\ Rsim sc s
- /\ Rsim sc' s'
  /\ Rsim sc'' s''
  /\ clI s s'' (SUC n)
         ==>
@@ -1209,16 +1214,21 @@ val Icodef_xfer_po =
 Define `Icodef_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
 !sc sc' sc'' s s' s'' n dl. 
     cm_user_po Icoh Icode Icm 
- /\ ca_II Icoh Icode Icm ca_Icmf caI sc sc' n
- /\ cl_II cl_Icmf clI s s' n
+ /\ Rsim sc s
+ /\ (!m sm scm. 
+        m <= n
+     /\ cl_kcomp s sm m
+     /\ ca_kcomp sc scm m
+            ==>
+        Rsim scm sm
+     /\ ca_II Icoh Icode Icm ca_Icmf caI sc scm m
+     /\ cl_II cl_Icmf clI s sm m)
  /\ ca_kcomp sc sc' n
  /\ cl_kcomp s s' n 
  /\ ca_Icmf sc sc'' (SUC n)
  /\ cl_Icmf s s'' (SUC n)
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
- /\ Rsim sc s
- /\ Rsim sc' s'
  /\ Rsim sc'' s''
  /\ clI s s'' (SUC n)
         ==>
@@ -1330,14 +1340,19 @@ val Icodef_init_sim_lem = store_thm("Icodef_init_sim_lem", ``
 val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
 !sc sc' sc'' s s' s'' n dl Icoh Icode Icm ca_Icmf cl_Icmf ca_Icodef cl_Icodef.
     cm_user_po Icoh Icode Icm 
- /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
- /\ cl_II cl_Icmf cl_Icodef s s' n
+ /\ Rsim sc s
+ /\ (!m sm scm. 
+        m <= n
+     /\ cl_kcomp s sm m
+     /\ ca_kcomp sc scm m
+            ==>
+        Rsim scm sm
+     /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc scm m
+     /\ cl_II cl_Icmf cl_Icodef s sm m)
  /\ cl_kcomp s s' n
  /\ ca_kcomp sc sc' n
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
- /\ Rsim sc s
- /\ Rsim sc' s'
  /\ Rsim sc'' s''
  /\ Icmf_xfer_po ca_Icmf cl_Icmf Icoh Icode Icm
  /\ cl_Icmf s s'' (SUC n)
@@ -1345,7 +1360,7 @@ val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
     ca_Icmf sc sc'' (SUC n)
 ``,
   RW_TAC std_ss [Icmf_xfer_po] >> 
-  PAT_X_ASSUM ``!x. y`` (
+  PAT_X_ASSUM ``!a b c d e f g h i j. y`` (
       fn thm => ASSUME_TAC (
 		    SPECL [``sc:hw_state``, ``sc':hw_state``,
 			   ``sc'':hw_state``, ``s:cl_state``, 
@@ -1356,22 +1371,27 @@ val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
 			  thm 
 		)
   ) >>
-  FULL_SIMP_TAC std_ss []
+  RES_TAC
 );
 
 val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
 !sc sc' sc'' s s' s'' n dl Icoh Icode Icm ca_Icmf cl_Icmf ca_Icodef cl_Icodef.
     cm_user_po Icoh Icode Icm 
- /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
- /\ cl_II cl_Icmf cl_Icodef s s' n
+ /\ Rsim sc s
+ /\ (!m sm scm. 
+        m <= n
+     /\ cl_kcomp s sm m
+     /\ ca_kcomp sc scm m
+            ==>
+        Rsim scm sm
+     /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc scm m
+     /\ cl_II cl_Icmf cl_Icodef s sm m)
  /\ cl_kcomp s s' n
  /\ ca_kcomp sc sc' n
  /\ ca_Icmf sc sc'' (SUC n) 
  /\ cl_Icmf s s'' (SUC n) 
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
- /\ Rsim sc s
- /\ Rsim sc' s'
  /\ Rsim sc'' s''
  /\ Icodef_xfer_po ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf
  /\ cl_Icodef s s'' (SUC n)
@@ -1379,7 +1399,7 @@ val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
     ca_Icodef sc sc'' (SUC n)
 ``,
   RW_TAC std_ss [Icodef_xfer_po] >> 
-  PAT_X_ASSUM ``!x. y`` (
+  PAT_X_ASSUM ``!a b c d e f g h. y`` (
       fn thm => ASSUME_TAC (
 		    SPECL [``sc:hw_state``, ``sc':hw_state``,
 			   ``sc'':hw_state``, ``s:cl_state``, 
@@ -1387,7 +1407,7 @@ val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
 			   ``n:num``, ``dl:mop list``] thm 
 		)
   ) >>
-  FULL_SIMP_TAC std_ss []
+  RES_TAC
 );
 
 (*********** finish ************)

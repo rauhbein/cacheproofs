@@ -731,10 +731,12 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
  /\ cl_II cl_Icmf cl_Icodef s s' n
  /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
 ``,
-  Induct_on `n`
+  completeInduct_on `n` >>
+  Cases_on `n = 0` 
   >| [(* n = 0 *)
       REPEAT GEN_TAC >>
       STRIP_TAC >>
+      REV_FULL_SIMP_TAC std_ss [] >>
       IMP_RES_TAC cl_kcomp_0_lem >>
       IMP_RES_TAC ca_kcomp_0_lem >>
       IMP_RES_TAC cl_II_po_def >>
@@ -745,12 +747,15 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
       IMP_RES_TAC Icodef_init_sim_lem
       ,
       (* n -> SUC n *)
+      `?m. n = SUC m` by ( METIS_TAC [arithmeticTheory.num_CASES] ) >>
+      ASM_REWRITE_TAC [] >>
       REPEAT GEN_TAC >>
       STRIP_TAC >>
       IMP_RES_TAC cl_II_po_def >>
       FULL_SIMP_TAC std_ss [cl_kcomp_SUC_lem, ca_kcomp_SUC_lem] >>
+      `m < SUC m` by ( FULL_SIMP_TAC arith_ss [] ) >>
       `Rsim s''' s'' /\
-       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc s''' n` by ( METIS_TAC [] ) >>
+       ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc s''' m` by ( METIS_TAC [] ) >>
       MATCH_MP_TAC (
           prove(``(A /\ (dl':mop list = dl)) /\ (A /\ (dl' = dl) ==> B) ==> 
 		  A /\ B``, PROVE_TAC [])
@@ -827,17 +832,35 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	  ,
           (* ca_II *)
 	  STRIP_TAC >>
-	  FULL_SIMP_TAC std_ss [cm_kernel_po_def] >>
 	  IMP_RES_TAC cl_II_po_def >>
-	  `cl_Icmf s s' (SUC n)` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
-	  `ca_Icmf sc sc' (SUC n)` by ( IMP_RES_TAC Icmf_sim_lem ) >>
+	  `cl_Icmf s s' (SUC m)` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
+	  IMP_RES_TAC cm_kernel_po_def >>
+          `!m' sm scm. m' <= m /\ cl_kcomp s sm m' /\ ca_kcomp sc scm m' ==>
+		       Rsim scm sm 
+                    /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc scm m' 
+                    /\ cl_II cl_Icmf cl_Icodef s sm m'` by (
+	      REPEAT GEN_TAC >>
+	      STRIP_TAC >>
+	      `m' < SUC m` by ( DECIDE_TAC ) >>
+	      METIS_TAC []
+	  ) >>
+	  `ca_Icmf sc sc' (SUC m)` by ( 
+	      MATCH_MP_TAC Icmf_sim_lem >>
+	      HINT_EXISTS_TAC >>
+	      EXISTS_TAC ``s:cl_state``>>
+	      EXISTS_TAC ``s'':cl_state``>>
+	      EXISTS_TAC ``s':cl_state``>>
+	      EXISTS_TAC ``dl: mop list``>>
+	      METIS_TAC []
+	  ) >>
 	  RW_TAC std_ss [ca_II_def] >>
-	  `cl_Icodef s s' (SUC n)` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
+	  `cl_Icodef s s' (SUC m)` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
 	  MATCH_MP_TAC Icodef_sim_lem >>
 	  EXISTS_TAC ``s''':hw_state`` >>
 	  EXISTS_TAC ``s:cl_state`` >>
 	  EXISTS_TAC ``s'':cl_state`` >>
 	  EXISTS_TAC ``s':cl_state`` >>
+	  EXISTS_TAC ``dl: mop list``>>
 	  METIS_TAC []
 	 ]
      ]

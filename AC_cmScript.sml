@@ -408,6 +408,8 @@ Ifun_AC_user_po ==> Icmf_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
 ``,
   REWRITE_TAC [Icmf_xfer_po_def, ca_Icmf_AC_def, cl_Icmf_AC_def] >>
   NTAC 12 STRIP_TAC >>
+  `n <= n` by ( FULL_SIMP_TAC arith_ss [] ) >>
+  RES_TAC >>
   FULL_SIMP_TAC std_ss [ca_II_def, cl_II_def] >>
   IMP_RES_TAC Rsim_cs_lem >>
   ASM_REWRITE_TAC [ca_Inv_Mmu_fixed_def, cl_Inv_Mmu_fixed_def] >>
@@ -430,7 +432,7 @@ Ifun_AC_user_po ==> Icmf_xfer_po ca_Icmf_AC cl_Icmf_AC Icoh_AC Icode_AC Icm_AC
   ) >>
   FULL_SIMP_TAC std_ss [cl_Inv_Mmu_fixed_def] >>
   RW_TAC std_ss [] >>
-  IMP_RES_TAC cl_MDVA_lem >>
+  `cl_MDVA s Kvm = cl_MDVA s'' Kvm` by ( METIS_TAC [cl_MDVA_lem] ) >>
   `MDVA sc Kvm = cl_MDVA s Kvm` by ( METIS_TAC [Rsim_MDVA_lem] ) >>
   FULL_SIMP_TAC std_ss [] >>
   IMP_RES_TAC dCoh_subset_lem >>
@@ -446,6 +448,8 @@ Ifun_AC_user_po ==> Icodef_xfer_po ca_Icodef_AC cl_Icodef_AC
 ``,
   REWRITE_TAC [Icodef_xfer_po_def, ca_Icodef_AC_def, cl_Icodef_AC_def] >>
   NTAC 10 STRIP_TAC >>
+  `n <= n` by ( FULL_SIMP_TAC arith_ss [] ) >>
+  RES_TAC >>
   FULL_SIMP_TAC std_ss [ca_II_def, cl_II_def, ca_Icmf_AC_def, cl_Icmf_AC_def] >>
   `cl_CRex s = CRex sc` by ( 
       MATCH_MP_TAC Rsim_CRex_lem >>
