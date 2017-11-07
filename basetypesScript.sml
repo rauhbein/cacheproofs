@@ -455,6 +455,185 @@ val not_writes_lem = store_thm("not_writes_lem", ``
      ]
 );
 
+val dclnw_def = Define `
+    (dclnw c (DOP d) = if cl d then (c UNION {PA d})
+		       else if wt d then (c DIFF {PA d})
+		       else c)
+ /\ (dclnw c (IFL a) = c)
+`;
+
+val dclnw_subset_lem = store_thm("dclnw_subset_lem", ``
+!dl A B. A SUBSET B ==> FOLDL dclnw A dl SUBSET FOLDL dclnw B dl
+``,
+  Induct_on `dl`
+  >| [(* [] *)
+      RW_TAC list_ss [pred_setTheory.EMPTY_SUBSET]
+      ,
+      (* h::dl *)
+      Cases_on `h`
+      >| [(* DOP *)
+	  RW_TAC list_ss [dclnw_def] 
+	  >| [(* cl /\ wt -> not possible *)
+	      METIS_TAC [dop_cases_lem2]
+	      ,
+	      (* cl *)
+	      `A UNION {PA d} SUBSET B UNION {PA d}` by (
+	          FULL_SIMP_TAC std_ss [pred_setTheory.UNION_SUBSET,
+				        pred_setTheory.SUBSET_UNION] >>
+	          FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF,
+				        pred_setTheory.IN_UNION]		  
+	      ) >>
+	      RES_TAC
+	      ,
+	      (* wt *)
+	      `A DIFF {PA d} SUBSET B DIFF {PA d}` by (
+	          FULL_SIMP_TAC std_ss [pred_setTheory.DIFF_SUBSET] >>
+	          FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF,
+				        pred_setTheory.IN_DIFF]		  
+	      ) >>
+	      RES_TAC
+	     ]
+	  ,
+	  (* IFL *)
+	  RW_TAC list_ss [dclnw_def]
+	 ]
+     ]	      
+);
+
+
+val UNION_DIFF_lem = store_thm("UNION_DIFF_lem", ``
+!A B C. (A UNION B) DIFF C = A DIFF C UNION (B DIFF C)
+``,
+  RW_TAC std_ss [pred_setTheory.EXTENSION,
+		 pred_setTheory.IN_DIFF,
+		 pred_setTheory.IN_UNION] >>
+  METIS_TAC []
+);
+
+
+val dclnw_union_lem = store_thm("dclnw_union_lem", ``
+!dl A B a. a IN FOLDL dclnw (A UNION B) dl ==> 
+    a IN FOLDL dclnw B dl UNION A
+``,
+  Induct_on `dl`
+  >| [(* [] *)
+      RW_TAC list_ss [] >> (
+          RW_TAC std_ss []
+      )
+      ,
+      (* h::dl *)
+      Cases_on `h`
+      >| [(* DOP *)
+	  RW_TAC list_ss [dclnw_def] 
+	  >| [(* cl /\ wt -> not possible *)
+	      METIS_TAC [dop_cases_lem2]
+	      ,
+	      (* cl *)
+	      `a IN FOLDL dclnw (A UNION (B UNION {PA d})) dl` by (
+	          RW_TAC std_ss [pred_setTheory.UNION_ASSOC]
+	      ) >>
+	      RES_TAC >> 
+	      FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION]		  
+	      ,
+	      (* wt *)
+	      FULL_SIMP_TAC std_ss [UNION_DIFF_lem] >>
+	      RES_TAC >>
+	      FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION, 
+				    pred_setTheory.IN_DIFF]		  
+	      ,
+	      (* neither *)
+	      RES_TAC >>
+	      FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION]		  
+	     ]
+	  ,
+	  (* IFL *)
+	  RW_TAC list_ss [dclnw_def] >>
+	  RES_TAC >>
+	  FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION]		  
+	 ]
+     ]	      
+);
+
+val dclnws_def = Define `dclnws dl = FOLDL dclnw EMPTY dl`;
+
+val dclnws_empty_lem = store_thm("dclnws_empty_lem", ``
+dclnws [] = EMPTY
+``,
+  RW_TAC list_ss [dclnws_def]
+);
+
+val dclnws_IFL_lem = store_thm("dclnws_IFL_lem", ``
+!ds a. 
+    (dclnws ((IFL a)::ds) = dclnws ds)
+``,
+  RW_TAC list_ss [dclnws_def, dclnw_def]
+);
+
+val dclnws_subset_lem = store_thm("dclnws_subset_lem", ``
+!ds d. dclnws ds SUBSET dclnws (d::ds)
+``,
+  Cases_on `d` 
+  >| [(* DOP *)
+      RW_TAC list_ss [dclnws_def, dclnw_def] 
+      >| [(* cl *)
+	  MATCH_MP_TAC dclnw_subset_lem >>
+          REWRITE_TAC [pred_setTheory.UNION_EMPTY, pred_setTheory.EMPTY_SUBSET]
+	  ,
+	  (* wt *)
+	  REWRITE_TAC [pred_setTheory.EMPTY_DIFF, pred_setTheory.SUBSET_REFL]
+	  ,
+	  (* neither *)
+	  REWRITE_TAC [pred_setTheory.SUBSET_REFL]
+	 ]
+      ,
+      (* IFL *)
+      RW_TAC list_ss [dclnws_IFL_lem, pred_setTheory.SUBSET_REFL] 
+     ]
+);
+
+
+val dclnws_DOP_lem = store_thm("dclnws_DOP_lem", ``
+!ds d a. a IN dclnws ((DOP d)::ds) 
+             <=> 
+         (cl d /\ (a = PA d) /\ a IN FOLDL dclnw {a} ds
+	   \/ a IN dclnws ds)
+``,
+  REPEAT STRIP_TAC >>
+  EQ_TAC 
+  >| [(* ==> *)
+      RW_TAC list_ss [dclnws_def, dclnw_def] 
+      >| [(* cl d *)
+	  `a IN FOLDL dclnw ({PA d} UNION EMPTY) ds` by (
+	      RW_TAC std_ss [pred_setTheory.UNION_COMM]
+	  ) >>
+	  IMP_RES_TAC dclnw_union_lem >>
+	  FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION,
+			        pred_setTheory.IN_SING,
+			        pred_setTheory.UNION_EMPTY] >> (
+	      RW_TAC std_ss []
+	  )
+	  ,
+	  (* wt d *)
+	  FULL_SIMP_TAC std_ss [pred_setTheory.EMPTY_DIFF]
+	 ]
+      ,
+      (* <== *)
+      STRIP_TAC 
+      >| [(* cl d *)
+	  RW_TAC list_ss [dclnws_def, dclnw_def, pred_setTheory.UNION_EMPTY] 
+	  ,
+	  (* in ds *)
+	  FULL_SIMP_TAC list_ss [dclnws_def] >>
+	  `EMPTY SUBSET dclnw EMPTY (DOP d)` by (
+	      RW_TAC std_ss [pred_setTheory.EMPTY_SUBSET]
+	  ) >>
+	  IMP_RES_TAC dclnw_subset_lem >>
+	  FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF]
+	 ]
+     ]
+);
+
+
 (*********** finish ************)
 
 val _ = export_theory();
