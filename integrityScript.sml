@@ -712,6 +712,10 @@ val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
 ``,
   RW_TAC std_ss [cm_kernel_po_def] >>
   IMP_RES_TAC Icm_f_po_def >>
+  IMP_RES_TAC cl_wrel_mode_lem >>
+  IMP_RES_TAC cl_wrel_exentry_lem >>
+  IMP_RES_TAC ca_wrel_mode_lem >>
+  IMP_RES_TAC ca_wrel_exentry_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem, Inv_rebuild_po_def] >>
   METIS_TAC []
 );

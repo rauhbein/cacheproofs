@@ -1275,8 +1275,10 @@ Inv_rebuild_po Icoh Icode Icm ca_Icmf ca_Icodef cl_Icmf cl_Icodef =
  /\ Rsim sc s
  /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
  /\ cl_II cl_Icmf cl_Icodef s s' n
- /\ ca_wrel sc sc' n
- /\ cl_wrel s s' n
+ /\ exentry sc
+ /\ cl_exentry s
+ /\ (mode sc' = USER)
+ /\ (cl_mode s' = USER)
  /\ Rsim sc' s'
  /\ cl_Inv s'
         ==> 

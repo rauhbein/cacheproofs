@@ -564,7 +564,6 @@ Inv_rebuild_po Icoh_AC Icode_AC Icm_AC
           ASM_REWRITE_TAC []
       ) >>
       FULL_SIMP_TAC std_ss [cl_II_def] >>
-      IMP_RES_TAC cachelessTheory.cl_wrel_mode_lem >>
       IMP_RES_TAC cl_Icodef_AC_def
      ]
 );
