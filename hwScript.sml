@@ -1529,6 +1529,21 @@ val hw_trans_clean_flush_lem = store_thm("hw_trans_clean_flush_lem", ``
   REV_FULL_SIMP_TAC std_ss [Adr_def]
 );
 
+val hw_trans_dcoh_flush_lem = store_thm("hw_trans_dcoh_flush_lem", ``
+!s m req s' pa. Creq req /\ hw_trans s m req s' 
+        ==> 
+    dcoh s'.ms (Adr req)
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC Creq_lem >> 
+  IMP_RES_TAC hw_trans_clean_lem >>
+  REV_FULL_SIMP_TAC std_ss [] >>
+  IMP_RES_TAC dc_cacheable_cl_miss_lem >> 
+  IMP_RES_TAC dcoh_miss_lem >>
+  REV_FULL_SIMP_TAC std_ss [Adr_def]
+);
+
 val hw_trans_clean_preserve_lem = store_thm("hw_trans_clean_preserve_lem", ``
 !s m req s' pa. hw_trans s m req s' 
 	     /\ (Wreq req ==> (pa <> Adr req))
@@ -2621,6 +2636,38 @@ val abs_ca_trans_dcoh_write_oblg = store_thm("abs_ca_trans_dcoh_write_oblg", ``
      ]
 );
 
+val abs_ca_trans_dcoh_flush_oblg = store_thm("abs_ca_trans_dcoh_flush_oblg", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN dcleans dl ==> 
+    dcoh s'.ms pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  IMP_RES_TAC abs_ca_req_lem >>
+  Cases_on `dl = []`
+  >| [(* Fetch or NOREQ *)
+      FULL_SIMP_TAC list_ss [dcleans_def]
+      ,
+      (* Dreq or Ireq *)
+      FULL_SIMP_TAC std_ss []
+      >| [(* Dreq *)
+          FULL_SIMP_TAC std_ss [] >>
+	  `Creq req /\ (Adr req = pa)` by (
+	      FULL_SIMP_TAC std_ss [] >>
+	      IMP_RES_TAC dcleans_lem >>
+	      FULL_SIMP_TAC std_ss [Creq_def, PA_def, opd_def, Adr_def]
+	  ) >>
+          REV_FULL_SIMP_TAC std_ss [] >>
+          IMP_RES_TAC hw_trans_dcoh_flush_lem >>
+	  REV_FULL_SIMP_TAC std_ss []
+	  ,
+	  (* Ireq *)
+	  FULL_SIMP_TAC std_ss [] >>
+	  IMP_RES_TAC dcleans_lem >>
+	  FULL_SIMP_TAC std_ss [ifl_def]
+	 ]
+     ]
+);
+
 val abs_ca_trans_dCoh_preserve_oblg = 
 store_thm("abs_ca_trans_dCoh_preserve_oblg", ``
 !s m dl s' As. 
@@ -2843,6 +2890,41 @@ val abs_ca_trans_icoh_flush_oblg = store_thm("abs_ca_trans_icoh_flush_oblg", ``
 	  ) >>
           IMP_RES_TAC hw_trans_icoh_flush_lem >>
 	  REV_FULL_SIMP_TAC std_ss []
+	 ]
+     ]
+);
+
+val abs_ca_trans_clean_disj_oblg = store_thm("abs_ca_trans_clean_disj_oblg", ``
+!s m dl s'. 
+    abs_ca_trans s m dl s'
+        ==> 
+    DISJOINT (dcleans dl) (icleans dl)
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl = []`
+  >| [(* Freq or NOREQ *)
+      RW_TAC list_ss [dcleans_def, icleans_def, pred_setTheory.DISJOINT_EMPTY]
+      ,
+      (* Dreq or Ireq *)
+      IMP_RES_TAC abs_ca_req_lem >>
+      REV_FULL_SIMP_TAC std_ss []
+      >| [(* Dreq *)
+	  RW_TAC list_ss [icleans_def]
+	  >| [(* ifl dop -> contradiction *)
+	      FULL_SIMP_TAC std_ss [ifl_def]
+	      ,
+	      (* empty *)
+	      REWRITE_TAC [pred_setTheory.DISJOINT_EMPTY]
+	     ]
+	  ,
+	  (* Ireq *)
+	  RW_TAC list_ss [dcleans_def]
+	  >| [(* ifl dop -> contradiction *)
+	      FULL_SIMP_TAC std_ss [ifl_def]
+	      ,
+	      (* empty *)
+	      REWRITE_TAC [pred_setTheory.DISJOINT_EMPTY]
+	     ]
 	 ]
      ]
 );

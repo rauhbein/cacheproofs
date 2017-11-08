@@ -8,7 +8,7 @@ open cachelessTheory;
 open InvIfTheory;
 open integrityTheory;
 
-val _ = new_theory "AC_cm";
+val _ = new_theory "SE_cm";
 
 (********* Instantiation: Selective Eviction *********)
 
@@ -46,6 +46,13 @@ store_thm("abs_ca_trans_clean_preserve_lem", ``
   REWRITE_TAC [abs_ca_trans_clean_preserve_oblg]
 );
 
+val abs_ca_trans_dcoh_flush_lem = store_thm("abs_ca_trans_dcoh_flush_lem", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN dcleans dl ==> 
+    dcoh s'.ms pa
+``,
+  REWRITE_TAC [abs_ca_trans_dcoh_flush_oblg]
+);
+
 val abs_ca_trans_icoh_flush_lem = store_thm("abs_ca_trans_icoh_flush_lem", ``
 !s m dl s' pa. 
     abs_ca_trans s m dl s'
@@ -71,6 +78,14 @@ store_thm("abs_ca_trans_icoh__preserve_lem", ``
   IMP_RES_TAC abs_ca_trans_icoh_clean_preserve_oblg
 );
 
+val abs_ca_trans_clean_disj_lem = store_thm("abs_ca_trans_clean_disj_lem", ``
+!s m dl s'. 
+    abs_ca_trans s m dl s'
+        ==> 
+    DISJOINT (dcleans dl) (icleans dl)
+``,
+  REWRITE_TAC [abs_ca_trans_clean_disj_oblg]
+);
 
 (* padr history variables, start with empty history *)
 (* cacheless history *)
@@ -522,15 +537,6 @@ val ca_hist_cah_lem = store_thm("ca_hist_cah_lem", ``
   IMP_RES_TAC cah_unique_lem
 ); 
 
-val ca_hist_cah_lem = store_thm("ca_hist_cah_lem", ``
-!f s s' h n. ca_kcomp s s' n ==> ca_hist f s s' (cah f s s' n) n 
-``,
-  REPEAT STRIP_TAC >>
-  `?h. cah f s s' n = h` by ( RW_TAC std_ss [] ) >>
-  ASM_REWRITE_TAC [] >>
-  IMP_RES_TAC cah_unique_lem
-); 
-
 val cah_0_lem = store_thm("cah_0_lem", ``
 !f s n. exentry s ==> (cah f s s 0 = EMPTY)
 ``,
@@ -627,3 +633,241 @@ val hist_bisim_lem = store_thm("hist_bisim_lem", ``
       RW_TAC std_ss []
      ]
 );
+
+(* history functions *)
+
+val hwr_def = Define `hwr h dl = h UNION writes dl`;
+
+val hdcl_def = Define `hdcl h dl = h UNION dcleans dl`;
+
+val hdclnw_def = Define `hdclnw h dl = (h DIFF writes dl) UNION dcleans dl`;
+
+val hicl_def = Define `hicl h dl = 
+(h DIFF (writes dl UNION dcleans dl)) UNION icleans dl`;
+
+val hwr_lem = store_thm("hwr_lem", ``
+!pa s dl s' h. 
+    abs_ca_trans s PRIV dl s' 
+ /\ ~dirty s.ms pa 
+ /\ pa NOTIN hwr h dl
+        ==>
+    ~dirty s'.ms pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [hwr_def, pred_setTheory.IN_UNION] >>
+  IMP_RES_TAC abs_ca_trans_clean_preserve_lem
+);
+
+val hdcl_lem = store_thm("hdcl_lem", ``
+!pa s dl s' h. 
+    abs_ca_trans s PRIV dl s' 
+ /\ dCoh s.ms h
+ /\ pa IN hdcl h dl
+ /\ (!d. MEM d dl ==> CA (opd d))
+        ==>
+    dcoh s'.ms pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [hdcl_def, pred_setTheory.IN_UNION]
+  >| [(* in h *)
+      IMP_RES_TAC abs_ca_trans_dCoh_preserve_lem >>
+      FULL_SIMP_TAC std_ss [dCoh_lem2]
+      ,
+      (* in dcleans *)
+      IMP_RES_TAC abs_ca_trans_dcoh_flush_lem
+     ]
+);
+
+val hdiffw_lem = store_thm("hdiffw_lem", ``
+!pa s dl s' h. 
+    abs_ca_trans s PRIV dl s' 
+ /\ ~dirty s.ms pa 
+ /\ pa IN h DIFF writes dl
+        ==>
+    ~dirty s'.ms pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [hwr_def, pred_setTheory.IN_DIFF] >>
+  IMP_RES_TAC abs_ca_trans_clean_preserve_lem
+);
+
+val hdclnw_lem = store_thm("hdclnw_lem", ``
+!pa s dl s' h. 
+    abs_ca_trans s PRIV dl s' 
+ /\ (pa IN h ==> ~dirty s.ms pa)
+ /\ pa IN hdclnw h dl
+        ==>
+    ~dirty s'.ms pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [hdclnw_def, pred_setTheory.IN_UNION] 
+  >| [(* h diff w *)
+      `pa IN h` by ( FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF] ) >>
+      RES_TAC >>
+      IMP_RES_TAC hdiffw_lem
+      ,
+      (* in dcleans *)
+      IMP_RES_TAC abs_ca_trans_clean_lem
+     ]
+);
+
+val hdiffwcl_lem = store_thm("hdiffwcl_lem", ``
+!pa s dl s' h. 
+    abs_ca_trans s PRIV dl s' 
+ /\ icoh s.ms pa
+ /\ ~dirty s.ms pa
+ /\ pa IN h DIFF (writes dl UNION dcleans dl)
+        ==>
+    icoh s'.ms pa
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF, pred_setTheory.IN_UNION] >>
+  IMP_RES_TAC abs_ca_trans_icoh_preserve_lem
+);
+
+val hicl_lem = store_thm("hicl_lem", ``
+!pa s dl s' h. 
+    abs_ca_trans s PRIV dl s' 
+ /\ (pa IN h ==> icoh s.ms pa)
+ /\ ~dirty s.ms pa
+ /\ pa IN hicl h dl
+        ==>
+    icoh s'.ms pa
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [hicl_def, pred_setTheory.IN_UNION]
+  >| [(* h diff w cl *)
+      `pa IN h` by ( FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF] ) >>
+      RES_TAC >>
+      IMP_RES_TAC hdiffwcl_lem 
+      ,
+      (* icleans *)
+      IMP_RES_TAC abs_ca_trans_icoh_flush_lem
+     ]
+);
+
+val icoh_clean_hwr_lem = store_thm("icoh_clean_hwr_lem", ``
+!pa s dl s' h A. 
+    abs_ca_trans s PRIV dl s' 
+ /\ (!pa. pa IN A DIFF h ==> icoh s.ms pa /\ ~dirty s.ms pa)
+        ==>
+    !pa. pa IN A DIFF hwr h dl ==> icoh s'.ms pa /\ ~dirty s'.ms pa
+``,
+  NTAC 9 STRIP_TAC >>
+  `pa IN A DIFF h` by (
+      FULL_SIMP_TAC std_ss [hwr_def, pred_setTheory.IN_DIFF, 
+			    pred_setTheory.IN_UNION]
+  ) >>
+  RES_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF] >>
+  STRIP_TAC
+  >| [(* icoh *)
+      FULL_SIMP_TAC std_ss [hwr_def, pred_setTheory.IN_UNION] >>
+      IMP_RES_TAC abs_ca_trans_icoh_clean_preserve_lem
+      ,
+      (* clean *)
+      IMP_RES_TAC hwr_lem
+     ]
+);
+
+val hcl_inter_lem = store_thm("hcl_inter_lem", ``
+!pa s dl s' hd hi. 
+    abs_ca_trans s PRIV dl s' 
+ /\ pa IN hdclnw hd dl INTER hicl hi dl
+        ==>
+    pa IN hd
+``,
+  RW_TAC std_ss [pred_setTheory.IN_INTER, hdclnw_def, hicl_def] >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION]
+  >| [(* in hd diff w / hi diff w cl *)
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF]
+      ,
+      (* in hd diff w / icl *)
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF]
+      ,
+      (* in cl / hi diff w cl *)
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF, pred_setTheory.IN_UNION]
+      ,
+      `DISJOINT (dcleans dl) (icleans dl)` by ( 
+          IMP_RES_TAC abs_ca_trans_clean_disj_lem
+      ) >>
+      METIS_TAC [pred_setTheory.IN_DISJOINT]
+     ]
+);
+
+val icoh_clean_hcl_lem = store_thm("icoh_clean_hcl_lem", ``
+!pa s dl s' hd hi. 
+    abs_ca_trans s PRIV dl s' 
+ /\ (!pa. pa IN hd ==> ~dirty s.ms pa)
+ /\ (!pa. pa IN hi /\ pa IN hd ==> icoh s.ms pa)
+        ==>
+    !pa. pa IN hdclnw hd dl INTER hicl hi dl ==> 
+        icoh s'.ms pa /\ ~dirty s'.ms pa
+``,
+  NTAC 9 STRIP_TAC >>
+  IMP_RES_TAC hcl_inter_lem >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_INTER] >>
+  RES_TAC >>
+  IMP_RES_TAC hdclnw_lem >>
+  ASM_REWRITE_TAC [] >>
+  METIS_TAC [hicl_lem]
+);
+
+val icoh_clean_hist_lem = store_thm("icoh_clean_hist_lem", ``
+!s hd hi hw A. 
+    (!pa. pa IN hd ==> ~dirty s.ms pa)
+ /\ (!pa. pa IN hi INTER hd ==> icoh s.ms pa)
+ /\ (!pa. pa IN A DIFF hw ==> icoh s.ms pa /\ ~dirty s.ms pa)
+        ==>
+    !pa. pa IN (A DIFF hw) UNION (hd INTER hi) ==> 
+        icoh s.ms pa /\ ~dirty s.ms pa
+``,
+  NTAC 8 STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION, pred_setTheory.IN_INTER]
+);
+
+val icoh_clean_hist_next_lem = store_thm("icoh_clean_hist_next_lem", ``
+!pa s dl s' hd hi hw A. 
+    abs_ca_trans s PRIV dl s' 
+ /\ (!pa. pa IN hd ==> ~dirty s.ms pa)
+ /\ (!pa. pa IN hi INTER hd ==> icoh s.ms pa)
+ /\ (!pa. pa IN A DIFF hw ==> icoh s.ms pa /\ ~dirty s.ms pa)
+        ==>
+    !pa. pa IN (A DIFF hwr hw dl) UNION (hdclnw hd dl INTER hicl hi dl) ==> 
+        icoh s'.ms pa /\ ~dirty s'.ms pa
+``,
+  NTAC 9 STRIP_TAC >>
+  MATCH_MP_TAC icoh_clean_hist_lem >>
+  NTAC 3 STRIP_TAC 
+  >| [(* hdclnw *)
+      METIS_TAC [hdclnw_lem]
+      ,
+      (* hicl cap hdclnw *)
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_INTER] >>
+      STRIP_TAC >>
+      IMP_RES_TAC icoh_clean_hcl_lem >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_INTER]
+      ,
+      (* A diff hwr *)
+      STRIP_TAC >>
+      IMP_RES_TAC icoh_clean_hwr_lem >> 
+      ASM_REWRITE_TAC []
+     ]
+);
+
+val cl_hw_def = Define `cl_hw s s' n = clh hwr s s' n`;
+val ca_hw_def = Define `ca_hw s s' n = cah hwr s s' n`;
+
+val cl_hdc_def = Define `cl_hdc s s' n = clh hdcl s s' n`;
+val ca_hdc_def = Define `ca_hdc s s' n = cah hdcl s s' n`;
+
+val cl_hdcn_def = Define `cl_hdcn s s' n = clh hdclnw s s' n`;
+val ca_hdcn_def = Define `ca_hdcn s s' n = cah hdclnw s s' n`;
+
+val cl_hic_def = Define `cl_hic s s' n = clh hicl s s' n`; 
+val ca_hic_def = Define `ca_hic s s' n = cah hicl s s' n`; 
