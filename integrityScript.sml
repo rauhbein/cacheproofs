@@ -198,7 +198,6 @@ store_thm("abs_ca_trans_icoh_clean_preserve_lem", ``
   REWRITE_TAC [abs_ca_trans_icoh_clean_preserve_oblg]
 );
 
-
 val abs_cl_trans_mode_lem = store_thm("abs_cl_trans_mode_lem", ``
 !s m dl s'. abs_cl_trans s m dl s' ==> (cl_mode s = m) 
 ``,

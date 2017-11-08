@@ -28,6 +28,50 @@ val abs_cl_unique_lem = store_thm("abs_cl_unique_lem", ``
   REWRITE_TAC [abs_cl_unique_oblg]
 );
 
+val abs_ca_trans_clean_lem = store_thm("abs_ca_trans_clean_lem", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN dcleans dl ==> 
+    ~dirty s'.ms pa
+``,
+  REWRITE_TAC [abs_ca_trans_clean_oblg]
+);
+
+val abs_ca_trans_clean_preserve_lem = 
+store_thm("abs_ca_trans_clean_preserve_lem", ``
+!s m dl s' pa. abs_ca_trans s m dl s' 
+            /\ pa NOTIN writes dl 
+            /\ ~dirty s.ms pa 
+        ==> 
+    ~dirty s'.ms pa
+``,
+  REWRITE_TAC [abs_ca_trans_clean_preserve_oblg]
+);
+
+val abs_ca_trans_icoh_flush_lem = store_thm("abs_ca_trans_icoh_flush_lem", ``
+!s m dl s' pa. 
+    abs_ca_trans s m dl s'
+ /\ pa IN icleans dl
+        ==> 
+    icoh s'.ms pa
+``,
+  REWRITE_TAC [abs_ca_trans_icoh_flush_oblg]
+);
+
+val abs_ca_trans_icoh_preserve_lem = 
+store_thm("abs_ca_trans_icoh__preserve_lem", ``
+!s m dl s' pa.
+    abs_ca_trans s m dl s'
+ /\ pa NOTIN writes dl
+ /\ pa NOTIN dcleans dl
+ /\ icoh s.ms pa
+ /\ ~dirty s.ms pa
+        ==>
+    icoh s'.ms pa
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC abs_ca_trans_icoh_clean_preserve_oblg
+);
+
+
 (* padr history variables, start with empty history *)
 (* cacheless history *)
 

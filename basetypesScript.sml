@@ -397,6 +397,22 @@ val ifl_def = Define `
  /\ (ifl _ = F)
 `;
 
+val ifl_lem = store_thm("ifl_lem", ``
+!d. ifl d ==> ?pa. d = IFL pa
+``,
+  Cases_on `d` >> (
+      RW_TAC std_ss [ifl_def]
+  )
+);
+
+val not_ifl_lem = store_thm("not_ifl_lem", ``
+!d. ~ifl d ==> ?dop. d = DOP dop
+``,
+  Cases_on `d` >> (
+      RW_TAC std_ss [ifl_def]
+  )
+);
+
 val cleans_def = Define `cleans dl = 
     set (MAP PA (FILTER cl (MAP opd dl)))
 `;
@@ -406,6 +422,31 @@ val icleans_def = Define `icleans dl =
 val dcleans_def = Define `dcleans dl = 
     set (MAP PA (FILTER cl (MAP opd (FILTER ($~ o ifl) dl))))
 `;
+
+val icleans_lem = store_thm("icleans_lem", ``
+!d pa. pa IN icleans [d] ==>  ifl d /\ cl (opd d) /\ (PA (opd d) = pa)
+``,
+  REWRITE_TAC [icleans_def] >>
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_MAP] >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_FILTER] >>
+  REV_FULL_SIMP_TAC std_ss [listTheory.MEM] >>
+  IMP_RES_TAC ifl_lem >>
+  METIS_TAC [cl_def, opd_def]
+);
+
+val dcleans_lem = store_thm("dcleans_lem", ``
+!d pa. pa IN dcleans [d] ==>  ~ifl d /\ cl (opd d) /\ (PA (opd d) = pa)
+``,
+  REWRITE_TAC [dcleans_def] >>
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [listTheory.MEM_MAP, listTheory.MEM_FILTER] >>
+  REV_FULL_SIMP_TAC std_ss [listTheory.MEM] >>
+  IMP_RES_TAC not_ifl_lem >>
+  METIS_TAC [cl_def, opd_def]
+);
 
 val not_writes_lem = store_thm("not_writes_lem", ``
 !dl pa. pa IN adrs dl /\ pa NOTIN writes dl ==> 
