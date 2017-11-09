@@ -2929,6 +2929,41 @@ val abs_ca_trans_clean_disj_oblg = store_thm("abs_ca_trans_clean_disj_oblg", ``
      ]
 );
 
+val abs_ca_trans_i_w_disj_oblg = store_thm("abs_ca_trans_i_w_disj_oblg", ``
+!s m dl s'. 
+    abs_ca_trans s m dl s'
+        ==> 
+    DISJOINT (writes dl) (icleans dl)
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl = []`
+  >| [(* Freq or NOREQ *)
+      RW_TAC list_ss [dcleans_def, icleans_def, pred_setTheory.DISJOINT_EMPTY]
+      ,
+      (* Dreq or Ireq *)
+      IMP_RES_TAC abs_ca_req_lem >>
+      REV_FULL_SIMP_TAC std_ss []
+      >| [(* Dreq *)
+	  RW_TAC list_ss [icleans_def]
+	  >| [(* ifl dop -> contradiction *)
+	      FULL_SIMP_TAC std_ss [ifl_def]
+	      ,
+	      (* empty *)
+	      REWRITE_TAC [pred_setTheory.DISJOINT_EMPTY]
+	     ]
+	  ,
+	  (* Ireq *)
+	  RW_TAC list_ss [writes_def]
+	  >| [(* ifl dop -> contradiction *)
+	      FULL_SIMP_TAC std_ss [ifl_def, opd_def, wt_def]
+	      ,
+	      (* empty *)
+	      REWRITE_TAC [pred_setTheory.DISJOINT_EMPTY]
+	     ]
+	 ]
+     ]
+);
+
 val hw_state_comp_eq = store_thm("hw_state_comp_eq", ``
 !s s'. (s = s') <=> (s.cs = s'.cs) /\ (s.ms = s'.ms)
 ``,

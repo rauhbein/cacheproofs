@@ -247,7 +247,6 @@ val cl_Icmf_AC_def = Define `cl_Icmf_AC s s' (n:num) =
    only accesses va from KVM
    corresponding pa are in always cacheable region 
    always cacheable region is coherent
-   resulting CR is in always cacheable region
 *)
 val ca_Icmf_AC_def = Define `ca_Icmf_AC s s' (n:num) = 
     ca_Inv_Mmu_fixed s s'
@@ -255,7 +254,6 @@ val ca_Icmf_AC_def = Define `ca_Icmf_AC s s' (n:num) =
  /\ ca_deps s' SUBSET Mac
  /\ dCoh s'.ms Mac
 `; 
-
 
 (* fix MMU so that all va in Kvm are cacheable 
    all va in Kcode map to CRex
@@ -276,7 +274,6 @@ val cl_Icodef_AC_def = Define `cl_Icodef_AC s s' (n:num) =
    PC always in Kcode
    never write CRex
    CRex i-coherent and not dirty
-   resulting CRex not expanding (or fixed) and contains Kcode
 *)
 val ca_Icodef_AC_def = Define `ca_Icodef_AC s s' (n:num) = 
     VApc s'.cs IN Kcode

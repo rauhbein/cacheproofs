@@ -1168,6 +1168,7 @@ val Icmf_init_xfer_po = Define `Icmf_init_xfer_po caI clI Icoh Icode Icm =
  /\ Rsim sc s
  /\ Inv Icoh Icode Icm sc
  /\ cl_Inv s
+ /\ cl_exentry s
  /\ clI s s 0
         ==>
     caI sc sc 0
@@ -1182,6 +1183,7 @@ Define `Icodef_init_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
  /\ ca_Icmf sc sc 0
  /\ cl_Icmf s s 0
  /\ cl_Inv s
+ /\ cl_exentry s
  /\ clI s s 0
         ==>
     caI sc sc 0
@@ -1313,6 +1315,7 @@ val Icmf_init_sim_lem = store_thm("Icmf_init_sim_lem", ``
  /\ Rsim sc s
  /\ Inv Icoh Icode Icm sc
  /\ cl_Inv s
+ /\ cl_exentry s
  /\ Icmf_init_xfer_po ca_Icmf cl_Icmf Icoh Icode Icm
  /\ cl_Icmf s s 0
         ==>
@@ -1328,6 +1331,7 @@ val Icodef_init_sim_lem = store_thm("Icodef_init_sim_lem", ``
  /\ Rsim sc s
  /\ Inv Icoh Icode Icm sc
  /\ cl_Inv s
+ /\ cl_exentry s
  /\ Icodef_init_xfer_po ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf
  /\ ca_Icmf sc sc 0
  /\ cl_Icmf s s 0
