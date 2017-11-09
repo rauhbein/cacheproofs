@@ -871,3 +871,104 @@ val ca_hdcn_def = Define `ca_hdcn s s' n = cah hdclnw s s' n`;
 
 val cl_hic_def = Define `cl_hic s s' n = clh hicl s s' n`; 
 val ca_hic_def = Define `ca_hic s s' n = cah hicl s s' n`; 
+
+(********* Instantiation *********)
+
+val _ = new_constant("Kvm", ``:vadr set``);
+val _ = new_constant("Ktr", ``:vadr -> padr``);
+
+(* user integrity *)
+
+val Icoh_SE_def = Define `Icoh_SE s = 
+    dCoh s.ms ({pa | MEM pa IN CR s})
+`; 
+
+val Icode_SE_def = Define `Icode_SE s = 
+    iCoh s.ms {pa | MEM pa IN CRex s}
+ /\ isafe s {pa | MEM pa IN CRex s}
+`; 
+
+val Icm_SE_def = Define `Icm_SE s = T`; 
+
+(* discharge POs *)
+
+val Inv_SE_CR_unchanged_lem = store_thm("Inv_SE_CR_unchanged_lem", ``
+!s s'. 
+    Icoh_SE s
+ /\ Ifun s
+ /\ drvbl s s'
+        ==> 
+    (!r. r IN CR s ==> (Cv s r = Cv s' r))
+``,
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  MATCH_MP_TAC Cv_lem >>
+  STRIP_TAC
+  >| [(* regs equal *)
+      RW_TAC std_ss [Cv_reg_eq_def] >>
+      FULL_SIMP_TAC std_ss [drvbl_def] >>
+      IMP_RES_TAC CR_coreg_lem >>
+      ASM_REWRITE_TAC []
+      ,
+      (* data core view of CR unchanged *)
+      MATCH_MP_TAC drvbl_Coh_mem_lem >>
+      IMP_RES_TAC Ifun_Mon_lem >>
+      IMP_RES_TAC Icoh_SE_def >>
+      FULL_SIMP_TAC std_ss []
+     ]
+);
+
+val Inv_SE_CR_lem = store_thm("Inv_SE_CR_lem", ``
+!s s'.
+    Icoh_SE s
+ /\ Ifun s
+ /\ drvbl s s'
+        ==> 
+    (CR s' = CR s)
+``,
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC Inv_SE_CR_unchanged_lem >>
+  IMP_RES_TAC CR_lem >>
+  ASM_REWRITE_TAC []
+);
+
+
+val discharge_user_SE_lem = store_thm("discharge_user_SE_lem", ``
+cm_user_po Icoh_SE Icode_SE Icm_SE
+``,
+  RW_TAC std_ss [cm_user_po_def]
+  >| [(* Icoh_CR_po *)
+      RW_TAC std_ss [Icoh_CR_po_def, Icoh_SE_def]
+      ,
+      (* Icoh_dCoh_po *)
+      RW_TAC std_ss [Icoh_dCoh_po_def, Icoh_SE_def]
+      ,
+      (* Icode_CR_po *)
+      RW_TAC std_ss [Icode_CR_po_def, Icode_SE_def]
+      ,
+      (* Icode_iCoh_po *)
+      RW_TAC std_ss [Icode_iCoh_po_def, Icode_SE_def]
+      ,
+      (* Icode_isafe_po *)
+      RW_TAC std_ss [Icode_isafe_po_def, Icode_SE_def]
+      ,
+      (* Icm_po *)
+      RW_TAC std_ss [Icm_po_def, Icm_SE_def]
+     ]
+);
+
+val Inv_SE_user_preserved_thm = store_thm("Inv_SE_user_preserved_thm", ``
+!s s' req. 
+    Inv Icoh_SE Icode_SE Icm_SE s
+ /\ abs_ca_trans s USER req s' 
+        ==> 
+    Inv Icoh_SE Icode_SE Icm_SE s'
+ /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))
+ /\ Cv_imv_eq s s' (CRex s)
+ /\ ((mode s' = PRIV) ==> exentry s')
+``,
+  NTAC 4 STRIP_TAC >>
+  MATCH_MP_TAC Inv_user_preserved_thm >>
+  HINT_EXISTS_TAC >> 
+  ASM_REWRITE_TAC [discharge_user_SE_lem]
+);
