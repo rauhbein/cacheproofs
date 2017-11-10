@@ -1110,18 +1110,12 @@ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE  ==>
 ``,
   REWRITE_TAC [Icmf_xfer_po_def, ca_Icmf_SE_def, cl_Icmf_SE_def] >>
   NTAC 12 STRIP_TAC >> 
-  IMP_RES_TAC ca_kcomp_exentry_lem >>
-  IMP_RES_TAC cl_kcomp_exentry_lem >>
+  `cl_exentry s` by ( cheat ) >>
+  `exentry sc` by ( cheat ) >>
+  (* IMP_RES_TAC ca_kcomp_exentry_lem >> *)
+  (* IMP_RES_TAC cl_kcomp_exentry_lem >> *)
+
   IMP_RES_TAC ca_Dfl_init_lem >>
-  `!m s1 sc1.
-       m <= n /\ cl_kcomp s s1 m /\ ca_kcomp sc sc1 m ==>
-           Rsim sc1 s1 /\ ca_Icmf_SE sc sc1 m` by ( 
-      NTAC 4 STRIP_TAC >>
-      RES_TAC >>
-      FULL_SIMP_TAC std_ss [ca_II_def]
-  ) >>
-  `n <= n` by ( FULL_SIMP_TAC arith_ss [] ) >>
-  RES_TAC >>
   FULL_SIMP_TAC std_ss [ca_II_def, cl_II_def] >>
   IMP_RES_TAC Rsim_cs_lem >>
   ASM_REWRITE_TAC [ca_Inv_Mmu_fixed_def, cl_Inv_Mmu_fixed_def] >>
