@@ -1248,7 +1248,7 @@ val cl_Icmf_po = Define `cl_Icmf_po Icmf =
 val ca_Icmf_po = Define `ca_Icmf_po Icmf Icoh Icode Icm = 
 !s s' n. 
     cm_user_po Icoh Icode Icm
- /\ ca_kcomp s s' n 
+ (* /\ ca_kcomp s s' n  *)
  /\ Icoh s
  /\ Icmf s s' n
         ==>
@@ -1259,7 +1259,7 @@ val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm Icmf =
 !s s' n. 
     cm_user_po Icoh Icode Icm
  /\ Inv Icoh Icode Icm s
- /\ ca_kcomp s s' n 
+ (* /\ ca_kcomp s s' n  *)
  /\ Icmf s s' n
  /\ Icodef s s' n
  /\ (mode s' = PRIV)
@@ -1291,7 +1291,8 @@ val Icm_f_po = Define `Icm_f_po Icmf Icodef Icoh Icode Icm =
 !sc sc' n. 
     cm_user_po Icoh Icode Icm 
  /\ ca_II Icoh Icode Icm Icmf Icodef sc sc' n
- /\ ca_wrel sc sc' n
+ (* /\ ca_wrel sc sc' n *)
+ /\ (mode sc' = USER)
         ==> 
     Icm sc'
 `;
