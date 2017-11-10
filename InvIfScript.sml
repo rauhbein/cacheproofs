@@ -1193,14 +1193,18 @@ Define `Icodef_init_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
 val Icmf_xfer_po = Define `Icmf_xfer_po caI clI Icoh Icode Icm =
 !sc sc' sc'' s s' s'' n dl ca_Icodef cl_Icodef. 
     cm_user_po Icoh Icode Icm 
+ /\ exentry sc
+ /\ cl_exentry s
  /\ Rsim sc s
  /\ Rsim sc' s'
- /\ (!f. clh f s s' n = cah f sc sc' n)
  /\ ca_II Icoh Icode Icm caI ca_Icodef sc sc' n
  /\ cl_II clI cl_Icodef s s' n
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
  /\ Rsim sc'' s''
+ /\ (!f. (clh f s s' n = cah f sc sc' n)
+      /\ (clh f s s'' (SUC n) = cah f sc sc'' (SUC n))
+      /\ (cah f sc sc'' (SUC n) = f (cah f sc sc' n) dl))
  /\ clI s s'' (SUC n)
         ==>
     caI sc sc'' (SUC n)
@@ -1211,9 +1215,10 @@ val Icodef_xfer_po =
 Define `Icodef_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
 !sc sc' sc'' s s' s'' n dl. 
     cm_user_po Icoh Icode Icm 
+ /\ exentry sc
+ /\ cl_exentry s
  /\ Rsim sc s
  /\ Rsim sc' s'
- /\ (!f. clh f s s' n = cah f sc sc' n)
  /\ ca_II Icoh Icode Icm ca_Icmf caI sc sc' n
  /\ cl_II cl_Icmf clI s s' n
  /\ ca_Icmf sc sc'' (SUC n)
@@ -1221,6 +1226,9 @@ Define `Icodef_xfer_po caI clI Icoh Icode Icm ca_Icmf cl_Icmf =
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
  /\ Rsim sc'' s''
+ /\ (!f. (clh f s s' n = cah f sc sc' n)
+      /\ (clh f s s'' (SUC n) = cah f sc sc'' (SUC n))
+      /\ (cah f sc sc'' (SUC n) = f (cah f sc sc' n) dl))
  /\ clI s s'' (SUC n)
         ==>
     caI sc sc'' (SUC n)
@@ -1334,14 +1342,18 @@ val Icodef_init_sim_lem = store_thm("Icodef_init_sim_lem", ``
 val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
 !sc sc' sc'' s s' s'' n dl Icoh Icode Icm ca_Icmf cl_Icmf ca_Icodef cl_Icodef.
     cm_user_po Icoh Icode Icm 
+ /\ exentry sc
+ /\ cl_exentry s
  /\ Rsim sc s
  /\ Rsim sc' s'
- /\ (!f. clh f s s' n = cah f sc sc' n)
  /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
  /\ cl_II cl_Icmf cl_Icodef s s' n
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
  /\ Rsim sc'' s''
+ /\ (!f. (clh f s s' n = cah f sc sc' n)
+      /\ (clh f s s'' (SUC n) = cah f sc sc'' (SUC n))
+      /\ (cah f sc sc'' (SUC n) = f (cah f sc sc' n) dl))
  /\ Icmf_xfer_po ca_Icmf cl_Icmf Icoh Icode Icm
  /\ cl_Icmf s s'' (SUC n)
         ==>
@@ -1365,9 +1377,10 @@ val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
 val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
 !sc sc' sc'' s s' s'' n dl Icoh Icode Icm ca_Icmf cl_Icmf ca_Icodef cl_Icodef.
     cm_user_po Icoh Icode Icm 
+ /\ exentry sc
+ /\ cl_exentry s
  /\ Rsim sc s
  /\ Rsim sc' s'
- /\ (!f. clh f s s' n = cah f sc sc' n)
  /\ ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc sc' n
  /\ cl_II cl_Icmf cl_Icodef s s' n
  /\ ca_Icmf sc sc'' (SUC n) 
@@ -1375,6 +1388,9 @@ val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
  /\ Rsim sc'' s''
+ /\ (!f. (clh f s s' n = cah f sc sc' n)
+      /\ (clh f s s'' (SUC n) = cah f sc sc'' (SUC n))
+      /\ (cah f sc sc'' (SUC n) = f (cah f sc sc' n) dl))
  /\ Icodef_xfer_po ca_Icodef cl_Icodef Icoh Icode Icm ca_Icmf cl_Icmf
  /\ cl_Icodef s s'' (SUC n)
         ==>

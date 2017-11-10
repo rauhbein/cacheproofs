@@ -630,6 +630,19 @@ val Inv_CRex_EXfl_lem = store_thm("Inv_CRex_EXfl_lem", ``
 
 val hist_bisim_SE_lem = store_thm("hist_bisim_SE_lem", ``
 !s s' sc sc' m dl (n:num).
+    (!f. (clh f s s' n = cah f sc sc' n))
+        ==>
+    (cl_hw s s' n = ca_hw sc sc' n)
+ /\ (cl_hdc s s' n = ca_hdc sc sc' n)
+ /\ (cl_hdcn s s' n = ca_hdcn sc sc' n)
+ /\ (cl_hic s s' n = ca_hic sc sc' n)
+``,
+  RW_TAC std_ss [cl_hw_def, ca_hw_def, cl_hdc_def, ca_hdc_def, 
+		 cl_hdcn_def, ca_hdcn_def, cl_hic_def, ca_hic_def] 
+);
+
+val hist_bisim_SE_lem_old = store_thm("hist_bisim_SE_lem_old", ``
+!s s' sc sc' m dl (n:num).
     cm_user_po Icoh_SE Icode_SE Icm_SE
  /\ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE
  /\ Rsim sc s
@@ -659,6 +672,22 @@ val hist_bisim_SE_lem = store_thm("hist_bisim_SE_lem", ``
 val Dfl_bisim_lem = store_thm("Dfl_bisim_lem", ``
 !s s' sc sc' m dl (n:num).
     cm_user_po Icoh_SE Icode_SE Icm_SE
+ /\ Rsim sc s
+ /\ (!f. (clh f s s' n = cah f sc sc' n))
+ /\ Icoh_SE sc
+ /\ Ifun sc
+        ==>
+    (cl_Dfl s s' n = ca_Dfl sc sc' n)
+``,
+  RW_TAC std_ss [cl_Dfl_def, ca_Dfl_def] >>
+  IMP_RES_TAC Rsim_CR_eq_lem >>
+  IMP_RES_TAC hist_bisim_SE_lem >>
+  FULL_SIMP_TAC std_ss []
+);
+
+val Dfl_bisim_lem_old = store_thm("Dfl_bisim_lem_old", ``
+!s s' sc sc' m dl (n:num).
+    cm_user_po Icoh_SE Icode_SE Icm_SE
  /\ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE
  /\ Rsim sc s
  /\ (!m s'' sc''. 
@@ -677,11 +706,27 @@ val Dfl_bisim_lem = store_thm("Dfl_bisim_lem", ``
 ``,
   RW_TAC std_ss [cl_Dfl_def, ca_Dfl_def] >>
   IMP_RES_TAC Rsim_CR_eq_lem >>
-  IMP_RES_TAC hist_bisim_SE_lem >>
+  IMP_RES_TAC hist_bisim_SE_lem_old >>
   FULL_SIMP_TAC std_ss []
 );
 
 val EXfl_bisim_lem = store_thm("EXfl_bisim_lem", ``
+!s s' sc sc' m dl (n:num).
+    cm_user_po Icoh_SE Icode_SE Icm_SE
+ /\ Rsim sc s
+ /\ (!f. (clh f s s' n = cah f sc sc' n))
+ /\ Icoh_SE sc
+ /\ Ifun sc
+        ==>
+    (cl_EXfl s s' n = ca_EXfl sc sc' n)
+``,
+  RW_TAC std_ss [cl_EXfl_def, ca_EXfl_def] >>
+  IMP_RES_TAC Rsim_CRex_lem >>
+  IMP_RES_TAC hist_bisim_SE_lem >>
+  FULL_SIMP_TAC std_ss []
+);
+
+val EXfl_bisim_lem_old = store_thm("EXfl_bisim_lem_old", ``
 !s s' sc sc' m dl (n:num).
     cm_user_po Icoh_SE Icode_SE Icm_SE
  /\ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE
@@ -702,12 +747,13 @@ val EXfl_bisim_lem = store_thm("EXfl_bisim_lem", ``
 ``,
   RW_TAC std_ss [cl_EXfl_def, ca_EXfl_def] >>
   IMP_RES_TAC Rsim_CRex_lem >>
-  IMP_RES_TAC hist_bisim_SE_lem >>
+  IMP_RES_TAC hist_bisim_SE_lem_old >>
   FULL_SIMP_TAC std_ss []
 );
 
 val ca_Dfl_dCoh_lem = store_thm("ca_Dfl_dCoh_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
 	     /\ ca_Icmf_SE s s' n
 	     /\ (!d. MEM d dl ==> CA (opd d))
 		     ==> 
@@ -718,16 +764,15 @@ val ca_Dfl_dCoh_lem = store_thm("ca_Dfl_dCoh_lem", ``
   FULL_SIMP_TAC std_ss [dCoh_lem2] >>
   REPEAT STRIP_TAC >>
   FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION, ca_hdc_def] >>
-  `cah hdcl s s'' (SUC n) = hdcl (cah hdcl s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
+  `cah hdcl s s'' (SUC n) = hdcl (cah hdcl s s' n) dl` by ( METIS_TAC [] ) >>
   MATCH_MP_TAC hdcl_lem >>
   FULL_SIMP_TAC std_ss [] >>
   METIS_TAC [dCoh_lem2]
 );
 
 val ca_EXfl_icoh_clean_next_lem = store_thm("ca_EXfl_icoh_clean_next_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
 	     /\ ca_Icodef_SE s s' n
 		     ==> 
     !pa. pa IN ca_EXfl s s'' (SUC n) ==> icoh s''.ms pa /\ ~dirty s''.ms pa  
@@ -735,14 +780,10 @@ val ca_EXfl_icoh_clean_next_lem = store_thm("ca_EXfl_icoh_clean_next_lem", ``
   NTAC 6 STRIP_TAC >>
   FULL_SIMP_TAC std_ss [ca_Icodef_SE_def, ca_EXfl_def] >>
   FULL_SIMP_TAC std_ss [ca_hw_def, ca_hic_def, ca_hdcn_def] >>
-  `cah hwr s s'' (SUC n) = hwr (cah hwr s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
-  `cah hicl s s'' (SUC n) = hicl (cah hicl s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
-  `cah hdclnw s s'' (SUC n) = hdclnw (cah hdclnw s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
+  `cah hwr s s'' (SUC n) = hwr (cah hwr s s' n) dl` by ( METIS_TAC [] ) >>
+  `cah hicl s s'' (SUC n) = hicl (cah hicl s s' n) dl` by ( METIS_TAC [] ) >>
+  `cah hdclnw s s'' (SUC n) = hdclnw (cah hdclnw s s' n) dl` by ( 
+      METIS_TAC [] 
   ) >>
   ASM_REWRITE_TAC [] >>
   MATCH_MP_TAC icoh_clean_hist_next_lem >>
@@ -750,7 +791,8 @@ val ca_EXfl_icoh_clean_next_lem = store_thm("ca_EXfl_icoh_clean_next_lem", ``
 );
 
 val ca_Icodef_icoh_clean_lem = store_thm("ca_Icodef_icoh_clean_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
 	     /\ ca_Icodef_SE s s' n
 		     ==> 
 (!pa. pa IN {pa | MEM pa IN CRex s} DIFF ca_hw s s'' (SUC n) ==>
@@ -762,14 +804,10 @@ val ca_Icodef_icoh_clean_lem = store_thm("ca_Icodef_icoh_clean_lem", ``
   NTAC 6 STRIP_TAC >>
   FULL_SIMP_TAC std_ss [ca_Icodef_SE_def] >>
   FULL_SIMP_TAC std_ss [ca_hw_def, ca_hic_def, ca_hdcn_def] >>
-  `cah hwr s s'' (SUC n) = hwr (cah hwr s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
-  `cah hicl s s'' (SUC n) = hicl (cah hicl s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
-  `cah hdclnw s s'' (SUC n) = hdclnw (cah hdclnw s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
+  `cah hwr s s'' (SUC n) = hwr (cah hwr s s' n) dl` by ( METIS_TAC [] ) >>
+  `cah hicl s s'' (SUC n) = hicl (cah hicl s s' n) dl` by ( METIS_TAC [] ) >>
+  `cah hdclnw s s'' (SUC n) = hdclnw (cah hdclnw s s' n) dl` by ( 
+       METIS_TAC [] 
   ) >>
   ASM_REWRITE_TAC [] >>
   STRIP_TAC >- (
@@ -801,13 +839,14 @@ val cl_Dfl_SUC_lem = store_thm("cl_Dfl_SUC_lem", ``
 );
 
 val ca_Dfl_SUC_lem = store_thm("ca_Dfl_SUC_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' ==> 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
+		==> 
     (ca_Dfl s s'' (SUC n) = ca_Dfl s s' n UNION dcleans dl)
 ``,
+  REPEAT STRIP_TAC >>
   RW_TAC std_ss [ca_Dfl_def, pred_setTheory.EXTENSION, ca_hdc_def] >>
-  `cah hdcl s s'' (SUC n) = hdcl (cah hdcl s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
+  `cah hdcl s s'' (SUC n) = hdcl (cah hdcl s s' n) dl` by ( METIS_TAC [] ) >>
   RW_TAC std_ss [hdcl_def, pred_setTheory.UNION_ASSOC]
 );
 
@@ -824,13 +863,14 @@ val cl_hw_SUC_lem = store_thm("cl_hw_SUC_lem", ``
 );
 
 val ca_hw_SUC_lem = store_thm("ca_hw_SUC_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' ==> 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
+		==> 
     (ca_hw s s'' (SUC n) = ca_hw s s' n UNION writes dl)
 ``,
+  REPEAT STRIP_TAC >>
   RW_TAC std_ss [pred_setTheory.EXTENSION, ca_hw_def] >>
-  `cah hwr s s'' (SUC n) = hwr (cah hwr s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
+  `cah hwr s s'' (SUC n) = hwr (cah hwr s s' n) dl` by ( METIS_TAC [] ) >>
   RW_TAC std_ss [hwr_def]
 );
 
@@ -846,12 +886,15 @@ val cl_hdcn_SUC_lem = store_thm("cl_hdcn_SUC_lem", ``
 );
 
 val ca_hdcn_SUC_lem = store_thm("ca_hdcn_SUC_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' ==> 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
+		==> 
     (ca_hdcn s s'' (SUC n) = (ca_hdcn s s' n DIFF writes dl) UNION dcleans dl)
 ``,
+  REPEAT STRIP_TAC >>
   RW_TAC std_ss [pred_setTheory.EXTENSION, ca_hdcn_def] >>
-  `cah hdclnw s s'' (SUC n) = hdclnw (cah hdclnw s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
+  `cah hdclnw s s'' (SUC n) = hdclnw (cah hdclnw s s' n) dl` by ( 
+      METIS_TAC [] 
   ) >>
   RW_TAC std_ss [hdclnw_def]
 );
@@ -869,14 +912,15 @@ val cl_hic_SUC_lem = store_thm("cl_hic_SUC_lem", ``
 );
 
 val ca_hic_SUC_lem = store_thm("ca_hic_SUC_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' ==> 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s''
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
+		==> 
     (ca_hic s s'' (SUC n) = (ca_hic s s' n DIFF (writes dl UNION dcleans dl))
 		      UNION icleans dl)
 ``,
+  REPEAT STRIP_TAC >>
   RW_TAC std_ss [pred_setTheory.EXTENSION, ca_hic_def] >>
-  `cah hicl s s'' (SUC n) = hicl (cah hicl s s' n) dl` by (
-      METIS_TAC [cah_SUC_lem] 
-  ) >>
+  `cah hicl s s'' (SUC n) = hicl (cah hicl s s' n) dl` by ( METIS_TAC [] ) >>
   RW_TAC std_ss [hicl_def]
 );
 
@@ -967,13 +1011,16 @@ val cl_EXfl_SUC_lem = store_thm("cl_EXfl_SUC_lem", ``
 );
 
 val ca_EXfl_SUC_lem = store_thm("ca_EXfl_SUC_lem", ``
-!s s' s'' n dl. ca_kcomp s s' n /\ abs_ca_trans s' PRIV dl s'' ==> 
+!s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
+		==> 
     (ca_EXfl s s'' (SUC n) = 
          (ca_EXfl s s' n DIFF (writes dl UNION dcleans dl)) UNION
 	 (({pa | MEM pa IN CRex s} DIFF (ca_hw s s' n UNION writes dl))
 	      INTER dcleans dl) UNION
 	 (ca_hdcn s s' n INTER icleans dl))
 ``,
+  REPEAT STRIP_TAC >>
   RW_TAC std_ss [ca_EXfl_def, pred_setTheory.EXTENSION] >>
   IMP_RES_TAC ca_hw_SUC_lem >>
   IMP_RES_TAC ca_hdcn_SUC_lem >>
@@ -1105,16 +1152,10 @@ Icodef_init_xfer_po ca_Icodef_SE cl_Icodef_SE
 );
 
 val Icmf_SE_xfer_lem = store_thm("Icmf_SE_xfer_lem", ``
-ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE  ==> 
     Icmf_xfer_po ca_Icmf_SE cl_Icmf_SE Icoh_SE Icode_SE Icm_SE
 ``,
   REWRITE_TAC [Icmf_xfer_po_def, ca_Icmf_SE_def, cl_Icmf_SE_def] >>
   NTAC 12 STRIP_TAC >> 
-  `cl_exentry s` by ( cheat ) >>
-  `exentry sc` by ( cheat ) >>
-  (* IMP_RES_TAC ca_kcomp_exentry_lem >> *)
-  (* IMP_RES_TAC cl_kcomp_exentry_lem >> *)
-
   IMP_RES_TAC ca_Dfl_init_lem >>
   FULL_SIMP_TAC std_ss [ca_II_def, cl_II_def] >>
   IMP_RES_TAC Rsim_cs_lem >>
@@ -1130,14 +1171,15 @@ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE  ==>
       IMP_RES_TAC cl_Inv_Mmu_fixed_lem >>
       IMP_RES_TAC abs_cl_trans_fixmmu_CA_lem
   ) >>
-  IMP_RES_TAC ca_Dfl_dCoh_lem >>
+  `dCoh sc''.ms (ca_Dfl sc sc'' (SUC n))` by ( METIS_TAC [ca_Dfl_dCoh_lem] ) >>
   `{pa | MEM pa IN CR sc} SUBSET ca_Dfl sc sc'' (SUC n)` by (
       RW_TAC std_ss [ca_Dfl_def, pred_setTheory.SUBSET_DEF, 
 		     pred_setTheory.IN_UNION]
   ) >>
-  IMP_RES_TAC cl_Dfl_SUC_lem >>
-  IMP_RES_TAC ca_Dfl_SUC_lem >>
-  `cl_Dfl s s' n = ca_Dfl sc sc' n` by ( METIS_TAC [Dfl_bisim_lem] ) >>
+  (* `cl_Dfl s s' n = ca_Dfl sc sc' n` by ( METIS_TAC [Dfl_bisim_lem] ) >> *)
+  `cl_Dfl s s'' (SUC n) = ca_Dfl sc sc'' (SUC n)` by ( 
+      METIS_TAC [Dfl_bisim_lem] 
+  ) >>
   FULL_SIMP_TAC std_ss [ca_Icmf_SE_def, cl_Icmf_SE_def] >>
   `cl_deps s'' = ca_deps sc''` by ( IMP_RES_TAC Rsim_cl_deps_lem ) >>
   `cl_vdeps s'' = ca_vdeps sc''` by (
@@ -1165,18 +1207,7 @@ Icodef_xfer_po ca_Icodef_SE cl_Icodef_SE
 ``,
   REWRITE_TAC [Icodef_xfer_po_def, ca_Icodef_SE_def, cl_Icodef_SE_def] >>
   NTAC 10 STRIP_TAC >>
-  IMP_RES_TAC ca_kcomp_exentry_lem >>
-  IMP_RES_TAC cl_kcomp_exentry_lem >>
   IMP_RES_TAC ca_EXfl_init_lem >>
-  `!m s1 sc1.
-       m <= n /\ cl_kcomp s s1 m /\ ca_kcomp sc sc1 m ==>
-           Rsim sc1 s1 /\ ca_Icmf_SE sc sc1 m` by ( 
-      NTAC 4 STRIP_TAC >>
-      RES_TAC >>
-      FULL_SIMP_TAC std_ss [ca_II_def]
-  ) >>
-  `n <= n` by ( FULL_SIMP_TAC arith_ss [] ) >>
-  RES_TAC >>
   FULL_SIMP_TAC std_ss [ca_II_def, cl_II_def, Inv_lem] >>
   IMP_RES_TAC Rsim_cs_lem >>
   `(cl_hw s s' n = ca_hw sc sc' n) /\
@@ -1184,9 +1215,11 @@ Icodef_xfer_po ca_Icodef_SE cl_Icodef_SE
    (cl_hdcn s s' n = ca_hdcn sc sc' n) /\
    (cl_hic s s' n = ca_hic sc sc' n)` by ( METIS_TAC [hist_bisim_SE_lem] ) >>
   `cl_CRex s = CRex sc` by ( METIS_TAC [Rsim_CRex_lem] ) >>
-  IMP_RES_TAC cl_EXfl_SUC_lem >>
-  IMP_RES_TAC ca_EXfl_SUC_lem >>
-  `cl_EXfl s s' n = ca_EXfl sc sc' n` by ( METIS_TAC [EXfl_bisim_lem] ) >>
+  (* IMP_RES_TAC cl_EXfl_SUC_lem >> *)
+  (* IMP_RES_TAC ca_EXfl_SUC_lem >> *)
+  `cl_EXfl s s'' (SUC n) = ca_EXfl sc sc'' (SUC n)` by ( 
+      METIS_TAC [EXfl_bisim_lem] 
+  ) >>
   METIS_TAC [ca_Icodef_icoh_clean_lem]
 );
 
@@ -1225,12 +1258,11 @@ ca_Icodef_po ca_Icodef_SE Icoh_SE Icode_SE Icm_SE ca_Icmf_SE
 );
 
 val Inv_rebuild_SE_lem = store_thm("Inv_rebuild_SE_lem", ``
-cm_user_po Icoh_SE Icode_SE Icm_SE ==> 
 Inv_rebuild_po Icoh_SE Icode_SE Icm_SE 
                ca_Icmf_SE ca_Icodef_SE cl_Icmf_SE cl_Icodef_SE
 ``,
   REWRITE_TAC [Inv_rebuild_po_def] >>
-  NTAC 7 STRIP_TAC >>
+  NTAC 6 STRIP_TAC >>
   MATCH_MP_TAC (
       prove(``A /\ (A ==> B) /\ (A /\ B ==> C) ==> A /\ B /\ C``, PROVE_TAC [])
   ) >>
@@ -1242,15 +1274,15 @@ Inv_rebuild_po Icoh_SE Icode_SE Icm_SE
       ASSUME_TAC ( SPEC ``r:resource`` coreIfTheory.res_cases ) >>
       FULL_SIMP_TAC std_ss []
       >| [(* memory *)
-	  FULL_SIMP_TAC std_ss [] >>
+	  FULL_SIMP_TAC std_ss [Inv_lem] >>
 	  `pa IN cl_Dfl s s' n` by ( 
-	      FULL_SIMP_TAC std_ss [Inv_lem, cl_II_def, 
+	      FULL_SIMP_TAC std_ss [cl_II_def, 
 				    cl_Icmf_SE_def, 
 				    pred_setTheory.SUBSET_DEF,
 				    pred_setTheory.IN_GSPEC_IFF] >>
 	      RES_TAC
-	  ) >> (* Dfl_bisim_lem *)
-	  `cl_Dfl s s' n = ca_Dfl sc sc' n` by ( cheat ) >>
+	  ) >> 
+	  `cl_Dfl s s' n = ca_Dfl sc sc' n` by ( METIS_TAC [Dfl_bisim_lem] ) >>
 	  FULL_SIMP_TAC std_ss [ca_II_def, ca_Icmf_SE_def] >>
 	  IMP_RES_TAC Rsim_dCoh_Cv_lem
 	  ,
@@ -1260,7 +1292,8 @@ Inv_rebuild_po Icoh_SE Icode_SE Icm_SE
       ,
       (* Icoh *)
       RW_TAC std_ss [Icoh_SE_def, dCoh_lem2] >>
-      `cl_Dfl s s' n = ca_Dfl sc sc' n` by ( cheat ) >>
+      FULL_SIMP_TAC std_ss [Inv_lem] >>
+      `cl_Dfl s s' n = ca_Dfl sc sc' n` by ( METIS_TAC [Dfl_bisim_lem] ) >>
       `{pa | MEM pa IN cl_CR s'} SUBSET ca_Dfl sc sc' n` by ( 
           FULL_SIMP_TAC std_ss [Inv_lem, cl_II_def, 
 				cl_Icmf_SE_def, 
@@ -1285,8 +1318,9 @@ Inv_rebuild_po Icoh_SE Icode_SE Icm_SE
       `CRex sc' = cl_CRex s'` by ( 
           IMP_RES_TAC Rsim_CRex_lem >>
           ASM_REWRITE_TAC []
-      ) >>  (* EXfl_bisim_lem *)
-      `cl_EXfl s s' n = ca_EXfl sc sc' n` by ( cheat ) >>
+      ) >> 
+      FULL_SIMP_TAC std_ss [Inv_lem] >>
+      `cl_EXfl s s' n = ca_EXfl sc sc' n` by ( METIS_TAC [EXfl_bisim_lem] ) >>
       FULL_SIMP_TAC std_ss [cl_II_def, cl_Icodef_SE_def]
      ]
 );
@@ -1297,13 +1331,8 @@ val discharge_kernel_SE_lem = store_thm("discharge_kernel_SE_lem", ``
     cm_kernel_po cl_Icmf_SE cl_Icodef_SE ca_Icmf_SE ca_Icodef_SE 
                  Icoh_SE Icode_SE Icm_SE
 ``,
-  STRIP_TAC >> 
-  REWRITE_TAC [cm_kernel_po_def] >>
-  MATCH_MP_TAC (
-      prove(``a /\ b /\ (f ==> c) /\ (f ==> d) /\ e /\ f /\ g /\ h /\ i ==>
-	      a /\ b /\ c /\ d /\ e /\ f /\ g /\ h /\ i``, PROVE_TAC [])
-  ) >>
-  RW_TAC std_ss [Icmf_SE_init_xfer_lem,
+  RW_TAC std_ss [cm_kernel_po_def,
+		 Icmf_SE_init_xfer_lem,
 		 Icodef_SE_init_xfer_lem,
 		 Icmf_SE_xfer_lem,
 		 Icodef_SE_xfer_lem,

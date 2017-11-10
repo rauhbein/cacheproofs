@@ -814,7 +814,8 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
        ca_II Icoh Icode Icm ca_Icmf ca_Icodef sc s''' n /\
        (!f. clh f s s'' n = cah f sc s''' n)` by ( METIS_TAC [] ) >>
       MATCH_MP_TAC (
-          prove(``(A /\ (dl':mop list = dl)) /\ (A /\ (dl' = dl) ==> B /\ C) ==> 
+          prove(``(A /\ (dl':mop list = dl)) /\ (A /\ (dl' = dl) ==> C) /\ 
+		  (A /\ (dl' = dl) /\ C ==> B ) ==> 
 		  A /\ B /\ C``, PROVE_TAC [])
       ) >>
       STRIP_TAC >- (
@@ -888,10 +889,15 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	     ] 
       ) >>
       NTAC 2 STRIP_TAC
-      >| [(* ca_II *)
+      >| [(* history equivalent *)
+	  METIS_TAC [hist_SUC_bisim_lem]
+	  ,
+	  (* ca_II *)
 	  IMP_RES_TAC cl_II_po_def >>
 	  `cl_Icmf s s' (SUC n)` by ( FULL_SIMP_TAC std_ss [cl_II_def] ) >>
 	  IMP_RES_TAC cm_kernel_po_def >>
+	  IMP_RES_TAC cl_kcomp_exentry_lem >>
+	  IMP_RES_TAC ca_kcomp_exentry_lem >>
 	  `ca_Icmf sc sc' (SUC n)` by ( 
 	      MATCH_MP_TAC Icmf_sim_lem >>
 	      EXISTS_TAC ``s''':hw_state``>>
@@ -899,6 +905,11 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	      EXISTS_TAC ``s'':cl_state``>>
 	      EXISTS_TAC ``s':cl_state``>>
 	      EXISTS_TAC ``dl: mop list``>>
+	      `!f. (clh f s s'' n = cah f sc s''' n)
+		/\ (clh f s s' (SUC n) = cah f sc sc' (SUC n)) 
+		/\ (cah f sc sc' (SUC n) = f (cah f sc s''' n) dl)` by (
+	          METIS_TAC [cah_SUC_lem]
+	      ) >>
 	      METIS_TAC []
 	  ) >>
 	  RW_TAC std_ss [ca_II_def] >>
@@ -909,10 +920,12 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	  EXISTS_TAC ``s'':cl_state`` >>
 	  EXISTS_TAC ``s':cl_state`` >>
 	  EXISTS_TAC ``dl: mop list``>>
+	  `!f. (clh f s s'' n = cah f sc s''' n)
+	    /\ (clh f s s' (SUC n) = cah f sc sc' (SUC n)) 
+	    /\ (cah f sc sc' (SUC n) = f (cah f sc s''' n) dl)` by (
+	      METIS_TAC [cah_SUC_lem]
+	  ) >>
 	  METIS_TAC []
-	  ,
-	  (* history equivalent *)
-	  METIS_TAC [hist_SUC_bisim_lem]
 	 ]      
      ]
 );
