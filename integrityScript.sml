@@ -6,6 +6,7 @@ open wordsLib blastLib;
 open hwTheory;
 open InvIfTheory;
 open cachelessTheory;
+open histTheory;
 
 val _ = new_theory "integrity";
 
@@ -262,6 +263,61 @@ val core_bisim_lem = store_thm("core_bisim_lem", ``
  /\ (!pa. pa IN writes dl ==> (cl_Cv s' (MEM pa) = Cv sc' (MEM pa)))
 ``,
   REWRITE_TAC [core_bisim_oblg]
+);
+
+val hist_bisim_lem = store_thm("hist_bisim_lem", ``
+!s s' sc sc' m dl (n:num) f Icoh Icode Icm ca_Icmf.
+    cm_user_po Icoh Icode Icm
+ /\ ca_Icmf_po ca_Icmf Icoh Icode Icm
+ /\ Rsim sc s
+ /\ (!m s'' sc''. 
+        m <= n
+     /\ cl_kcomp s s'' m
+     /\ ca_kcomp sc sc'' m
+            ==>
+        Rsim sc'' s''
+     /\ ca_Icmf sc sc'' m)
+ /\ Icoh sc
+ /\ cl_kcomp s s' n
+ /\ ca_kcomp sc sc' n
+        ==>
+    (clh f s s' n = cah f sc sc' n)
+``,
+  Induct_on `n`
+  >| [(* n = 0 *)
+      REPEAT STRIP_TAC >>
+      IMP_RES_TAC cl_kcomp_0_lem >>
+      IMP_RES_TAC ca_kcomp_0_lem >>
+      IMP_RES_TAC clh_0_lem >>
+      IMP_RES_TAC cah_0_lem >>
+      ASM_REWRITE_TAC []
+      ,
+      (* n -> SUC n *)
+      REPEAT STRIP_TAC >>
+      FULL_SIMP_TAC std_ss [cl_kcomp_SUC_lem, ca_kcomp_SUC_lem] >>
+      `n <= SUC n` by ( RW_TAC arith_ss [] ) >>
+      `Rsim s''' s''` by ( RES_TAC ) >>
+      `ca_Icmf sc s''' n` by ( RES_TAC ) >>
+      `s''.cs = s'''.cs` by ( IMP_RES_TAC Rsim_cs_lem ) >>
+      `dl = dl'` by (
+          MATCH_MP_TAC core_bisim_dl_lem >>
+	  IMP_RES_TAC ca_Icmf_po_def >>
+	  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
+	  METIS_TAC []
+      ) >>
+      RW_TAC std_ss [] >>
+      `!m s1 sc1. m <= n /\ cl_kcomp s s1 m /\ ca_kcomp sc sc1 m ==>
+		  Rsim sc1 s1 /\ ca_Icmf sc sc1 m` by ( 
+          REPEAT GEN_TAC >>
+	  STRIP_TAC >>
+	  `m <= SUC n` by ( DECIDE_TAC ) >>
+	  METIS_TAC [] 
+      ) >>
+      `clh f s s'' n = cah f sc s''' n` by ( METIS_TAC [] ) >>
+      IMP_RES_TAC clh_SUC_lem >>
+      IMP_RES_TAC cah_SUC_lem >>
+      RW_TAC std_ss []
+     ]
 );
 
 val ca_deps_pc_lem = store_thm("ca_deps_pc_lem", ``
