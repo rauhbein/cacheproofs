@@ -204,7 +204,7 @@ val ca_Inv_Mmu_fixed_lem = store_thm("ca_Inv_Mmu_fixed_lem", ``
 
 (* additional constraint on functional invariant for changes of CR:
    - Kcode should always remain in CRex 
-   - should be executable (not strictly needed*)
+   - should be executable (not strictly needed) *)
 val Ifun_AC_kernel_po = Define `Ifun_AC_kernel_po = 
 !c mv. Ifun_(c,mv) ==> 
     !va. va IN Kcode ==> 
