@@ -25,8 +25,14 @@ val CR_coreg_lem = store_thm("CR_coreg_lem", ``
   REWRITE_TAC [CR_coreg_oblg]
 );
 
+val CRex_eq_lem = store_thm("CRex_eq_lem", ``
+!s s'. Ifun s /\ (!r. r IN CR s ==> (Cv s r = Cv s' r)) ==> (CRex s = CRex s')
+``,
+  REWRITE_TAC [CRex_eq_oblg]
+);
+
 val CRex_lem = store_thm("CRex_lem", ``
-!s r. r IN CRex s ==> (?pa. (r = MEM pa)) /\ r IN CR s /\ ?m. Mon s r m EX
+!s r. Ifun s /\ r IN CRex s ==> (?pa. (r = MEM pa)) /\ r IN CR s
 ``,
   REWRITE_TAC [CRex_oblg]
 );
@@ -174,7 +180,7 @@ val abs_ca_trans_drvbl_lem = store_thm("abs_ca_trans_drvbl_lem", ``
 );
 
 val abs_ca_trans_switch_lem = store_thm("abs_ca_trans_switch_lem", ``
-!s dl s'. abs_ca_trans s USER dl s' ∧ (mode s' = PRIV) ⇒ exentry s'
+!s dl s'. abs_ca_trans s USER dl s' /\ (mode s' = PRIV) ==> exentry s'
 ``,
   REWRITE_TAC [abs_ca_trans_switch_oblg]
 );
@@ -351,8 +357,8 @@ val ca_vdeps_PC_lem = store_thm("ca_vdeps_PC_lem", ``
 );
 
 val cl_CRex_lem = store_thm("cl_CRex_lem", ``
-!s r. r IN cl_CRex s ==> 
-(?pa. (r = MEM pa)) /\ r IN cl_CR s /\ ?m. cl_Mon s r m EX
+!s r. cl_Inv s /\ r IN cl_CRex s ==> 
+(?pa. (r = MEM pa)) /\ r IN cl_CR s
 ``,
   REWRITE_TAC [cl_CRex_oblg]
 );
@@ -514,11 +520,10 @@ val Inv_CRex_lem = store_thm("Inv_CRex_lem", ``
         ==> 
     (CRex s' = CRex s)
 ``,
-  RW_TAC std_ss [CRex_def] >>
-  IMP_RES_TAC Inv_CR_lem >>
+  RW_TAC std_ss [] >>
   IMP_RES_TAC Inv_CR_unchanged_lem >>
-  IMP_RES_TAC Inv_Mon_CR_lem >>
-  ASM_REWRITE_TAC []
+  IMP_RES_TAC CRex_eq_lem >>
+  FULL_SIMP_TAC std_ss [Inv_lem]
 );
 
 val Inv_iCoh_lem = store_thm("Inv_iCoh_lem", ``
@@ -538,18 +543,11 @@ val Inv_iCoh_lem = store_thm("Inv_iCoh_lem", ``
   IMP_RES_TAC Ifun_Mon_lem >>
   IMP_RES_TAC Icode_iCoh_lem >>
   IMP_RES_TAC Icode_isafe_lem >>
-  RW_TAC std_ss []
-  >| [(* CRex not writable *)
-      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
-      IMP_RES_TAC CRex_lem >>
-      RES_TAC
-      ,
-      (* CRex executable *)
-      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
-      IMP_RES_TAC CRex_lem >>
-      HINT_EXISTS_TAC >>
-      ASM_REWRITE_TAC []
-     ]
+  RW_TAC std_ss [] >>
+  (* CRex not writable *)
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  IMP_RES_TAC CRex_lem >>
+  RES_TAC
 );
 
 val Inv_isafe_lem = store_thm("Inv_isafe_lem", ``
@@ -649,16 +647,9 @@ val Inv_user_preserved_thm = store_thm("Inv_user_preserved_thm", ``
   IMP_RES_TAC Icode_iCoh_lem >>
   IMP_RES_TAC Icode_isafe_lem >>
   IMP_RES_TAC Ifun_Mon_lem >>
-  RW_TAC std_ss []
-  >| [(* CRex not writable *)
-      IMP_RES_TAC CRex_lem >>
-      RES_TAC
-      ,
-      (* CRex executable *)
-      IMP_RES_TAC CRex_lem >>
-      HINT_EXISTS_TAC >>
-      ASM_REWRITE_TAC []
-     ]
+  RW_TAC std_ss [] >>
+  IMP_RES_TAC CRex_lem >>
+  RES_TAC
 );
 
 (*********** kernel integrity ************)

@@ -14,18 +14,18 @@ val _ = new_theory "InvIf";
 
 (* critical resources and invariant obligations *)
 
-val Ifun_CR_po = Define `Ifun_CR_po I CR =
+val Ifun_CR_po = Define `Ifun_CR_po I CR Ex =
 !c c' mv mv'. I(c,mv) ==>
     ((!r. r IN CR(c,mv) ==> (CV c mv r = CV c' mv' r)) ==>
-        (CR(c,mv) = CR(c',mv')) /\ I(c',mv'))
+        (CR(c,mv) = CR(c',mv')) /\ (Ex(c,mv) = Ex(c',mv')) /\ I(c',mv'))
+ /\ (Ex(c,mv) SUBSET {r | (?pa. r = MEM pa) /\ r IN CR(c,mv)})
  /\ (!r. reg_res r /\ r IN CR(c,mv) ==> ?r'. r = COREG r')
 `;
 
 val Ifun_CR_po2 = Define `Ifun_CR_po2 I CR =
 !c c' mv mv'. I(c,mv) ==>
     ((!r. r IN CR(c',mv') ==> (CV c' mv' r = CV c mv r)) ==>
-        (CR(c',mv') = CR(c,mv)) /\ I(c',mv'))
- /\ (!r. reg_res r /\ r IN CR(c,mv) ==> ?r'. r = COREG r')
+        (CR(c,mv) = CR(c',mv')) /\ I(c',mv'))
 `;
 
 (* val Ifun_CR_po = Define `Ifun_CR_po I CR = *)
@@ -43,14 +43,16 @@ val Ifun_Mon_po = Define `Ifun_Mon_po I CR =
 
 val Ifun_CR_exists = prove (``
 ?CR:core_state # mem_view -> resource set
+ Ex:core_state # mem_view -> resource set
  Ifun:core_state # mem_view -> bool.
-    Ifun_CR_po Ifun CR
+    Ifun_CR_po Ifun CR Ex
  /\ Ifun_CR_po2 Ifun CR
  /\ Ifun_MD_po Ifun CR
  /\ Ifun_Mon_po Ifun CR
 ``,
   Q.ABBREV_TAC `Cr = \(c,mv):core_state # mem_view. MD_(c,mv,UNIV:vadr set)` >>
   EXISTS_TAC ``Cr:core_state # mem_view -> resource set`` >>
+  EXISTS_TAC ``\(c,mv):core_state # mem_view. EMPTY:resource set`` >>
   EXISTS_TAC ``\(c,mv). MD_(c,mv,UNIV:vadr set) SUBSET Cr(c,mv) 
                 /\ !r. r IN Cr(c,mv) ==> ~Mon_(c,mv,r,USER,W)`` >>
   Q.UNABBREV_TAC `Cr` >>
@@ -67,6 +69,9 @@ val Ifun_CR_exists = prove (``
       IMP_RES_TAC Mon__lem >>
       FULL_SIMP_TAC std_ss []
       ,
+      (* EX SUBSET CR *)
+      REWRITE_TAC [pred_setTheory.EMPTY_SUBSET]
+      ,
       (* CR coreg *)
       `(!r. reg_res r /\ r IN MD_ (c,mv,UNIV:vadr set) ==> 
             ?r'. r = COREG r')` by (
@@ -77,7 +82,8 @@ val Ifun_CR_exists = prove (``
       ASM_REWRITE_TAC []
       ,
       (* CR = CR' *)
-      IMP_RES_TAC MD__lem
+      IMP_RES_TAC MD__lem >>
+      ASM_REWRITE_TAC []
       ,
       (* MD SUBSET CR *)
       FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_REFL]
@@ -87,20 +93,20 @@ val Ifun_CR_exists = prove (``
       IMP_RES_TAC MD__lem >>
       IMP_RES_TAC Mon__lem >>
       FULL_SIMP_TAC std_ss []
-      ,
-      (* CR coreg *)
-      `(!r. reg_res r /\ r IN MD_ (c,mv,UNIV:vadr set) ==> 
-            ?r'. r = COREG r')` by (
-          METIS_TAC [coreIfTheory.Mmu_MD_spec]
-      ) >>
-      RES_TAC >>
-      HINT_EXISTS_TAC >>
-      ASM_REWRITE_TAC []
+      (* , *)
+      (* (* CR coreg *) *)
+      (* `(!r. reg_res r /\ r IN MD_ (c,mv,UNIV:vadr set) ==>  *)
+      (*       ?r'. r = COREG r')` by ( *)
+      (*     METIS_TAC [coreIfTheory.Mmu_MD_spec] *)
+      (* ) >> *)
+      (* RES_TAC >> *)
+      (* HINT_EXISTS_TAC >> *)
+      (* ASM_REWRITE_TAC [] *)
      ]
 );  
 
 val Ifun_CR_spec = new_specification ("Ifun_CR_spec",
-  ["CR_", "Ifun_"], Ifun_CR_exists);
+  ["CR_", "CRex_", "Ifun_"], Ifun_CR_exists);
 
 val CR__lem = store_thm("CR__lem", ``
 !c c' mv mv'. 
@@ -122,6 +128,17 @@ val CR__lem2 = store_thm("CR__lem2", ``
 ``,
   ASSUME_TAC Ifun_CR_spec >>
   FULL_SIMP_TAC std_ss [Ifun_CR_po2]
+);  
+
+val CRex__lem = store_thm("CRex__lem", ``
+!c c' mv mv'. 
+    Ifun_(c,mv)
+ /\ (!r. r IN CR_(c,mv) ==> (CV c mv r = CV c' mv' r))
+        ==>
+    (CRex_(c,mv) = CRex_(c',mv'))
+``,
+  ASSUME_TAC Ifun_CR_spec >>
+  FULL_SIMP_TAC std_ss [Ifun_CR_po]
 );  
 
 val Ifun__lem = store_thm("Ifun__lem", ``
@@ -146,8 +163,7 @@ val Ifun__lem = store_thm("Ifun__lem", ``
 
 val CR_def = Define `CR s = CR_(s.cs, dmvca s.ms)`;
 
-val CRex_def = Define `CRex s = 
-{r | (?pa. r = MEM pa) /\ r IN CR s /\ ?m. Mon s r m EX}`;
+val CRex_def = Define `CRex s = CRex_(s.cs, dmvca s.ms)`;
 
 val iCoh_CRex_lem = store_thm("iCoh_CRex_lem", ``
 !sc. iCoh sc.ms {pa | MEM pa IN CRex sc} <=>
@@ -204,15 +220,25 @@ val CR_coreg_oblg = store_thm("CR_coreg_oblg", ``
   RW_TAC std_ss [coreIfTheory.CV_def]
 );
 
-val CRex_oblg = store_thm("CRex_oblg", ``
-!s r. r IN CRex s ==> (?pa. (r = MEM pa)) /\ r IN CR s /\ ?m. Mon s r m EX
+val CRex_eq_oblg = store_thm("CRex_eq_oblg", ``
+!s s'. Ifun s /\ (!r. r IN CR s ==> (Cv s r = Cv s' r)) ==> (CRex s = CRex s')
 ``,
-  RW_TAC std_ss [CRex_def] >> (
-      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
-      RW_TAC std_ss []
-  ) >>
-  HINT_EXISTS_TAC >>
-  ASM_REWRITE_TAC []
+  RW_TAC std_ss [Cv_def, CR_def, CRex_def, Ifun_def] >>
+  IMP_RES_TAC CRex__lem
+);
+
+val CRex_oblg = store_thm("CRex_oblg", ``
+!s r. Ifun s /\ r IN CRex s ==> (?pa. (r = MEM pa)) /\ r IN CR s 
+(* /\ ?m. Mon s r m EX *)
+``,
+  ASSUME_TAC Ifun_CR_spec >>
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [CRex_def, CR_def, Ifun_CR_po, Ifun_def, 
+			pred_setTheory.SUBSET_DEF] >>
+  RES_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  RW_TAC std_ss [] 
 );
 
 val Icoh_CR_po = Define `Icoh_CR_po I = 
@@ -576,19 +602,20 @@ val CR_cl_lem = store_thm("CR_cl_lem", ``
   METIS_TAC [CR__lem]
 );
 
-val cl_CRex_def = Define `cl_CRex s = 
-{r | (?pa. r = MEM pa) /\ r IN cl_CR s /\ ?m. cl_Mon s r m EX}`;
+val cl_CRex_def = Define `cl_CRex s = CRex_(s.cs, MVcl s.M)`;
 
 val cl_CRex_oblg = store_thm("cl_CRex_oblg", ``
-!s r. r IN cl_CRex s ==> 
-(?pa. (r = MEM pa)) /\ r IN cl_CR s /\ ?m. cl_Mon s r m EX
+!s r. cl_Inv s /\ r IN cl_CRex s ==> 
+(?pa. (r = MEM pa)) /\ r IN cl_CR s (* /\ ?m. cl_Mon s r m EX *)
 ``,
-  RW_TAC std_ss [cl_CRex_def] >> (
-      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
-      RW_TAC std_ss []
-  ) >>
-  HINT_EXISTS_TAC >>
-  ASM_REWRITE_TAC []
+  ASSUME_TAC Ifun_CR_spec >>
+  REPEAT GEN_TAC >>
+  STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [cl_CRex_def, cl_CR_def, Ifun_CR_po, cl_Inv_def, 
+			pred_setTheory.SUBSET_DEF] >>
+  RES_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+  RW_TAC std_ss [] 
 );
 
 val cl_MD_lem = store_thm("cl_CR_lem", ``
@@ -1037,45 +1064,26 @@ val Rsim_Mon_lem = store_thm("Rsim_Mon_lem", ``
 val Rsim_CRex_dCoh_ca_lem = store_thm("Rsim_CRex_dCoh_ca_lem", ``
 !sc s. Rsim sc s /\ Ifun sc
     /\ dCoh sc.ms {pa | MEM pa IN CR sc} 
-    /\ dCoh sc.ms {pa | MEM pa IN MD sc}
         ==>
     (cl_CRex s = CRex sc)
 ``,
-  RW_TAC std_ss [cl_CRex_def, CRex_def, pred_setTheory.EXTENSION,
-		 pred_setTheory.IN_GSPEC_IFF] >>
-  `(cl_CR s = CR sc) /\ (!m. cl_Mon s x m EX <=> Mon sc x m EX)` suffices_by (
-      RW_TAC std_ss []
-  ) >>
-  REPEAT STRIP_TAC
-  >| [(* CR *)
-      IMP_RES_TAC Rsim_CR_eq_dCoh_ca_lem
-      ,
-      (* Mon *)
-      IMP_RES_TAC Rsim_Mon_dCoh_ca_lem >>
-      ASM_REWRITE_TAC []
-     ]
+  RW_TAC std_ss [cl_CRex_def, CRex_def, Ifun_def] >>
+  MATCH_MP_TAC EQ_SYM >>
+  MATCH_MP_TAC CRex__lem >>
+  IMP_RES_TAC Rsim_CR_dCoh_ca_lem >>
+  FULL_SIMP_TAC std_ss [CR_def, cl_Cv_def, Cv_def]
 );
 
 val Rsim_CRex_dCoh_cl_lem = store_thm("Rsim_CRex_dCoh_cl_lem", ``
 !sc s. Rsim sc s /\ cl_Inv s
     /\ dCoh sc.ms {pa | MEM pa IN cl_CR s} 
-    /\ dCoh sc.ms {pa | MEM pa IN cl_MD s}
         ==>
     (cl_CRex s = CRex sc)
 ``,
-  RW_TAC std_ss [cl_CRex_def, CRex_def, pred_setTheory.EXTENSION,
-		 pred_setTheory.IN_GSPEC_IFF] >>
-  `(cl_CR s = CR sc) /\ (!m. cl_Mon s x m EX <=> Mon sc x m EX)` suffices_by (
-      RW_TAC std_ss []
-  ) >>
-  REPEAT STRIP_TAC
-  >| [(* CR *)
-      IMP_RES_TAC Rsim_CR_eq_dCoh_cl_lem
-      ,
-      (* Mon *)
-      IMP_RES_TAC Rsim_Mon_dCoh_cl_lem >>
-      ASM_REWRITE_TAC []
-     ]
+  RW_TAC std_ss [cl_CRex_def, CRex_def, cl_Inv_def] >>
+  MATCH_MP_TAC CRex__lem >>
+  IMP_RES_TAC Rsim_CR_dCoh_cl_lem >>
+  FULL_SIMP_TAC std_ss [cl_CR_def, cl_Cv_def, Cv_def]
 );
 
 val Rsim_CRex_lem = store_thm("Rsim_CRex_lem", ``
@@ -1087,19 +1095,9 @@ val Rsim_CRex_lem = store_thm("Rsim_CRex_lem", ``
         ==>
     (cl_CRex s = CRex sc)
 ``,
-  RW_TAC std_ss [cl_CRex_def, CRex_def, pred_setTheory.EXTENSION,
-		 pred_setTheory.IN_GSPEC_IFF] >>
-  `(cl_CR s = CR sc) /\ (!m. cl_Mon s x m EX <=> Mon sc x m EX)` suffices_by (
-      RW_TAC std_ss []
-  ) >>
-  REPEAT STRIP_TAC
-  >| [(* CR *)
-      IMP_RES_TAC Rsim_CR_eq_lem
-      ,
-      (* Mon *)
-      IMP_RES_TAC Rsim_Mon_lem >>
-      ASM_REWRITE_TAC []
-     ]
+  REPEAT STRIP_TAC >>
+  MATCH_MP_TAC Rsim_CRex_dCoh_ca_lem >>
+  METIS_TAC [Icoh_dCoh_oblg]
 );
 
 val Rsim_fixmmu_lem = store_thm("Rsim_fixmmu_lem", ``
@@ -1351,6 +1349,7 @@ val Icmf_sim_lem = store_thm("Icmf_sim_lem", ``
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
  /\ Rsim sc'' s''
+    (* histories coupled *)
  /\ (!f. (clh f s s' n = cah f sc sc' n)
       /\ (clh f s s'' (SUC n) = cah f sc sc'' (SUC n))
       /\ (cah f sc sc'' (SUC n) = f (cah f sc sc' n) dl))
@@ -1388,6 +1387,7 @@ val Icodef_sim_lem = store_thm("Icodef_sim_lem", ``
  /\ abs_cl_trans s' PRIV dl s''
  /\ abs_ca_trans sc' PRIV dl sc''
  /\ Rsim sc'' s''
+    (* histories coupled *)
  /\ (!f. (clh f s s' n = cah f sc sc' n)
       /\ (clh f s s'' (SUC n) = cah f sc sc'' (SUC n))
       /\ (cah f sc sc'' (SUC n) = f (cah f sc sc' n) dl))

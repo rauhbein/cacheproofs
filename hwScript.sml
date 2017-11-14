@@ -2290,8 +2290,10 @@ val drvbl_dCoh_cacheable_lem = store_thm("drvbl_dCoh_cacheable_lem", ``
 
 (* instruction cache integrity *)
 
+(* NOTE: former region only restricted executable addresses,
+executability not strictly required as long as PC is always in isafe region *)
 val isafe_def = Define `isafe s As =
-!pa m. pa IN As /\ Mon s (MEM pa) m EX ==> ~dirty s.ms pa
+!pa. pa IN As (* /\ Mon s (MEM pa) m EX *) ==> ~dirty s.ms pa
 `;
 
 val drvbl_clean_lem = store_thm("drvbl_clean_lem", ``
@@ -2359,7 +2361,8 @@ val drvbl_mem_unchanged_lem = store_thm("drvbl_mem_unchanged_lem", ``
 
 
 val drvbl_iCoh_lem = store_thm("drvbl_iCoh_lem", ``
-!s s' As. (!pa. pa IN As ==> ~Mon s (MEM pa) USER W /\ ?m. Mon s (MEM pa) m EX)
+!s s' As. (!pa. pa IN As ==> ~Mon s (MEM pa) USER W)
+(* /\ ?m. Mon s (MEM pa) m EX *)
        /\ iCoh s.ms As 
        /\ isafe s As
        /\ drvbl s s'
@@ -2398,8 +2401,8 @@ val drvbl_iCoh_lem = store_thm("drvbl_iCoh_lem", ``
 
 val drvbl_iCoh_mem_lem = store_thm("drvbl_iCoh_mem_lem", ``
 !s s' Rs. drvbl s s' 	
-       /\ (!pa. MEM pa IN Rs ==> ~Mon s (MEM pa) USER W 
-	                      /\ ?m. Mon s (MEM pa) m EX)
+       /\ (!pa. MEM pa IN Rs ==> ~Mon s (MEM pa) USER W) 
+	                      (* /\ ?m. Mon s (MEM pa) m EX) *)
        /\ iCoh s.ms {pa | MEM pa IN Rs}
        /\ isafe s {pa | MEM pa IN Rs}
            ==> 

@@ -203,13 +203,12 @@ val ca_Inv_Mmu_fixed_lem = store_thm("ca_Inv_Mmu_fixed_lem", ``
 );
 
 (* additional constraint on functional invariant for changes of CR:
-   - Kcode should always remain in cl_CRex *)
+   - Kcode should always remain in CRex 
+   - should be executable (not strictly needed*)
 val Ifun_AC_kernel_po = Define `Ifun_AC_kernel_po = 
 !c mv. Ifun_(c,mv) ==> 
     !va. va IN Kcode ==> 
-        MEM (Ktr va) IN {r | (?pa. r = MEM pa) /\ 
-			     r IN CR_(c,mv) /\ 
-			     ?m. Mon_(c,mv,r,m,EX)}
+        MEM (Ktr va) IN {r | r IN CRex_(c,mv) /\ Mon_(c,mv,r,PRIV,EX)}
 `;
 
 val cl_Inv_AC_kernel_lem = store_thm("cl_Inv_AC_kernel_lem", ``
@@ -217,7 +216,9 @@ val cl_Inv_AC_kernel_lem = store_thm("cl_Inv_AC_kernel_lem", ``
     !va. va IN Kcode ==> MEM (Ktr va) IN cl_CRex s
 ``,
   RW_TAC std_ss [Ifun_AC_kernel_po, cl_Inv_def, 
-		 cl_CRex_def, cl_CR_def, cl_Mon_def]
+		 cl_CRex_def, cl_CR_def, cl_Mon_def] >>
+  RES_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
 );
 
 val Inv_AC_kernel_lem = store_thm("Inv_AC_kernel_lem", ``
@@ -229,7 +230,9 @@ val Inv_AC_kernel_lem = store_thm("Inv_AC_kernel_lem", ``
     !va. va IN Kcode ==> MEM (Ktr va) IN CRex sc
 ``,
   RW_TAC std_ss [Inv_lem, Ifun_AC_kernel_po, Ifun_def, 
-		 CRex_def, CR_def, Mon_def]
+		 CRex_def, CR_def, Mon_def] >>
+  RES_TAC >>
+  FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
 );
 
 (* fix MMU so that all va in Kvm are cacheable 
@@ -334,8 +337,7 @@ val Inv_CRex_Mac_lem = store_thm("Inv_CRex_Mac_lem", ``
 ``,
   RW_TAC std_ss [Inv_lem, Icoh_AC_def] >>
   `CRex sc SUBSET CR sc` by ( 
-      FULL_SIMP_TAC std_ss [CRex_def, CR_def, pred_setTheory.SUBSET_DEF, 
-			    pred_setTheory.IN_GSPEC_IFF] 
+      FULL_SIMP_TAC std_ss [CRex_lem, pred_setTheory.SUBSET_DEF] 
   ) >>
   FULL_SIMP_TAC std_ss [pred_setTheory.SUBSET_DEF, 
 		        pred_setTheory.IN_GSPEC_IFF] >>
