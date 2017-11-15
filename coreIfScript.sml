@@ -221,7 +221,7 @@ val core_Mon_reg_po = Define `core_Mon_reg_po trans =
     (CV c mv r = CV c' mv r)
 `;
 
-(* corereq only depending on deps *)
+(* corereq only depending on vdeps *)
 val core_MD_mv_po = Define `core_MD_mv_po trans = 
 !c mv mv' req c'. 
     (!pa. MEM pa IN MD_(c,mv,vdeps_ c) ==> 

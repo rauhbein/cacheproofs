@@ -587,10 +587,8 @@ val Inv_Icode_lem = store_thm("Inv_Icode_lem", ``
   IMP_RES_TAC Inv_iCoh_lem >>
   IMP_RES_TAC Inv_isafe_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
-  (* IMP_RES_TAC Icoh_dCoh_lem >> *)
   IMP_RES_TAC Icode_iCoh_lem >>
   IMP_RES_TAC Icode_isafe_lem >>
-  (* IMP_RES_TAC Inv_Coh_CR_lem >> *)
   IMP_RES_TAC Icode_CR_lem
 );
 
@@ -740,6 +738,13 @@ val Rsim_cl_step_lem = store_thm("Rsim_cl_step_lem", ``
 
 (* top level proof *)
 
+(* simulating execution of kernel code preserve the invariant, if:
+- Rsim holds initially and finally
+- final access history variables are equivalent
+- cache-less invariant holds initially and finally
+- cache-aware invariant holds initially
+- intermediate invariants hold finally on both models
+ *)
 val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
 !s s' sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef n. 
     cm_user_po Icoh Icode Icm
@@ -767,6 +772,16 @@ val ca_Inv_rebuild_lem = store_thm("ca_Inv_rebuild_lem", ``
   METIS_TAC []
 );
 
+(* main bisimulation lemma (assuming proof obligations): 
+GIVEN
+- we start in simulating states
+- initial invariants hold
+- cache-less and cache-aware kernel computations of the same length
+THEN
+- the bisimulation relation is preserved
+- intermediate invariants hold in the final states on both models
+- all final state history variables are equivalent
+*)
 val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 !s s' sc sc' n Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef. 
     cm_user_po Icoh Icode Icm
@@ -921,6 +936,7 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
      ]
 );
 
+(* existence of simulating cache-less kernel computation of the same length *)
 val kernel_wrel_sim_lem = store_thm("kernel_wrel_sim_lem", ``
 !sc sc' Icoh Icode Icm cl_Icmf ca_Icmf cl_Icodef ca_Icodef n. 
     cm_user_po Icoh Icode Icm
@@ -1026,6 +1042,8 @@ val kernel_integrity_sim_thm = store_thm("kernel_integrity_sim_thm", ``
 );
 
 (******** overall integrity *********)
+
+(* Invariant preserved by weak transition relation, merging kernel steps *)
 
 val (Wrel_rules, Wrel_ind, Wrel_cases) = Hol_reln `
    (!s s' req s''. Wrel s s' /\ abs_ca_trans s' USER req s'' ==> Wrel s s'')
