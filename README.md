@@ -315,8 +315,9 @@ in such a way that the following proof obligations hold:
 * *ic_cacheable_read_oblg*: an instruction fetch only affects the corresponding
    cache entry if it was missing before and results in a cache fill of the
    address from memory (2)
-* *ic_cacheable_cl_other_oblg*: an instruction cache flush does not affect
-   instruction cache entries for addresses other than the flushed one (3)
+* *ic_cacheable_cl_other_oblg*: an instruction cache flush only affects
+   instruction cache entries for addresses other than the flushed one by
+   evicting them as well
 * *ic_cacheable_cl_oblg*: if an instruction cache flush affects the target
    address' instruction cache entry, it results in a miss for that address
 * *dcoh_oblg*: if memory and cache entries are unchanged for a given pa, then

@@ -560,13 +560,14 @@ val ic_cacheable_read_oblg = store_thm("ic_cacheable_read_oblg", ``
 
 val ic_cacheable_cl_other_oblg = store_thm("ic_cacheable_cl_other_oblg", ``
 !ms pa ms' pa'. (ms' = msca_trans ms (ICFR pa')) /\ (pa <> pa') ==>
-    (iw ms' pa = iw ms pa)
+    (iw ms' pa = iw ms pa) \/ ~ihit ms' pa
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   IMP_RES_TAC msca_ICFR_lem >>
   FULL_SIMP_TAC std_ss [iw_def, ihit_def] >>
-  IMP_RES_TAC cacheable_cl_other_lem
+  IMP_RES_TAC cacheable_cl_other_lem >>
+  RW_TAC std_ss []
 );
 
 val ic_cacheable_cl_oblg = store_thm("ic_cacheable_cl_oblg", ``
@@ -846,9 +847,18 @@ val Invic_flush_lem = store_thm("Invic_flush_lem", ``
 	 ]
       ,
       (* other pa' *)
-      IMP_RES_TAC ic_cacheable_cl_other_oblg >>
-      FULL_SIMP_TAC std_ss [iw_def] >> 
-      METIS_TAC [cdirty_lem]
+      `(iw ms' pa' = iw ms pa') \/ ~ihit ms' pa'` by (
+          METIS_TAC [ic_cacheable_cl_other_oblg] )
+      >| [(* unchanged *)
+	  FULL_SIMP_TAC std_ss [iw_def] >>
+          IMP_RES_TAC cdirty_lem >>
+	  RW_TAC std_ss []
+	  ,
+	  (* miss *)
+	  FULL_SIMP_TAC std_ss [ihit_def] >> 
+	  IMP_RES_TAC not_chit_not_cdirty_lem >>
+	  RW_TAC std_ss []
+	 ]
      ]	  	  
 );
 
@@ -1245,11 +1255,18 @@ val imv_flush_oblg = store_thm("imv_flush_oblg", ``
       ,
       (* other address *)
       FULL_SIMP_TAC std_ss [] >>
-      IMP_RES_TAC ic_cacheable_cl_other_oblg >>
-      FULL_SIMP_TAC std_ss [iw_def] >>
-      RW_TAC std_ss [imv_def] >>
-      MATCH_MP_TAC MVca_lem >>
-      ASM_REWRITE_TAC []
+      `(iw ms' pa = iw ms pa) \/ ~ihit ms' pa` by (
+          METIS_TAC [ic_cacheable_cl_other_oblg] )
+      >| [(* unchanged ic *)
+	  FULL_SIMP_TAC std_ss [imv_def, iw_def] >>
+	  MATCH_MP_TAC MVca_lem >>
+	  RW_TAC std_ss []
+	  ,
+	  (* changed ic -> flushed *)
+	  REV_FULL_SIMP_TAC std_ss [iw_def, icoh_def, ihit_def, 
+				    icnt_def, M_def, dirty_def] >>
+	  RW_TAC std_ss [imv_def, MVca_def]
+	 ]
      ]
 );
 

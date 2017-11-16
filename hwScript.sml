@@ -482,7 +482,7 @@ val ic_cacheable_read_lem = store_thm("ic_cacheable_read_lem", ``
 
 val ic_cacheable_cl_other_lem = store_thm("ic_cacheable_cl_other_lem", ``
 !ms pa ms' pa'. (ms' = msca_trans ms (ICFR pa')) /\ (pa <> pa') ==>
-    (iw ms' pa = iw ms pa)
+    (iw ms' pa = iw ms pa) \/ ~ihit ms' pa
 ``,
   REWRITE_TAC [ic_cacheable_cl_other_oblg]
 );
