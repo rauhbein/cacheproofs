@@ -283,7 +283,7 @@ val ca_Icodef_AC_def = Define `ca_Icodef_AC s s' (n:num) =
  /\ (!pa s'' dl. abs_ca_trans s' PRIV dl s'' 
               /\ MEM pa IN CRex s ==> 
 		 pa NOTIN writes dl)
- /\ (!pa. MEM pa IN CRex s ==> icoh s'.ms pa /\ ~dirty s'.ms pa)
+ /\ (!pa. MEM pa IN CRex s ==> icoh s'.ms pa /\ clean s'.ms pa)
 `; 
 
 val Inv_Coh_AC_lem = store_thm("Inv_Coh_AC_lem", ``
@@ -465,7 +465,11 @@ Ifun_AC_user_po ==> Icodef_xfer_po ca_Icodef_AC cl_Icodef_AC
       ,
       (* icoh CRex and not dirty *)
       NTAC 2 STRIP_TAC >>
-      FULL_SIMP_TAC std_ss [ca_Icodef_AC_def] >>
+      IMP_RES_TAC dCoh_subset_lem >>
+      FULL_SIMP_TAC std_ss [ca_Icodef_AC_def, dCoh_lem2] >>
+      `pa IN {pa | MEM pa IN CRex sc}` by (
+          RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF]
+      ) >>
       RES_TAC >>
       METIS_TAC [abs_ca_trans_icoh_clean_preserve_lem]
      ]

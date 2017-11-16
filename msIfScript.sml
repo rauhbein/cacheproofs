@@ -32,6 +32,8 @@ val iw_def = Define `iw ms pa = ms.ic pa`;
 val ihit_def = Define `ihit ms pa = chit_ ms.ic pa`;
 val icnt_def = Define `icnt ms pa = ccnt_ ms.ic pa`;
 
+val clean_def = Define `clean ms pa = dirty ms pa ==> (dcnt ms pa = M ms pa)`;
+
 (* instruction cache invariant *)
 
 val Invic_def = Define `Invic ms = !pa. ~cdirty_ ms.ic pa`;
@@ -136,6 +138,35 @@ val icnt_oblg = store_thm("icnt_oblg", ``
 ``,
   RW_TAC std_ss [icnt_def, iw_def, ccnt_lem]
 );
+
+val clean_oblg = store_thm("clean_oblg", ``
+!ms ms' pa. (dw ms' pa = dw ms pa) /\ (M ms' pa = M ms pa) ==> 
+	(clean ms' pa <=> clean ms pa)
+``,
+  RW_TAC std_ss [clean_def] >>
+  IMP_RES_TAC dirty_oblg >>
+  IMP_RES_TAC dcnt_oblg >>
+  RW_TAC std_ss []
+);
+
+val clean_dirty_oblg = store_thm("clean_dirty_oblg", ``
+!ms pa. clean ms pa /\ dirty ms pa ==> (dcnt ms pa = M ms pa)
+``,
+  RW_TAC std_ss [clean_def]
+);
+
+val clean_not_dirty_oblg = store_thm("clean_not_dirty_oblg", ``
+!ms pa. ~dirty ms pa ==> clean ms pa
+``,
+  RW_TAC std_ss [clean_def]
+);
+
+val clean_equal_oblg = store_thm("clean_equal_oblg", ``
+!ms pa. (dcnt ms pa = M ms pa) ==> clean ms pa
+``,
+  RW_TAC std_ss [clean_def]
+);
+
 
 (* transition system *)
 
@@ -318,7 +349,9 @@ val msca_write_val_oblg = store_thm("msca_write_val_oblg", ``
 val dc_cacheable_other_oblg = store_thm("dc_cacheable_other_oblg", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
              /\ (dw ms' pa <> dw ms pa) ==> 
-    ~dhit ms' pa  /\ (dirty ms pa ==> (M ms' pa = dcnt ms pa))
+    (~dhit ms' pa  /\ (dirty ms pa ==> (M ms' pa = dcnt ms pa))) \/
+    (wt dop /\ dhit ms pa /\ ~dirty ms pa /\ dirty ms' pa 
+            /\ (dcnt ms' pa = dcnt ms pa))
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -886,7 +919,7 @@ val Invic_preserve_oblg = store_thm("Invic_preserve_oblg", ``
 (* Instruction Cache Coherency *) (* TODO: check, ihit -> ~dirty*)
 
 val icoh_def = Define `icoh ms pa = 
-ihit ms pa ==> (icnt ms pa = M ms pa) /\ ~dirty ms pa`;
+ihit ms pa ==> (icnt ms pa = M ms pa) /\ clean ms pa`;
 val iCoh_def = Define `iCoh ms (Rs:padr set) = !pa. pa IN Rs ==> icoh ms pa`;
 
 val iCoh_oblg = store_thm("iCoh_oblg", ``
@@ -904,16 +937,17 @@ val iCoh_oblg2 = store_thm("iCoh_oblg2", ``
 val icoh_lem = store_thm("icoh_lem", ``
 !ms pa. Invic ms ==> 
     (icoh ms pa <=> 
-     coh ms.ic ms.mem pa /\ (chit_ ms.ic pa ==> ~cdirty_ ms.dc pa))
+     coh ms.ic ms.mem pa /\ 
+     (chit_ ms.ic pa ==> (~cdirty_ ms.dc pa \/ (ccnt_ ms.dc pa = ms.mem pa))))
 ``,
   RW_TAC std_ss [Invic_def, icoh_def, coh_def, ihit_def, icnt_def, 
-		 M_def, dirty_def] >>
+		 M_def, dirty_def, clean_def, dcnt_def] >>
   REWRITE_TAC [GSYM IMP_DISJ_THM] >>
   EQ_TAC >> ( RW_TAC std_ss [] )
 );
 
 val icoh_fetch_lem = store_thm("icoh_fetch_lem", ``
-!ms ms' pa. icoh ms pa /\ ~dirty ms pa /\ (ms' = msca_trans ms (FREQ pa))
+!ms ms' pa. icoh ms pa /\ clean ms pa /\ (ms' = msca_trans ms (FREQ pa))
         ==>
     icoh ms' pa
 ``,
@@ -930,19 +964,24 @@ val icoh_fetch_lem = store_thm("icoh_fetch_lem", ``
 	  RW_TAC std_ss []
 	  ,
 	  (* not dirty in dc *)
-	  FULL_SIMP_TAC std_ss [dirty_def] >>
-	  `ms'.dc (PA dop) = ms.dc (PA dop)` by (
-	      FULL_SIMP_TAC std_ss [] 
+	  `dw ms' (PA dop) = dw ms (PA dop)` by (
+	      FULL_SIMP_TAC std_ss [dw_def] 
 	  ) >>
-	  `~cdirty_ ms'.dc (PA dop)` by (
-	      RW_TAC std_ss [] >>
-	      IMP_RES_TAC cdirty_lem
+	  `M ms' (PA dop) = M ms (PA dop)` by (
+	      FULL_SIMP_TAC std_ss [M_def] 
 	  ) >>
-	  RW_TAC std_ss [] >>
-	  FULL_SIMP_TAC std_ss []
+	  IMP_RES_TAC clean_oblg >>
+	  RW_TAC std_ss []
 	 ]
       ,
       (* miss *)
+      `dw ms' pa = dw ms pa` by (
+          FULL_SIMP_TAC std_ss [dw_def] 
+      ) >>
+      `M ms' pa = M ms pa` by (
+          FULL_SIMP_TAC std_ss [M_def] 
+      ) >>
+      IMP_RES_TAC clean_oblg >>
       RW_TAC std_ss [] >>
       IMP_RES_TAC ca_cacheable_read_lem >>
       FULL_SIMP_TAC std_ss [icoh_def, dirty_def, icnt_def, ihit_def, M_def]
@@ -963,11 +1002,13 @@ val icoh_fetch_other_lem = store_thm("icoh_fetch_other_lem", ``
       IMP_RES_TAC chit_lem >>
       IMP_RES_TAC ccnt_lem >>
       RES_TAC >>
-      `ms'.dc pa' = ms.dc pa'` by ( FULL_SIMP_TAC std_ss [] ) >>
-      `~cdirty_ ms'.dc pa'` by (
-          RW_TAC std_ss [] >>
-	  IMP_RES_TAC cdirty_lem
+      `dw ms' pa' = dw ms pa'` by (
+          FULL_SIMP_TAC std_ss [dw_def] 
       ) >>
+      `M ms' pa' = M ms pa'` by (
+          FULL_SIMP_TAC std_ss [M_def] 
+      ) >>
+      IMP_RES_TAC clean_oblg >>
       RW_TAC std_ss []
       ,
       (* miss *)
@@ -978,7 +1019,7 @@ val icoh_fetch_other_lem = store_thm("icoh_fetch_other_lem", ``
 );
 
 val icoh_flush_oblg = store_thm("icoh_flush_oblg", ``
-!ms ms' pa. (* icoh ms pa /\ ~dirty ms pa /\  *)(ms' = msca_trans ms (ICFR pa))
+!ms ms' pa. (ms' = msca_trans ms (ICFR pa))
         ==>
     icoh ms' pa
 ``,
@@ -988,25 +1029,7 @@ val icoh_flush_oblg = store_thm("icoh_flush_oblg", ``
       IMP_RES_TAC msca_ICFR_lem >>
       FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def] >>
       STRIP_TAC >>
-      `¬chit_ ca' (PA dop)` by ( IMP_RES_TAC cacheable_cl_lem )
-      (* >| [(* icoh *) *)
-      (* 	  RW_TAC std_ss [] >> *)
-      (* 	  IMP_RES_TAC chit_lem >> *)
-      (* 	  IMP_RES_TAC ccnt_lem >> *)
-      (* 	  RW_TAC std_ss [] *)
-      (* 	  , *)
-      (* 	  (* not dirty in dc *) *)
-      (* 	  FULL_SIMP_TAC std_ss [dirty_def] >> *)
-      (* 	  `ms'.dc (PA dop) = ms.dc (PA dop)` by ( *)
-      (* 	      FULL_SIMP_TAC std_ss []  *)
-      (* 	  ) >> *)
-      (* 	  `~cdirty_ ms'.dc (PA dop)` by ( *)
-      (* 	      RW_TAC std_ss [] >> *)
-      (* 	      IMP_RES_TAC cdirty_lem *)
-      (* 	  ) >> *)
-      (* 	  RW_TAC std_ss [] >> *)
-      (* 	  FULL_SIMP_TAC std_ss [] *)
-      (* 	 ] *)
+      `~chit_ ca' (PA dop)` by ( IMP_RES_TAC cacheable_cl_lem )
       ,
       (* miss *)
       IMP_RES_TAC ic_cacheable_cl_oblg >>
@@ -1020,15 +1043,28 @@ val icoh_flush_other_lem = store_thm("icoh_flush_other_lem", ``
     icoh ms' pa'
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC ic_cacheable_cl_other_oblg >>
-  IMP_RES_TAC msca_ICFR_lem >>
-  FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, 
-			dirty_def, iw_def] >>
-  STRIP_TAC >>
-  IMP_RES_TAC chit_lem >>
-  RES_TAC >>
-  IMP_RES_TAC ccnt_lem >>
-  RW_TAC std_ss []
+  `(iw ms' pa' = iw ms pa') \/ ~ihit ms' pa'` by ( 
+      METIS_TAC [ic_cacheable_cl_other_oblg] )
+  >| [(* unchanged *)
+      IMP_RES_TAC msca_ICFR_lem >>
+      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, 
+			    dirty_def, iw_def] >>
+      STRIP_TAC >>
+      IMP_RES_TAC chit_lem >>
+      RES_TAC >>
+      IMP_RES_TAC ccnt_lem >>
+      `dw ms' pa' = dw ms pa'` by (
+          FULL_SIMP_TAC std_ss [dw_def] 
+      ) >>
+      `M ms' pa' = M ms pa'` by (
+          FULL_SIMP_TAC std_ss [M_def] 
+      ) >>
+      IMP_RES_TAC clean_oblg >>
+      RW_TAC std_ss []
+      ,
+      (* flushed *)
+      RW_TAC std_ss [icoh_def]
+     ]
 );
 
 val icoh_not_write_lem = store_thm("icoh_not_write_lem", ``
@@ -1040,45 +1076,82 @@ val icoh_not_write_lem = store_thm("icoh_not_write_lem", ``
   IMP_RES_TAC msca_DREQ_lem >>
   Cases_on `CA dop`
   >| [(* cacheable *)
-      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, dirty_def] >>
-      IMP_RES_TAC ca_cacheable_mem >>
-      PAT_X_ASSUM ``!pa. X`` ( fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) ) >>
+      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def] >>
       STRIP_TAC >>
       RES_TAC >>
-      FULL_SIMP_TAC std_ss [] >> (
-          FULL_SIMP_TAC std_ss []
-      ) >>
-      Cases_on `ca' pa = ms.dc pa`
-      >| [(* unchanged *)
-	  METIS_TAC [cdirty_lem]
+      IMP_RES_TAC ca_cacheable_mem >>
+      PAT_X_ASSUM ``!pa. X`` ( fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) ) >>
+      STRIP_TAC 
+      >| [(* mem = ccnt *)
+	  FULL_SIMP_TAC std_ss [] >> (
+              FULL_SIMP_TAC std_ss []
+	  ) >>
+          FULL_SIMP_TAC std_ss [clean_def, dirty_def, dcnt_def, M_def]
 	  ,
-	  (* changed *)
-	  Cases_on `pa = PA dop`
-	  >| [(* PA dop *)
-	      FULL_SIMP_TAC std_ss [not_wt_lem]
-	      >| [(* read miss *)
-		  RW_TAC std_ss [] >>
-		  IMP_RES_TAC ca_cacheable_read_lem
+	  (* clean *)
+          Cases_on `ca' pa = ms.dc pa`
+          >| [(* unchanged *)
+	      FULL_SIMP_TAC std_ss [] >> ( FULL_SIMP_TAC std_ss [] )
+	      >| [(* mem unchanged *)
+      	          `dw ms' pa = dw ms pa` by (
+      	              FULL_SIMP_TAC std_ss [dw_def] 
+      	          ) >>
+      	          `M ms' pa = M ms pa` by (
+      	              FULL_SIMP_TAC std_ss [M_def] 
+      	          ) >>
+      	          IMP_RES_TAC clean_oblg >>
+      	          RW_TAC std_ss []
 		  ,
-		  (* clean *)
-		  IMP_RES_TAC ca_cacheable_cl_lem >>
-	          PAT_X_ASSUM ``!pa. X`` ( 
-		      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+		  (* flush *)
+		  `dcnt ms' pa = M ms' pa` by (
+		      METIS_TAC [ccnt_lem, dcnt_def, M_def]
 		  ) >>
-		  REV_FULL_SIMP_TAC std_ss [] >>
-		  IMP_RES_TAC not_chit_not_cdirty_lem >>
+		  IMP_RES_TAC clean_equal_oblg >>
 		  RW_TAC std_ss []
 		 ]
-	      ,
-	      (* other pa *)
-	      IMP_RES_TAC ca_cacheable_other_lem >>
-	      IMP_RES_TAC not_chit_not_cdirty_lem 
-	     ]
+              ,
+              (* changed *)
+              Cases_on `pa = PA dop`
+              >| [(* PA dop, clean *)
+		  FULL_SIMP_TAC std_ss [] >> ( FULL_SIMP_TAC std_ss [] )
+		  >| [(* mem unchanged, cache changed *)
+		      FULL_SIMP_TAC std_ss [not_wt_lem]
+		      >| [(* read *)
+			  IMP_RES_TAC ca_cacheable_read_lem >>
+			  RW_TAC std_ss [clean_def, dcnt_def, M_def]
+			  ,
+			  (* clean *)
+          		  IMP_RES_TAC ca_cacheable_cl_lem >>
+			  PAT_X_ASSUM ``!pa. X`` ( 
+			      fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+			  ) >>
+			  RW_TAC std_ss [clean_def, dcnt_def, M_def] >>
+			  FULL_SIMP_TAC std_ss [dirty_def] >>
+			  IMP_RES_TAC not_chit_not_cdirty_lem
+			 ]
+		      ,
+		      (* clean, cache changed *)
+          	      IMP_RES_TAC ca_cacheable_cl_lem >>
+		      PAT_X_ASSUM ``!pa. X`` ( 
+		          fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
+		      ) >>
+		      RW_TAC std_ss [clean_def, dcnt_def, M_def] >>
+		      FULL_SIMP_TAC std_ss [dirty_def] >>
+		      IMP_RES_TAC not_chit_not_cdirty_lem
+		     ]
+		  ,
+		  (* other pa *)
+          	  IMP_RES_TAC ca_cacheable_other_lem >>
+          	  IMP_RES_TAC not_chit_not_cdirty_lem >>
+		  RW_TAC std_ss [clean_def, dcnt_def, M_def, dirty_def]
+          	 ]
+             ]
 	 ]
       ,
       (* uncacheable *)
       IMP_RES_TAC uncacheable_unchanged_lem >>
-      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, dirty_def]
+      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, 
+			    dirty_def, clean_def, dcnt_def]
      ]
 );
 
@@ -1092,25 +1165,41 @@ val icoh_write_other_lem = store_thm("icoh_write_other_lem", ``
   IMP_RES_TAC msca_DREQ_lem >>
   Cases_on `CA dop`
   >| [(* cacheable *)
-      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, dirty_def] >>
+      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, clean_def] >>
       STRIP_TAC >>
       RES_TAC >>
       IMP_RES_TAC ca_cacheable_mem >>
       PAT_X_ASSUM ``!pa. X`` ( fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) ) >>
-      REV_FULL_SIMP_TAC std_ss [] >>
       Cases_on `ca' pa = ms.dc pa`
       >| [(* unchanged *)
-	  METIS_TAC [cdirty_lem]
+	  REV_FULL_SIMP_TAC std_ss [dirty_def]
+	  >| [(* mem unchanged *)
+	      STRIP_TAC >> 
+	      IMP_RES_TAC ccnt_lem >>
+	      IMP_RES_TAC cdirty_lem >>
+	      RES_TAC >>
+	      FULL_SIMP_TAC std_ss [dcnt_def]
+	      ,
+	      (* eviction *)
+	      RES_TAC >>
+	      IMP_RES_TAC ccnt_lem >>
+	      FULL_SIMP_TAC std_ss [dcnt_def]
+	     ] 
 	  ,
 	  (* changed *)
 	  IMP_RES_TAC ca_cacheable_other_lem >>
-	  IMP_RES_TAC not_chit_not_cdirty_lem 
+	  IMP_RES_TAC not_chit_not_cdirty_lem >>
+	  FULL_SIMP_TAC std_ss [dirty_def] >> (
+	      FULL_SIMP_TAC std_ss [dcnt_def] >>
+	      RW_TAC std_ss []
+	  )
 	 ]
       ,
       (* uncacheable *)
       IMP_RES_TAC ca_uncacheable >>
       IMP_RES_TAC cl_other_unchanged_lem >>
-      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, dirty_def] >>
+      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, 
+			    clean_def, dirty_def, dcnt_def] >>
       RW_TAC std_ss []
      ]
 );
@@ -1119,7 +1208,7 @@ val icoh_write_other_lem = store_thm("icoh_write_other_lem", ``
 val icoh_preserve_oblg = store_thm("icoh_preserve_oblg", ``
 !ms req ms' pa. icoh ms pa /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
-	     /\ ~dirty ms pa
+	     /\ clean ms pa
         ==>
     icoh ms' pa
 ``,
@@ -1165,16 +1254,21 @@ val icoh_preserve_oblg = store_thm("icoh_preserve_oblg", ``
       ,
       (* NOREQ *)
       IMP_RES_TAC msca_NOREQ_lem >>
-      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def, dirty_def]
+      FULL_SIMP_TAC std_ss [icoh_def, ihit_def, icnt_def, M_def,
+			    clean_def, dirty_def, dcnt_def] 
      ]
 );
 
 val imv_dmv_oblg = store_thm("imv_dmv_oblg", ``
-!ms pa. icoh ms pa /\ dcoh ms pa /\ ~dirty ms pa ==> 
+!ms pa. icoh ms pa /\ dcoh ms pa /\ clean ms pa ==> 
     (imv ms T pa = dmvca ms T pa)
 ``,
-  RW_TAC std_ss [icoh_def, ihit_def, icnt_def, imv_def, M_def,
-		 dcoh_def, dirty_def, dmvca_def, MVca_def] >>
+  REPEAT GEN_TAC >>
+  Cases_on `dirty ms pa` >> (
+      RW_TAC std_ss [icoh_def, ihit_def, icnt_def, imv_def, M_def, dcnt_def,
+		     dcoh_def, clean_def, dirty_def, dmvca_def, MVca_def] 
+  ) >> 
+  FULL_SIMP_TAC std_ss [dirty_def] >>
   IMP_RES_TAC coh_clean_lem >>
   RW_TAC std_ss []
 );
@@ -1273,9 +1367,10 @@ val imv_flush_oblg = store_thm("imv_flush_oblg", ``
 val msca_clean_preserve_oblg = store_thm("msca_clean_preserve_oblg", ``
 !ms pa ms' req. Dreq req /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
-	     /\ ~dirty ms pa
+	     /\ clean ms pa
+	     /\ dcoh ms pa
         ==>
-    ~dirty ms' pa
+    clean ms' pa
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -1286,14 +1381,33 @@ val msca_clean_preserve_oblg = store_thm("msca_clean_preserve_oblg", ``
       >| [(* PA dop *)
 	  Cases_on `dw ms' (PA dop) = dw ms (PA dop)`
 	  >| [(* dc unchanged *)
-	      `~dirty ms' pa` by ( METIS_TAC [dirty_oblg] ) >>
-	      RW_TAC std_ss []
+	      Cases_on `M ms' (PA dop) = M ms (PA dop)` 
+	      >| [(* mem unchanged *)
+		  METIS_TAC [clean_oblg]
+		  ,
+		  (* mem changed *)
+		  Cases_on `cl dop`
+		  >| [(* data flush *)
+		      FULL_SIMP_TAC std_ss [] >>
+		      IMP_RES_TAC M_cacheable_cl_oblg >>
+		      IMP_RES_TAC dcnt_oblg >>
+		      MATCH_MP_TAC clean_equal_oblg >>
+		      RW_TAC std_ss []
+		      ,
+		      (* not flush *)
+		      FULL_SIMP_TAC std_ss [] >>
+		      IMP_RES_TAC M_cacheable_not_cl_oblg >>
+		      IMP_RES_TAC clean_equal_oblg >>
+		      RW_TAC std_ss []
+		     ]
+		 ]
 	      ,
 	      (* dc changed *)
 	      ASSUME_TAC ( SPEC ``dop:dop`` dop_cases_lem2 ) >>
 	      FULL_SIMP_TAC std_ss []
 	      >| [(* read *)
 		  IMP_RES_TAC dc_cacheable_read_oblg >>
+		  MATCH_MP_TAC clean_not_dirty_oblg >>
 		  RW_TAC std_ss []
 		  ,
 		  (* write *)
@@ -1303,6 +1417,7 @@ val msca_clean_preserve_oblg = store_thm("msca_clean_preserve_oblg", ``
 		  ,
 		  (* clean *)
 		  IMP_RES_TAC dc_cacheable_cl_oblg >>
+		  MATCH_MP_TAC clean_not_dirty_oblg >>
 	          IMP_RES_TAC not_dhit_not_dirty_oblg >>
 		  RW_TAC std_ss []
 		 ]
@@ -1311,22 +1426,69 @@ val msca_clean_preserve_oblg = store_thm("msca_clean_preserve_oblg", ``
 	  (* other *)
 	  Cases_on `dw ms' pa = dw ms pa`
 	  >| [(* dc unchanged *)
-	      `~dirty ms' pa` by ( METIS_TAC [dirty_oblg] ) >>
-	      RW_TAC std_ss []
+	      Cases_on `M ms' pa = M ms pa` 
+	      >| [(* mem unchanged *)
+		  METIS_TAC [clean_oblg]
+		  ,
+		  (* mem changed *)
+		  FULL_SIMP_TAC std_ss [] >>
+		  IMP_RES_TAC M_cacheable_other_oblg >>
+		  IMP_RES_TAC dcnt_oblg >>
+		  MATCH_MP_TAC clean_equal_oblg >>
+		  RW_TAC std_ss []
+		 ]
 	      ,
 	      (* dc changed *)
 	      FULL_SIMP_TAC std_ss [] >>
-	      IMP_RES_TAC dc_cacheable_other_oblg >>
-	      IMP_RES_TAC not_dhit_not_dirty_oblg >>
-	      RW_TAC std_ss []
+	      Cases_on `dhit ms' pa`
+	      >| [(* dirty but clean *)
+		  IMP_RES_TAC dc_cacheable_other_oblg >>
+		  Cases_on `M ms' pa = M ms pa`
+		  >| [(* mem unchanged *)
+		      FULL_SIMP_TAC std_ss [clean_def] >>
+		      Cases_on `dirty ms pa`
+		      >| [(* dirty before *)
+			  RES_TAC >>
+			  RW_TAC std_ss []
+			  ,
+			  (* not dirty before -> use coherency *)
+			  IMP_RES_TAC dcoh_clean_oblg >>
+			  RW_TAC std_ss []
+			 ]
+		      ,
+		      (* mem changed *)
+		      IMP_RES_TAC M_cacheable_other_oblg >>
+		      RW_TAC std_ss [clean_def]
+		     ]
+		  ,
+		  (* evicted *)
+		  IMP_RES_TAC not_dhit_not_dirty_oblg >>
+		  MATCH_MP_TAC clean_not_dirty_oblg >>
+		  RW_TAC std_ss []
+		 ]
 	     ]
 	 ]
       ,
       (* not cacheable *)
       FULL_SIMP_TAC std_ss [] >>
       IMP_RES_TAC dc_uncacheable_unchanged_oblg >>
-      `~dirty ms' pa` by ( METIS_TAC [dirty_oblg] ) >>
-      RW_TAC std_ss []
+      Cases_on `pa = PA dop`
+      >| [(* PA dop *)
+	  Cases_on `wt dop`
+	  >| [(* write -> contradiction *)
+	      `Wreq (DREQ dop)` by ( FULL_SIMP_TAC std_ss [Wreq_def] ) >>
+	      RES_TAC >>
+	      FULL_SIMP_TAC std_ss [Adr_def]
+	      ,
+	      (* not write *)
+	      IMP_RES_TAC M_uncacheable_unchanged_oblg >>
+	      METIS_TAC [clean_oblg]
+	     ]
+	  ,
+	  (* other *)
+	  IMP_RES_TAC M_uncacheable_others_oblg >>	      
+	  METIS_TAC [clean_oblg]
+	 ]
      ]
 );
 
@@ -1334,14 +1496,14 @@ val imv_dreq_lem = store_thm("imv_dreq_lem", ``
 !ms pa ms' req. icoh ms pa /\ dcoh ms pa /\ Dreq req 
 	     /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
-	     /\ ~dirty ms pa
+	     /\ clean ms pa
         ==>
     (imv ms' T pa = imv ms T pa)
 ``,
   REPEAT STRIP_TAC >>
   `icoh ms' pa` by ( METIS_TAC [icoh_preserve_oblg] ) >>
   IMP_RES_TAC Dreq_lem >>
-  `~dirty ms' pa` by ( METIS_TAC [msca_clean_preserve_oblg] ) >>
+  `clean ms' pa` by ( METIS_TAC [msca_clean_preserve_oblg] ) >>
   Cases_on `Wreq req`
   >| [(* write *)
       RES_TAC >>
@@ -1373,7 +1535,7 @@ val imv_dreq_lem = store_thm("imv_dreq_lem", ``
 val imv_preserve_oblg = store_thm("imv_preserve_oblg", ``
 !ms req ms' pa. icoh ms pa /\ dcoh ms pa /\ (ms' = msca_trans ms req)
 	     /\ (Wreq req ==> (pa <> Adr req))
-	     /\ ~dirty ms pa
+	     /\ clean ms pa
         ==>
     (imv ms' T pa = imv ms T pa)
 ``,

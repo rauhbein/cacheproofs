@@ -226,6 +226,8 @@ memory functionality:
 * *dirty*: predicate stating whether a given pa is dirty in the data cache
 * *dcnt*: content for a given pa in the data cache
 * *M*: Memory content for a given pa
+* *clean*: predicate stating that a cache line is either not dirty or its data
+   cache content is consistent with its memory content
 * *iw*: the instruction cache entry for a given pa
 * *ihit*: predicate stating whether a given pa hits the instruction cache
 * *icnt*: content for a given pa in the instruction cache
@@ -268,6 +270,13 @@ in such a way that the following proof obligations hold:
    different memory system states are equal for a pa that misses
 * *icnt_oblg*: the content stored for a given pa in the instruction cache
    depends only on its corresponding cache entry
+* *clean_oblg*: the cleanness of an address only depends on the corresponding
+   data cache entry and its memory content
+* *clean_dirty_oblg*: if an address is dirty but clean, its data cache and
+   memory contents agree
+* *clean_not_dirty_oblg*: non-dirty lines are always clean
+* *clean_equal_oblg*: if data cache content and memory content agree for a given
+   pa, it is considered clean
 * *msca_DREQ_unchanged_oblg*: data operations do not change entries of the
    instruction cache
 * *msca_FREQ_unchanged_oblg*: instruction fetches do not change data cache
@@ -278,7 +287,8 @@ in such a way that the following proof obligations hold:
    written pa to the written value
 * *dc_cacheable_other_oblg*: if a cacheable data operation affects the cache
    entry of a different address than the one accessed, then this line is evicted
-   and written back to memory if it was dirty (3)
+   and written back to memory if it was dirty, or it was made dirty by a write
+   to an address hitting the same cache line
 * *M_cacheable_other_oblg*: if a cacheable data operation affects the memory of
    different address than the one accessed, then this was due to the write back
    of a dirty data cache line
@@ -349,13 +359,13 @@ in such a way that the following proof obligations hold:
 * *dmvalt_not_write_oblg*: the memory view of an address is unchanged unless it
    is target of a write operation
 * *iCoh_oblg*: instruction coherency holds for pa iff a hit implies that its
-   instruction cache and memory contents agree and it is not dirty in the data
-   cache (2)
+   instruction cache and memory contents agree and it is clean in the data
+   cache, i.e., not dirty or consistent with the memory content (2)
 * *icoh_flush_oblg*: an instruction flush makes the flushed address instruction
    coherent
 * *icoh_preserve_oblg*: instruction coherency is preserved for addresses that
-   are not dirty and not written in a memory system operation
-* *imv_dmv_oblg*: for non-dirty, data and instruction coherent address, the data
+   are clean and not written in a memory system operation
+* *imv_dmv_oblg*: for clean, data and instruction coherent address, the data
    and instruction view agree
 * *imv_dmvcl_oblg*: for instruction coherent addresses the cacheless and
    instruction view agree
@@ -363,23 +373,18 @@ in such a way that the following proof obligations hold:
    instruction coherent addresses
 * *imv_flush_oblg*: instruction cache flushes preserve the instruction view of
    instruction coherent addresses
-* *msca_clean_preserve_oblg*: non-dirty addresses are kept non-dirty by data
-   operations unless they are written
-* *imv_preserve_oblg*: for non-dirty, data and instruction coherent addresses,
+* *msca_clean_preserve_oblg*: clean and data coherent addresses are kept clean
+   by data operations unless they are written
+* *imv_preserve_oblg*: for clean, data and instruction coherent addresses,
    the instruction view is unchanged, unless they are written
 
 (2) These proof obligations are broken by memory systems with a unified L2 cache
 from which the instruction cache can be filled and in which instruction fetches
-may be allocated, causing eviction of dirty data entries. To support such a case
-they need to generalized along with the proofs of the lemmas that depend on them
-in the simple hardware model above. Instruction coherency needs to be extended
-as well, e.g., by demanding data coherency for the unified L2 cache. This work
-is ongoing.
-
-(3) Here our instantiation of the cache model with a word-length line size
-shines through. To support wider caches, the proof obligations need to cover the
-cases that addresses may be evicted or marked dirty by accesses to an address on
-the same cache line. This work is ongoing.
+may be allocated, causing eviction of dirty data entries. To support such cases
+they need to be generalized along with the proofs of the lemmas that depend on
+them in the simple hardware model above. Instruction coherency needs to be
+extended as well, e.g., by demanding data coherency for the unified L2
+cache. This work is ongoing.
 
 #### Interface Instantiation
 

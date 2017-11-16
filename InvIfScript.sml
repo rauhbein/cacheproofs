@@ -174,7 +174,7 @@ val iCoh_CRex_lem = store_thm("iCoh_CRex_lem", ``
 
 val isafe_CRex_lem = store_thm("isafe_CRex_lem", ``
 !s pa. pa IN {pa | MEM pa IN CRex s} /\ isafe s {pa | MEM pa IN CRex s} ==>
-    ~dirty s.ms pa
+    clean s.ms pa
 ``,
   RW_TAC std_ss [CRex_def, isafe_def] >>
   FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
@@ -183,7 +183,7 @@ val isafe_CRex_lem = store_thm("isafe_CRex_lem", ``
 
 val isafe_CRex_lem2 = store_thm("isafe_CRex_lem2", ``
 !sc. isafe sc {pa | MEM pa IN CRex sc} <=>
-     !pa. MEM pa IN CRex sc ==> ~dirty sc.ms pa
+     !pa. MEM pa IN CRex sc ==> clean sc.ms pa
 ``,
   GEN_TAC >>
   EQ_TAC 
@@ -548,7 +548,7 @@ val Rsim_dCoh_Cv_lem = store_thm("Rsim_dCoh_Cv_lem", ``
 
 val Rsim_iCoh_lem = store_thm("Rsim_iCoh_lem", ``
 !sc s As. Rsim sc s /\ dCoh sc.ms As /\ iCoh sc.ms As ==>
-    !pa. pa IN As /\ ~dirty sc.ms pa ==> (MVcl s.M T pa = imv sc.ms T pa)
+    !pa. pa IN As /\ clean sc.ms pa ==> (MVcl s.M T pa = imv sc.ms T pa)
 ``,
   RW_TAC std_ss [Rsim_lem] >>
   IMP_RES_TAC dCoh_alt_lem >>
@@ -560,14 +560,14 @@ val Rsim_iCoh_lem = store_thm("Rsim_iCoh_lem", ``
 
 val Rsim_iCoh_Cv_lem = store_thm("Rsim_iCoh_lem", ``
 !sc s As. Rsim sc s /\ dCoh sc.ms As /\ iCoh sc.ms As ==>
-    !pa. pa IN As /\ ~dirty sc.ms pa ==> (cl_Cv s (MEM pa) = imv sc.ms T pa)
+    !pa. pa IN As /\ clean sc.ms pa ==> (cl_Cv s (MEM pa) = imv sc.ms T pa)
 ``,
   RW_TAC std_ss [cl_Cv_mem_lem] >>
   IMP_RES_TAC Rsim_iCoh_lem
 );
 
 val Rsim_icoh_Cv_lem = store_thm("Rsim_icoh_lem", ``
-!sc s pa. Rsim sc s /\ dcoh sc.ms pa /\ icoh sc.ms pa /\ ~dirty sc.ms pa ==> 
+!sc s pa. Rsim sc s /\ dcoh sc.ms pa /\ icoh sc.ms pa /\ clean sc.ms pa ==> 
     (cl_Cv s (MEM pa) = imv sc.ms T pa)
 ``,
   REPEAT STRIP_TAC >>
@@ -1258,7 +1258,7 @@ val ca_Icodef_po = Define `ca_Icodef_po Icodef Icoh Icode Icm Icmf =
  /\ (mode s' = PRIV)
         ==>
     icoh s'.ms (ca_Tr s' (VApc s'.cs))
- /\ ~dirty s'.ms (ca_Tr s' (VApc s'.cs))
+ /\ clean s'.ms (ca_Tr s' (VApc s'.cs))
 `;
 
 val Inv_rebuild_po = Define `

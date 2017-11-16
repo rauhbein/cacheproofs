@@ -17,7 +17,7 @@ val _ = new_theory "SE_cm";
 
 val abs_ca_trans_clean_lem = store_thm("abs_ca_trans_clean_lem", ``
 !s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN dcleans dl ==> 
-    ~dirty s'.ms pa
+    clean s'.ms pa
 ``,
   REWRITE_TAC [abs_ca_trans_clean_oblg]
 );
@@ -26,9 +26,10 @@ val abs_ca_trans_clean_preserve_lem =
 store_thm("abs_ca_trans_clean_preserve_lem", ``
 !s m dl s' pa. abs_ca_trans s m dl s' 
             /\ pa NOTIN writes dl 
-            /\ ~dirty s.ms pa 
+            /\ dcoh s.ms pa
+            /\ clean s.ms pa 
         ==> 
-    ~dirty s'.ms pa
+    clean s'.ms pa
 ``,
   REWRITE_TAC [abs_ca_trans_clean_preserve_oblg]
 );
@@ -56,13 +57,30 @@ store_thm("abs_ca_trans_icoh__preserve_lem", ``
     abs_ca_trans s m dl s'
  /\ pa NOTIN writes dl
  /\ pa NOTIN dcleans dl
+ /\ dcoh s.ms pa
  /\ icoh s.ms pa
- /\ ~dirty s.ms pa
+ /\ clean s.ms pa
         ==>
     icoh s'.ms pa
 ``,
   REPEAT STRIP_TAC >>
   IMP_RES_TAC abs_ca_trans_icoh_clean_preserve_oblg
+);
+
+val abs_ca_dcoh_preserved_lem = store_thm("abs_ca_dcoh_preserved_lem", ``
+!pa s dl s'. 
+    abs_ca_trans s PRIV dl s' 
+ /\ (!d. MEM d dl ==> CA (opd d)) 
+ /\ dcoh s.ms pa 
+        ==>
+    dcoh s'.ms pa
+``,
+  REPEAT STRIP_TAC >>
+  `dCoh s.ms {pa}` by ( 
+      RW_TAC std_ss [dCoh_lem2, pred_setTheory.IN_SING]
+  ) >>
+  IMP_RES_TAC abs_ca_trans_dCoh_preserve_lem >>
+  FULL_SIMP_TAC std_ss [dCoh_lem2, pred_setTheory.IN_SING]
 );
 
 val abs_ca_trans_clean_disj_lem = store_thm("abs_ca_trans_clean_disj_lem", ``
@@ -115,10 +133,11 @@ val hicl_def = Define `hicl h dl =
 val hwr_lem = store_thm("hwr_lem", ``
 !pa s dl s' h. 
     abs_ca_trans s PRIV dl s' 
- /\ ~dirty s.ms pa 
+ /\ dcoh s.ms pa 
+ /\ clean s.ms pa 
  /\ pa NOTIN hwr h dl
         ==>
-    ~dirty s'.ms pa
+    clean s'.ms pa
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -150,24 +169,29 @@ val hdcl_lem = store_thm("hdcl_lem", ``
 val hdiffw_lem = store_thm("hdiffw_lem", ``
 !pa s dl s' h. 
     abs_ca_trans s PRIV dl s' 
- /\ ~dirty s.ms pa 
+ /\ (!d. MEM d dl ==> CA (opd d)) 
+ /\ dcoh s.ms pa 
+ /\ clean s.ms pa 
  /\ pa IN h DIFF writes dl
         ==>
-    ~dirty s'.ms pa
+    clean s'.ms pa /\ dcoh s'.ms pa
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   FULL_SIMP_TAC std_ss [hwr_def, pred_setTheory.IN_DIFF] >>
-  IMP_RES_TAC abs_ca_trans_clean_preserve_lem
+  IMP_RES_TAC abs_ca_trans_clean_preserve_lem >>
+  IMP_RES_TAC abs_ca_dcoh_preserved_lem >>
+  ASM_REWRITE_TAC []
 );
 
 val hdclnw_lem = store_thm("hdclnw_lem", ``
 !pa s dl s' h. 
     abs_ca_trans s PRIV dl s' 
- /\ (pa IN h ==> ~dirty s.ms pa)
+ /\ (!d. MEM d dl ==> CA (opd d)) 
+ /\ (pa IN h ==> clean s.ms pa /\ dcoh s.ms pa)
  /\ pa IN hdclnw h dl
         ==>
-    ~dirty s'.ms pa
+    clean s'.ms pa /\ dcoh s'.ms pa
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -175,18 +199,22 @@ val hdclnw_lem = store_thm("hdclnw_lem", ``
   >| [(* h diff w *)
       `pa IN h` by ( FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF] ) >>
       RES_TAC >>
-      IMP_RES_TAC hdiffw_lem
+      IMP_RES_TAC hdiffw_lem >>
+      ASM_REWRITE_TAC []
       ,
       (* in dcleans *)
-      IMP_RES_TAC abs_ca_trans_clean_lem
+      IMP_RES_TAC abs_ca_trans_clean_lem >>
+      IMP_RES_TAC abs_ca_trans_dcoh_flush_lem >>
+      ASM_REWRITE_TAC []
      ]
 );
 
 val hdiffwcl_lem = store_thm("hdiffwcl_lem", ``
 !pa s dl s' h. 
     abs_ca_trans s PRIV dl s' 
+ /\ dcoh s.ms pa 
  /\ icoh s.ms pa
- /\ ~dirty s.ms pa
+ /\ clean s.ms pa
  /\ pa IN h DIFF (writes dl UNION dcleans dl)
         ==>
     icoh s'.ms pa
@@ -200,8 +228,8 @@ val hdiffwcl_lem = store_thm("hdiffwcl_lem", ``
 val hicl_lem = store_thm("hicl_lem", ``
 !pa s dl s' h. 
     abs_ca_trans s PRIV dl s' 
- /\ (pa IN h ==> icoh s.ms pa)
- /\ ~dirty s.ms pa
+ /\ (pa IN h ==> icoh s.ms pa /\ dcoh s.ms pa)
+ /\ clean s.ms pa
  /\ pa IN hicl h dl
         ==>
     icoh s'.ms pa
@@ -219,11 +247,13 @@ val hicl_lem = store_thm("hicl_lem", ``
 );
 
 val icoh_clean_hwr_lem = store_thm("icoh_clean_hwr_lem", ``
-!pa s dl s' h A. 
-    abs_ca_trans s PRIV dl s' 
- /\ (!pa. pa IN A DIFF h ==> icoh s.ms pa /\ ~dirty s.ms pa)
+!s dl s' h A. 
+    abs_ca_trans s PRIV dl s'
+ /\ (!d. MEM d dl ==> CA (opd d)) 
+ /\ (!pa. pa IN A DIFF h ==> icoh s.ms pa /\ clean s.ms pa /\ dcoh s.ms pa)
         ==>
-    !pa. pa IN A DIFF hwr h dl ==> icoh s'.ms pa /\ ~dirty s'.ms pa
+    !pa. pa IN A DIFF hwr h dl ==> 
+         icoh s'.ms pa /\ clean s'.ms pa /\ dcoh s'.ms pa
 ``,
   NTAC 9 STRIP_TAC >>
   `pa IN A DIFF h` by (
@@ -232,13 +262,20 @@ val icoh_clean_hwr_lem = store_thm("icoh_clean_hwr_lem", ``
   ) >>
   RES_TAC >>
   FULL_SIMP_TAC std_ss [pred_setTheory.IN_DIFF] >>
-  STRIP_TAC
+  REPEAT STRIP_TAC
   >| [(* icoh *)
       FULL_SIMP_TAC std_ss [hwr_def, pred_setTheory.IN_UNION] >>
       IMP_RES_TAC abs_ca_trans_icoh_clean_preserve_lem
       ,
       (* clean *)
       IMP_RES_TAC hwr_lem
+      ,
+      (* dcoh *)
+      `dCoh s.ms {pa}` by ( 
+          RW_TAC std_ss [dCoh_lem2, pred_setTheory.IN_SING]
+      ) >>
+      IMP_RES_TAC abs_ca_trans_dCoh_preserve_lem >>
+      FULL_SIMP_TAC std_ss [dCoh_lem2, pred_setTheory.IN_SING]
      ]
 );
 
@@ -271,11 +308,12 @@ val hcl_inter_lem = store_thm("hcl_inter_lem", ``
 val icoh_clean_hcl_lem = store_thm("icoh_clean_hcl_lem", ``
 !pa s dl s' hd hi. 
     abs_ca_trans s PRIV dl s' 
- /\ (!pa. pa IN hd ==> ~dirty s.ms pa)
+ /\ (!d. MEM d dl ==> CA (opd d)) 
+ /\ (!pa. pa IN hd ==> clean s.ms pa /\ dcoh s.ms pa)
  /\ (!pa. pa IN hi /\ pa IN hd ==> icoh s.ms pa)
         ==>
     !pa. pa IN hicl hi dl INTER hdclnw hd dl ==> 
-        icoh s'.ms pa /\ ~dirty s'.ms pa
+        icoh s'.ms pa /\ clean s'.ms pa /\ dcoh s'.ms pa
 ``,
   NTAC 9 STRIP_TAC >>
   IMP_RES_TAC hcl_inter_lem >>
@@ -288,12 +326,12 @@ val icoh_clean_hcl_lem = store_thm("icoh_clean_hcl_lem", ``
 
 val icoh_clean_hist_lem = store_thm("icoh_clean_hist_lem", ``
 !s hd hi hw A. 
-    (!pa. pa IN hd ==> ~dirty s.ms pa)
+    (!pa. pa IN hd ==> clean s.ms pa /\ dcoh s.ms pa)
  /\ (!pa. pa IN hi INTER hd ==> icoh s.ms pa)
- /\ (!pa. pa IN A DIFF hw ==> icoh s.ms pa /\ ~dirty s.ms pa)
+ /\ (!pa. pa IN A DIFF hw ==> icoh s.ms pa /\ clean s.ms pa /\ dcoh s.ms pa)
         ==>
     !pa. pa IN (A DIFF hw) UNION (hi INTER hd) ==> 
-        icoh s.ms pa /\ ~dirty s.ms pa
+        icoh s.ms pa /\ clean s.ms pa /\ dcoh s.ms pa
 ``,
   NTAC 8 STRIP_TAC >>
   FULL_SIMP_TAC std_ss [pred_setTheory.IN_UNION, pred_setTheory.IN_INTER]
@@ -302,12 +340,13 @@ val icoh_clean_hist_lem = store_thm("icoh_clean_hist_lem", ``
 val icoh_clean_hist_next_lem = store_thm("icoh_clean_hist_next_lem", ``
 !pa s dl s' hd hi hw A. 
     abs_ca_trans s PRIV dl s' 
- /\ (!pa. pa IN hd ==> ~dirty s.ms pa)
+ /\ (!d. MEM d dl ==> CA (opd d)) 
+ /\ (!pa. pa IN hd ==> clean s.ms pa /\ dcoh s.ms pa)
  /\ (!pa. pa IN hi INTER hd ==> icoh s.ms pa)
- /\ (!pa. pa IN A DIFF hw ==> icoh s.ms pa /\ ~dirty s.ms pa)
+ /\ (!pa. pa IN A DIFF hw ==> icoh s.ms pa /\ clean s.ms pa /\ dcoh s.ms pa)
         ==>
     !pa. pa IN (A DIFF hwr hw dl) UNION (hicl hi dl INTER hdclnw hd dl) ==> 
-        icoh s'.ms pa /\ ~dirty s'.ms pa
+        icoh s'.ms pa /\ clean s'.ms pa /\ dcoh s'.ms pa
 ``,
   NTAC 9 STRIP_TAC >>
   MATCH_MP_TAC icoh_clean_hist_lem >>
@@ -556,8 +595,8 @@ val ca_Icodef_SE_def = Define `ca_Icodef_SE s s' (n:num) =
     VApc s'.cs IN Kvm
  /\ Ktr (VApc s'.cs) IN ca_EXfl s s' n
  /\ (!pa. pa IN {pa | MEM pa IN CRex s} DIFF ca_hw s s' n ==> 
-	  icoh s'.ms pa /\ ~dirty s'.ms pa)
- /\ (!pa. pa IN ca_hdcn s s' n ==> ~dirty s'.ms pa)
+	  icoh s'.ms pa /\ clean s'.ms pa /\ dcoh s'.ms pa)
+ /\ (!pa. pa IN ca_hdcn s s' n ==> clean s'.ms pa /\ dcoh s'.ms pa)
  /\ (!pa. pa IN ca_hic s s' n INTER ca_hdcn s s' n ==> icoh s'.ms pa)
 `; 
 
@@ -772,10 +811,12 @@ val ca_Dfl_dCoh_lem = store_thm("ca_Dfl_dCoh_lem", ``
 
 val ca_EXfl_icoh_clean_next_lem = store_thm("ca_EXfl_icoh_clean_next_lem", ``
 !s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!d. MEM d dl ==> CA (opd d)) 
 	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
 	     /\ ca_Icodef_SE s s' n
 		     ==> 
-    !pa. pa IN ca_EXfl s s'' (SUC n) ==> icoh s''.ms pa /\ ~dirty s''.ms pa  
+    !pa. pa IN ca_EXfl s s'' (SUC n) ==> 
+         icoh s''.ms pa /\ clean s''.ms pa /\ dcoh s''.ms pa
 ``,
   NTAC 6 STRIP_TAC >>
   FULL_SIMP_TAC std_ss [ca_Icodef_SE_def, ca_EXfl_def] >>
@@ -792,12 +833,13 @@ val ca_EXfl_icoh_clean_next_lem = store_thm("ca_EXfl_icoh_clean_next_lem", ``
 
 val ca_Icodef_icoh_clean_lem = store_thm("ca_Icodef_icoh_clean_lem", ``
 !s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 
+	     /\ (!d. MEM d dl ==> CA (opd d)) 
 	     /\ (!f. cah f s s'' (SUC n) = f (cah f s s' n) dl)
 	     /\ ca_Icodef_SE s s' n
 		     ==> 
 (!pa. pa IN {pa | MEM pa IN CRex s} DIFF ca_hw s s'' (SUC n) ==>
-      icoh s''.ms pa /\ ~dirty s''.ms pa) /\
-(!pa. pa IN ca_hdcn s s'' (SUC n) ==> ~dirty s''.ms pa) /\
+      icoh s''.ms pa /\ clean s''.ms pa /\ dcoh s''.ms pa) /\
+(!pa. pa IN ca_hdcn s s'' (SUC n) ==> clean s''.ms pa /\ dcoh s''.ms pa) /\
 (!pa. pa IN ca_hic s s'' (SUC n) INTER ca_hdcn s s'' (SUC n) ==>
   icoh s''.ms pa)
 ``,
@@ -1138,6 +1180,7 @@ Icodef_init_xfer_po ca_Icodef_SE cl_Icodef_SE
   FULL_SIMP_TAC std_ss [pred_setTheory.DIFF_EMPTY,
 			pred_setTheory.INTER_EMPTY,
 			pred_setTheory.NOT_IN_EMPTY] >>
+  IMP_RES_TAC Inv_CRex_dCoh_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
   `cl_CRex s = CRex sc` by ( IMP_RES_TAC Rsim_CRex_lem ) >>
   IMP_RES_TAC Rsim_cs_lem >>
@@ -1146,6 +1189,7 @@ Icodef_init_xfer_po ca_Icodef_SE cl_Icodef_SE
   FULL_SIMP_TAC std_ss [ca_EXfl_init_lem] >>
   IMP_RES_TAC Icode_SE_def >>
   NTAC 2 STRIP_TAC >>
+  IMP_RES_TAC dCoh_lem >>
   IMP_RES_TAC iCoh_lem >>
   IMP_RES_TAC isafe_CRex_lem >>
   ASM_REWRITE_TAC []
@@ -1220,7 +1264,14 @@ Icodef_xfer_po ca_Icodef_SE cl_Icodef_SE
   `cl_EXfl s s'' (SUC n) = ca_EXfl sc sc'' (SUC n)` by ( 
       METIS_TAC [EXfl_bisim_lem] 
   ) >>
-  METIS_TAC [ca_Icodef_icoh_clean_lem]
+  `!d. MEM d dl ==> CA (opd d)` suffices_by (
+      METIS_TAC [ca_Icodef_icoh_clean_lem]
+  ) >>
+  (* only cacheable accesses*)
+  MATCH_MP_TAC abs_cl_trans_fixmmu_CA_lem >>
+  IMP_RES_TAC cl_Icmf_SE_def >>
+  IMP_RES_TAC cl_Inv_Mmu_fixed_lem >>
+  METIS_TAC []
 );
 
 val Icm_f_SE_lem = store_thm("Icm_f_SE_lem", ``

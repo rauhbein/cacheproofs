@@ -196,11 +196,12 @@ store_thm("abs_ca_trans_icoh_clean_preserve_lem", ``
 !s m dl s' pa. 
     abs_ca_trans s m dl s'
  /\ pa NOTIN writes dl
+ /\ dcoh s.ms pa
  /\ icoh s.ms pa
- /\ ~dirty s.ms pa
+ /\ clean s.ms pa
         ==> 
     icoh s'.ms pa
- /\ ~dirty s'.ms pa
+ /\ clean s'.ms pa
 ``,
   REWRITE_TAC [abs_ca_trans_icoh_clean_preserve_oblg]
 );
@@ -392,6 +393,21 @@ val Inv_MD_not_writable_lem = store_thm("Inv_MD_not_writable_lem", ``
   RES_TAC
 );
 
+val Inv_CRex_dCoh_lem = store_thm("Inv_CRex_dCoh_lem", ``
+!s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Inv Icoh Icode Icm s ==> 
+    dCoh s.ms {pa | MEM pa IN CRex s}
+``,
+  REPEAT STRIP_TAC >>
+  FULL_SIMP_TAC std_ss [Inv_lem] >>
+  IMP_RES_TAC Icoh_dCoh_lem >>
+  `{pa | MEM pa IN CRex s} SUBSET {pa | MEM pa IN CR s}` by (
+      RW_TAC std_ss [pred_setTheory.SUBSET_DEF] >>
+      FULL_SIMP_TAC std_ss [pred_setTheory.IN_GSPEC_IFF] >>
+      IMP_RES_TAC CRex_lem
+  ) >>
+  IMP_RES_TAC dCoh_subset_lem 
+);
+
 val Inv_safe_lem = store_thm("Inv_safe_lem", ``
 !s Icoh Icode Icm. cm_user_po Icoh Icode Icm /\ Inv Icoh Icode Icm s ==> safe s
 ``,
@@ -539,6 +555,7 @@ val Inv_iCoh_lem = store_thm("Inv_iCoh_lem", ``
   ASM_REWRITE_TAC [] >>
   MATCH_MP_TAC drvbl_iCoh_lem >>
   HINT_EXISTS_TAC >>
+  IMP_RES_TAC Inv_CRex_dCoh_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
   IMP_RES_TAC Ifun_Mon_lem >>
   IMP_RES_TAC Icode_iCoh_lem >>
@@ -564,6 +581,7 @@ val Inv_isafe_lem = store_thm("Inv_isafe_lem", ``
   MATCH_MP_TAC drvbl_isafe_lem >>
   HINT_EXISTS_TAC >>
   IMP_RES_TAC Inv_safe_lem >>
+  IMP_RES_TAC Inv_CRex_dCoh_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
   IMP_RES_TAC Ifun_Mon_lem >>
   IMP_RES_TAC Icode_isafe_lem >>
@@ -641,6 +659,7 @@ val Inv_user_preserved_thm = store_thm("Inv_user_preserved_thm", ``
   IMP_RES_TAC abs_ca_trans_switch_lem >>
   RW_TAC std_ss [] >- ( IMP_RES_TAC Inv_user_preserved_lem ) >>
   MATCH_MP_TAC drvbl_iCoh_mem_lem >>
+  IMP_RES_TAC Inv_CRex_dCoh_lem >>
   FULL_SIMP_TAC std_ss [Inv_lem] >>
   IMP_RES_TAC Icode_iCoh_lem >>
   IMP_RES_TAC Icode_isafe_lem >>
