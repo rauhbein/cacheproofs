@@ -645,8 +645,7 @@ The corresponding proof obligations are collected in predicates *cm_user_po* and
   4. the histories in (s',s'') agree with (sc',sc'') and are computed correctly
   for the cache-aware step, and 
   5. cl_Icmf holds between s and s'', 
-
-then ca_Icmf holds between sc and sc''
+  then ca_Icmf holds between sc and sc''
 * *Icodef_xfer_po*: in the same scenario as above if additionally cl_Icodef
    holds between s and s'', and ca_Icmf holds between sc and sc'', then
    ca_Icodef holds between sc and sc''
@@ -664,8 +663,7 @@ then ca_Icmf holds between sc and sc''
   3. the history variables in s' and sc' agree, 
   4. cl_Inv holds in s', and 
   5. in both s' and sc' are the excecution mode is unprivileged,
-
-then Ifun, Icoh, and Icode hold in sc'
+  then Ifun, Icoh, and Icode hold in sc'
 * *Icm_f_po*: if the intermediate invariant holds between s and s' and the
    execution mode in s' is unprivileged, Icm holds in s'
 
