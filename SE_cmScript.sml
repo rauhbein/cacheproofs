@@ -52,7 +52,7 @@ val abs_ca_trans_icoh_flush_lem = store_thm("abs_ca_trans_icoh_flush_lem", ``
 );
 
 val abs_ca_trans_icoh_preserve_lem = 
-store_thm("abs_ca_trans_icoh__preserve_lem", ``
+store_thm("abs_ca_trans_icoh_preserve_lem", ``
 !s m dl s' pa.
     abs_ca_trans s m dl s'
  /\ pa NOTIN writes dl
@@ -680,34 +680,6 @@ val hist_bisim_SE_lem = store_thm("hist_bisim_SE_lem", ``
 		 cl_hdcn_def, ca_hdcn_def, cl_hic_def, ca_hic_def] 
 );
 
-val hist_bisim_SE_lem_old = store_thm("hist_bisim_SE_lem_old", ``
-!s s' sc sc' m dl (n:num).
-    cm_user_po Icoh_SE Icode_SE Icm_SE
- /\ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE
- /\ Rsim sc s
- /\ (!m s'' sc''. 
-        m <= n
-     /\ cl_kcomp s s'' m
-     /\ ca_kcomp sc sc'' m
-            ==>
-        Rsim sc'' s''
-     /\ ca_Icmf_SE sc sc'' m)
- /\ Icoh_SE sc
- /\ cl_kcomp s s' n
- /\ ca_kcomp sc sc' n
-        ==>
-    (cl_hw s s' n = ca_hw sc sc' n)
- /\ (cl_hdc s s' n = ca_hdc sc sc' n)
- /\ (cl_hdcn s s' n = ca_hdcn sc sc' n)
- /\ (cl_hic s s' n = ca_hic sc sc' n)
-``,
-  RW_TAC std_ss [cl_hw_def, ca_hw_def, cl_hdc_def, ca_hdc_def, 
-		 cl_hdcn_def, ca_hdcn_def, cl_hic_def, ca_hic_def] >> (
-      MATCH_MP_TAC hist_bisim_lem >>
-      METIS_TAC []
-  )
-);
-
 val Dfl_bisim_lem = store_thm("Dfl_bisim_lem", ``
 !s s' sc sc' m dl (n:num).
     cm_user_po Icoh_SE Icode_SE Icm_SE
@@ -721,31 +693,6 @@ val Dfl_bisim_lem = store_thm("Dfl_bisim_lem", ``
   RW_TAC std_ss [cl_Dfl_def, ca_Dfl_def] >>
   IMP_RES_TAC Rsim_CR_eq_lem >>
   IMP_RES_TAC hist_bisim_SE_lem >>
-  FULL_SIMP_TAC std_ss []
-);
-
-val Dfl_bisim_lem_old = store_thm("Dfl_bisim_lem_old", ``
-!s s' sc sc' m dl (n:num).
-    cm_user_po Icoh_SE Icode_SE Icm_SE
- /\ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE
- /\ Rsim sc s
- /\ (!m s'' sc''. 
-        m <= n
-     /\ cl_kcomp s s'' m
-     /\ ca_kcomp sc sc'' m
-            ==>
-        Rsim sc'' s''
-     /\ ca_Icmf_SE sc sc'' m)
- /\ Icoh_SE sc
- /\ Ifun sc
- /\ cl_kcomp s s' n
- /\ ca_kcomp sc sc' n
-        ==>
-    (cl_Dfl s s' n = ca_Dfl sc sc' n)
-``,
-  RW_TAC std_ss [cl_Dfl_def, ca_Dfl_def] >>
-  IMP_RES_TAC Rsim_CR_eq_lem >>
-  IMP_RES_TAC hist_bisim_SE_lem_old >>
   FULL_SIMP_TAC std_ss []
 );
 
@@ -765,30 +712,6 @@ val EXfl_bisim_lem = store_thm("EXfl_bisim_lem", ``
   FULL_SIMP_TAC std_ss []
 );
 
-val EXfl_bisim_lem_old = store_thm("EXfl_bisim_lem_old", ``
-!s s' sc sc' m dl (n:num).
-    cm_user_po Icoh_SE Icode_SE Icm_SE
- /\ ca_Icmf_po ca_Icmf_SE Icoh_SE Icode_SE Icm_SE
- /\ Rsim sc s
- /\ (!m s'' sc''. 
-        m <= n
-     /\ cl_kcomp s s'' m
-     /\ ca_kcomp sc sc'' m
-            ==>
-        Rsim sc'' s''
-     /\ ca_Icmf_SE sc sc'' m)
- /\ Icoh_SE sc
- /\ Ifun sc
- /\ cl_kcomp s s' n
- /\ ca_kcomp sc sc' n
-        ==>
-    (cl_EXfl s s' n = ca_EXfl sc sc' n)
-``,
-  RW_TAC std_ss [cl_EXfl_def, ca_EXfl_def] >>
-  IMP_RES_TAC Rsim_CRex_lem >>
-  IMP_RES_TAC hist_bisim_SE_lem_old >>
-  FULL_SIMP_TAC std_ss []
-);
 
 val ca_Dfl_dCoh_lem = store_thm("ca_Dfl_dCoh_lem", ``
 !s s' s'' n dl. abs_ca_trans s' PRIV dl s'' 

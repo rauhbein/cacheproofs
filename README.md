@@ -113,6 +113,92 @@ deriveability relation (abs_ca_trans_drvbl_oblg), and that cacheless and
 cache-aware model perform the same step if they agree on the core-view of
 dependencies of the current instruction (core_bisim_oblg).
 
+Below we list all proof obligations on the abstract cache-aware hardware model.
+
+* *abs_ca_trans_mode_oblg*: the mode parameter in the transition relation
+   correctly reflects the mode of the starting state
+* *abs_ca_trans_dmvalt_oblg*: steps of the cache-aware model that do not touch
+   an address leave its memory view unchanged
+* *abs_ca_trans_dmvalt_not_write_oblg*: steps of the cache-aware model that
+   touch an address but do not write it leave its memory view unchanged
+* *abs_ca_trans_dcoh_write_oblg*: cacheable writes make the written addresses
+   data-coherent
+* *abs_ca_trans_dCoh_preserve_oblg*: cacheable accesses preserve data-coherence
+* *abs_ca_trans_drvbl_oblg*: the transition relation for USER steps of the
+   cache-aware model is a subset of the deriveability relation
+* *abs_ca_trans_switch_lem*: any user step of the cache-aware model that
+   switches mode to privileged leads into an exception entry state, i.e., only
+   exceptions may escalate the execution mode privileges
+* *abs_ca_progress_oblg*: the cache-less model never gets stuck
+* *abs_ca_trans_icoh_clean_preserve_oblg*: addresses that are data and
+   instruction coherent and clean preserve their instruction coherency and
+   cleanness by a step of the cache-aware model if they are not written
+* *ca_deps_pc_oblg*: the translated PC is always contained in the dependencies
+   of the current instruction
+* *ca_vdeps_PC_oblg*: the PC is always contained in the virtual dependencies of
+   the current instruction
+* *ca_fixmmu_Tr_oblg*: if the MMU is fixed to a given translation function f for
+   a domain of virtual addresses VA, then all addresses va in VA will be
+   translated by the hardware to f(va)
+
+On the cacheless model we have the following proof obligations:
+
+* *abs_cl_trans_mode_oblg*: the mode parameter of the transition relation
+   correctly reflects the mode of the current state
+* *abs_cl_trans_not_write_oblg*: the cache-less core-view of an address does not
+   change when it is not written
+* *abs_cl_trans_not_adrs_oblg*: the cache-less core-view of an address does not
+   change when it is not touched at all
+* *abs_cl_trans_fixmmu_CA_lem*: if the MMU is fixed to only provide cacheable
+   aliases in privileged mode, every privileged transition of the cacheless
+   model will only perform cacheable memory operations
+* *abs_cl_progress_lem*: the cacheless model never gets stuck
+
+More obligations are needed in order to couple the cache-aware and cacheless
+model in the bisimulation proof for kernel execution:
+
+* *core_bisim_dl_oblg*: if a cache-aware and cacheless state have the same core
+   configuration, the states agree on the data view of the dependencies of the
+   next instruction of the cache-aware model, and the cacheless view and the
+   instruction view agree on the translated PC, then the next steps in both
+   models will exhibit the same memory operations
+* *core_bisim_oblg*: in the scenario above, if additionally both states have the
+   same dependencies for the next instruction and the memory operations
+   performed are only cacheable operations, then the resulting core states are
+   equal again, and the data views agree on all written addresses
+* *deps_eq_oblg*: if a cache-aware and cacheless state have the same core
+   configuration, the states agree on the data view of the dependencies of the
+   next instruction of the cache-aware model, then the dependencies of the next
+   instruction in both states are equal
+* *cl_deps_eq_oblg*: if a cache-aware and cacheless state have the same core
+   configuration, the states agree on the data view of the dependencies of the
+   next instruction of the cacheless model, then the dependencies of the next
+   instruction in both states are equal
+
+In addition to these properties, the proof of the *selective eviction*
+countermeasure introduces the following proof obligations on the hardware:
+
+* *abs_ca_trans_clean_oblg*: addresses that are targeted by data flush
+   operations on the cache-aware model become clean
+* *abs_ca_trans_clean_preserve_oblg*: data-coherent and clean addresses stay
+   clean if they are not written in the cache-aware model
+* *abs_ca_trans_dcoh_flush_oblg*: addresses that are targeted by data flush
+   operations on the cache-aware model become data-coherent
+* *abs_ca_trans_icoh_flush_oblg*: addresses that are targeted by instruction flush
+   operations on the cache-aware model become instruction-coherent
+* *abs_ca_trans_icoh_clean_preserve_oblg*: data-coherent, instruction-coherent
+   and clean addresses stay instruction coherent if they are not written or
+   data-flushed in the cache-aware model
+* *abs_ca_trans_clean_disj_oblg*: a cache-aware model step never performs both
+   data and instruction flush operations
+* *abs_ca_trans_i_w_disj_lem*: a cache-aware model step never performs both
+   instruction flush and write operations
+* *abs_cl_trans_clean_disj_oblg*: a cacheless model step never performs both
+   data and instruction flush operations
+* *abs_cl_trans_i_w_disj_lem*: a cacheless model step never performs both
+   instruction flush and write operations
+
+
 ### Single Memory Request Model
 
 In order to sanity-check the hardware proof obligations, we discharge them on a
@@ -165,8 +251,8 @@ subsequent core_rcv step (however the composition with the memory system is
 defined on the above abstraction layer).
 
 Additionally, the dependency functions (deps and vdeps) of the hardware model
-are introduced here together with the MMU domain as well as the definitions of
-core-view (CV), mode (Mode), and exception entry state (exentry_).
+are introduced here together with the MMU domain (MD) as well as the definitions
+of core-view (CV), mode (Mode), and exception entry state (exentry).
 
 The main properties assumed here are:
 
@@ -381,9 +467,9 @@ in such a way that the following proof obligations hold:
 (2) These proof obligations are broken by memory systems with a unified L2 cache
 from which the instruction cache can be filled and in which instruction fetches
 may be allocated, causing eviction of dirty data entries. To support such cases
-they need to be generalized along with the proofs of the lemmas that depend on
-them in the simple hardware model above. Instruction coherency needs to be
-extended as well, e.g., by demanding data coherency for the unified L2
+the obligations need to be generalized along with the proofs of the lemmas that
+depend on them in the simple hardware model above. Instruction coherency needs
+to be extended as well, e.g., by demanding data coherency for the unified L2
 cache. This work is ongoing.
 
 #### Interface Instantiation
@@ -408,7 +494,7 @@ The caches in the memory system are instances of our abstract cache model. For
 an uninterpreted cache state, it provides the interface functions to access
 cache entries and contents for a given address, and check whether such is
 hitting the cache and being dirty. It also defines a cache transition function
-*ctf* and proof obligations an uninterpreted eviction policy that define the
+*ctf*, an uninterpreted eviction policy, and proof obligations that define the
 expected cache semantics. We omit a more detailed description here. Naturally,
 many of these properties are used to discharge the proof obligations on the
 memory system.
@@ -420,4 +506,169 @@ instantiation with a more realistic cache design is ongoing.
 
 ## Instantiation of the Theory
 
-TODO
+The provided theorems can be instantiated for different softwares and
+hardwares. Below we describe how the proof obligations on hardware, invariants,
+and the code can be discharged separately.
+
+### Hardware Instantiation
+
+Our abstract hardware model assumes that the underlying hardware can be split
+into a core component and a memory system component, containing all caches and
+main memory. In order to connect such a hardware model to this theory, one must
+instantiate the core and memory system interface functions on top of it and
+prove the hardware proof obligations on the abstract hardware layer outlined
+above.
+
+Parts of our example instantiation can be reused, if the concrete model of the
+hardware is split into a core and memory system component and the core issues at
+most one memory operation per system transition. In this case, one can
+instantiate the core and memory system interface separately and discharge the
+corresponding lower level proof obligations. Our proofs yielding the abstract
+hardware layer obligations can then be reused.
+
+In principle one can also re-use our instantiation of the memory system, if only
+one layer of separate data and instruction cache is present. Then it suffices to
+instantiate the core and cache interfaces separately. However, in its current
+shape the cache interface is not general enough to support realistic
+instantiations, as some of its proof obligations rely on simplifications in our
+underlying rudimentary instantiation. Work to generalize the cache interface is
+ongoing.
+
+### Software Instantiation (Invariants)
+
+Software-specific properties are introduced in the theory by means of
+specification functions. For a given software these specification functions need
+to replaced by their corresponding definitions in the formal specification of
+that software. In particular, one must instantiate:
+
+* *cl_Inv* / *Ifun*: the functional invariant on the cacheless model /
+   cache-aware model
+* *Inv*: the invariant on the cache-aware model
+* *cl_CR* / *CR*: the critical resources in the cacheless / cache-aware model
+* *cl_CRex* / *CRex*: the executable critical resources in the cacheless /
+   cache-aware model
+
+In general definitions on the cache-aware model should be obtained by expressing
+their cacheless counterparts wrt. the cache-aware data view of memory. Then the
+following statements need to be proven about these functions.
+
+* *CR_oblg*: if the functional invariant holds on the cache-aware model, then CR
+   is self-contained, i.e., CR only depends on the data-view of resources
+   contained in CR
+* *CR_coreg_oblg*: only coprocessor registers can be part of the critical
+   resources
+* *CRex_eq_oblg*: if the functional invariant holds on the cache-aware model,
+   then CRex is self-contained, i.e., CRex only depends on the data-view of
+   resources contained in CRex
+* *CRex_oblg*: CRex only contains memory resources and is a subset of CR
+* *Ifun_CR_oblg*: Ifun only depends on the data view of resources in CR
+* *Ifun_MD_oblg*: all resources in the Mmu domain are contained in CR
+* *Ifun_Mon_oblg*: Ifun constrains the Mmu in such a way that resources in CR
+   are not writable in user mode
+* *Inv_oblg*: the invariant on the cache-aware model is exactly the conjunction
+   of Ifun with the counter-measure specific invariants Icoh, Icode, and Icm
+
+Note that all obligations on the counter-measure specific invariants have
+already been discharged for always cacheability and selective eviction.
+
+The always cacheability countermeasure introduces further proof obigations on
+the functional invariant:
+
+* *Ifun_AC_user_po*: the functional invariant guarantees that all aliases to the
+   always cacheable region are cacheable and that the critical memory resources
+   always lie in the always cacheable region
+* *Ifun_AC_kernel_po*: the Kcode region is mapped into the critical executable
+   resources and it is executable in privileged mode
+
+### Software Instantiation (Code Verification)
+
+The antecedents of the resulting theorems contain code verification
+conditions. In particular all theorems rely on:
+
+* *cl_Inv_po*: the functional invariant is preserved by the execution of kernel
+   handlers in the cacheless model
+* *cl_II_po*: the countermeasure specific parts of the intermediate invariant
+   hold throughout the kernel execution on the cacheless model
+
+Once these verification conditions are discharged, the theorems can be
+strengthened by removing these assumptions. 
+
+### Countermeasure Verification
+
+The presented framework can be used to verify new countermeasures that preserve
+integrity. In order to do so the following predicates need to be instantiated:
+
+* *Icoh*: the invariant on the cache-aware model guaranteeing data-coherency of
+   the critical resources
+* *Icode*: the invariant on the cache-aware model guaranteeing
+   instruction-coherency and cleanness of the executable critical resources
+* *Icm*: a countermeasure-specific invariant to guarantee instruction / data
+   coherency of other resources
+* *cl_Icmf*: functional properties of the kernel code on the cacheless model
+   that give the correctness of the countermeasure wrt. data coherency
+* *ca_Icmf*: data coherency-related properties established by the countermeasure
+   during the execution of kernel code
+* *cl_Icodef*: functional properties of the kernel code on the cacheless model
+   that give the correctness of the countermeasure wrt. instruction coherency
+* *ca_Icodef*: instruction coherency-related properties established by the
+   countermeasure during the execution of kernel code
+
+The corresponding proof obligations are collected in predicates *cm_user_po* and
+*cm_kernel_po* demanding the following properties:
+
+* *Icoh_CR_po*: Icoh only depends on the coherency of critical resources, their
+   data-view, and the functional invariant on them
+* *Icoh_dCoh_po*: Icoh and Ifun guarantee the data coherency of critical
+   resources
+* *Icode_CR_po*: Icoh only depends on the instruction coherency and cleanness of
+   executable critical resources, their data-view, and the functional invariant
+   on them
+* *Icode_iCoh_po*: Icode and Ifun guarantee the instruction coherency of
+   executable critical resources
+* *Icode_isafe_po*: Icode and Ifun guarantee the cleanness of executable
+   critical resources
+* *Icm_po*: Icm is preserved by derivable transitions from a state where Inv
+   holds
+* *Icmf_init_xfer_po*: if cl_Icmf holds in an exception entry point together
+   with cl_Inv on the cacheless model, then ca_Icmf holds in any simulating
+   cache-aware state where Inv holds
+* *Icodef_init_xfer_po*: if cl_Icodef holds in an exception entry point together
+   with cl_Inv and cl_Icmf on the cacheless model, then ca_Icodef holds in any
+   simulating cache-aware state where Inv and ca_Icmf hold
+* *Icmf_xfer_po*: given simulating pairs of states (s,sc), (s',sc'), and
+   (s'',sc'') such that 
+  1. (s,sc) are exception entry points where cl_Inv and
+   Inv hold, respectively, 
+  2. the intermediate invariants hold between s and s' as well as sc and sc', 
+  3. both cacheless and cache-aware models perform
+   a step from s' to s'', resp. sc' to sc'', 
+  4. the histories in (s',s'') agree with (sc',sc'') and are computed correctly
+  for the cache-aware step, and 
+  5. cl_Icmf holds between s and s'', 
+then ca_Icmf holds between sc and sc''
+* *Icodef_xfer_po*: in the same scenario as above if additionally cl_Icodef
+   holds between s and s'', and ca_Icmf holds between sc and sc'', then
+   ca_Icodef holds between sc and sc''
+* *cl_Icmf_po*: on any kernel computation from a cacheless state s to s', if
+   cl_Icmf holds between them, then the hardware only performs cacheable
+   operations
+* *ca_Icmf_po*: if Icoh holds in s and ca_Icmf holds between s and s', then the
+   dependencies of the next instruction in s' are data-coherent
+* *ca_Icodef_po*: if Inv holds in s and ca_Icmf and ca_Icodef holds between s
+   and s', then the translation of the PC in s' is instruction-coherent and
+   clean
+* *Inv_rebuild_po*: given simulating pairs of states (s,sc) and (s',sc') such that 
+  1. (s,sc) are exception entry points where cl_Inv and Inv hold, respectively,
+  2. the intermediate invariants hold between s and s', resp. sc and sc',
+  3. the history variables in s' and sc' agree, 
+  4. cl_Inv holds in s', and 
+  5. in both s' and sc' are the excecution mode is unprivileged,
+then Ifun, Icoh, and Icode hold in sc'
+* *Icm_f_po*: if the intermediate invariant holds between s and s' and the
+   execution mode in s' is unprivileged, Icm holds in s'
+
+Once these obligations are discharged for a given countermeasure, *cm_user_po*
+and *cm_kernel_po* can be removed from the antecedents of the generic kernel
+integrity theorems, yielding the integrity result for this countermeasure. Here,
+this procedure has been demonstrated for always cacheability and selective
+eviction.

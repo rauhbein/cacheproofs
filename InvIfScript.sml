@@ -260,7 +260,7 @@ val Icode_CR_po = Define `Icode_CR_po I =
     /\ iCoh s'.ms {pa | MEM pa IN CRex s'}
     /\ isafe s {pa | MEM pa IN CRex s}
     /\ isafe s' {pa | MEM pa IN CRex s'}
-    /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))
+    /\ (!r. r IN CRex s ==> (Cv s r = Cv s' r))
         ==>
     (I s <=> I s')
 `;
@@ -377,7 +377,7 @@ val Icode_CR_oblg = store_thm("Icode_CR_oblg", ``
     /\ iCoh s'.ms {pa | MEM pa IN CRex s'}
     /\ isafe s {pa | MEM pa IN CRex s}
     /\ isafe s' {pa | MEM pa IN CRex s'}
-    /\ (!r. r IN CR s ==> (Cv s r = Cv s' r))
+    /\ (!r. r IN CRex s ==> (Cv s r = Cv s' r))
         ==>
     (Icode s <=> Icode s')
 ``,

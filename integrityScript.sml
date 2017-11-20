@@ -94,7 +94,13 @@ val Icode_CR_lem = store_thm("Icode_CR_lem", ``
         ==>
     (Icode s <=> Icode s')
 ``,
-  REWRITE_TAC [Icode_CR_oblg]
+  REPEAT STRIP_TAC >>
+  `!r. r IN CRex s ==> (Cv s r = Cv s' r)` by (
+      REPEAT STRIP_TAC >>
+      IMP_RES_TAC CRex_lem >>
+      RES_TAC
+  ) >>
+  IMP_RES_TAC Icode_CR_oblg
 );
 
 val Icode_iCoh_lem = store_thm("Icode_iCoh_lem", ``
@@ -249,10 +255,11 @@ val core_bisim_dl_lem = store_thm("core_bisim_dl_lem", ``
  /\ abs_ca_trans sc m dlc sc'
  /\ (s.cs = sc.cs)
  /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
+ /\ (cl_Cv s (MEM (cl_Tr s (VApc s.cs))) = imv sc.ms T (ca_Tr sc (VApc sc.cs)))
         ==>
     (dl = dlc)
 ``,
-  REWRITE_TAC [core_bisim_dl_oblg]
+  METIS_TAC [core_bisim_dl_oblg]
 );
 
 val core_bisim_lem = store_thm("core_bisim_lem", ``
@@ -270,61 +277,6 @@ val core_bisim_lem = store_thm("core_bisim_lem", ``
  /\ (!pa. pa IN writes dl ==> (cl_Cv s' (MEM pa) = Cv sc' (MEM pa)))
 ``,
   REWRITE_TAC [core_bisim_oblg]
-);
-
-val hist_bisim_lem = store_thm("hist_bisim_lem", ``
-!s s' sc sc' m dl (n:num) f Icoh Icode Icm ca_Icmf.
-    cm_user_po Icoh Icode Icm
- /\ ca_Icmf_po ca_Icmf Icoh Icode Icm
- /\ Rsim sc s
- /\ (!m s'' sc''. 
-        m <= n
-     /\ cl_kcomp s s'' m
-     /\ ca_kcomp sc sc'' m
-            ==>
-        Rsim sc'' s''
-     /\ ca_Icmf sc sc'' m)
- /\ Icoh sc
- /\ cl_kcomp s s' n
- /\ ca_kcomp sc sc' n
-        ==>
-    (clh f s s' n = cah f sc sc' n)
-``,
-  Induct_on `n`
-  >| [(* n = 0 *)
-      REPEAT STRIP_TAC >>
-      IMP_RES_TAC cl_kcomp_0_lem >>
-      IMP_RES_TAC ca_kcomp_0_lem >>
-      IMP_RES_TAC clh_0_lem >>
-      IMP_RES_TAC cah_0_lem >>
-      ASM_REWRITE_TAC []
-      ,
-      (* n -> SUC n *)
-      REPEAT STRIP_TAC >>
-      FULL_SIMP_TAC std_ss [cl_kcomp_SUC_lem, ca_kcomp_SUC_lem] >>
-      `n <= SUC n` by ( RW_TAC arith_ss [] ) >>
-      `Rsim s''' s''` by ( RES_TAC ) >>
-      `ca_Icmf sc s''' n` by ( RES_TAC ) >>
-      `s''.cs = s'''.cs` by ( IMP_RES_TAC Rsim_cs_lem ) >>
-      `dl = dl'` by (
-          MATCH_MP_TAC core_bisim_dl_lem >>
-	  IMP_RES_TAC ca_Icmf_po_def >>
-	  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
-	  METIS_TAC []
-      ) >>
-      RW_TAC std_ss [] >>
-      `!m s1 sc1. m <= n /\ cl_kcomp s s1 m /\ ca_kcomp sc sc1 m ==>
-		  Rsim sc1 s1 /\ ca_Icmf sc sc1 m` by ( 
-          REPEAT GEN_TAC >>
-	  STRIP_TAC >>
-	  `m <= SUC n` by ( DECIDE_TAC ) >>
-	  METIS_TAC [] 
-      ) >>
-      `clh f s s'' n = cah f sc s''' n` by ( METIS_TAC [] ) >>
-      IMP_RES_TAC clh_SUC_lem >>
-      IMP_RES_TAC cah_SUC_lem >>
-      RW_TAC std_ss []
-     ]
 );
 
 val ca_deps_pc_lem = store_thm("ca_deps_pc_lem", ``
@@ -355,13 +307,6 @@ val ca_vdeps_PC_lem = store_thm("ca_vdeps_PC_lem", ``
 !s. VApc s.cs IN ca_vdeps s
 ``,
   REWRITE_TAC [ca_vdeps_PC_oblg]
-);
-
-val cl_CRex_lem = store_thm("cl_CRex_lem", ``
-!s r. cl_Inv s /\ r IN cl_CRex s ==> 
-(?pa. (r = MEM pa)) /\ r IN cl_CR s
-``,
-  REWRITE_TAC [cl_CRex_oblg]
 );
 
 (******** top level proof ********)
@@ -710,6 +655,8 @@ val Rsim_ca_step_lem = store_thm("Rsim_ca_step_lem", ``
 !sc s m dl sc'.
     Rsim sc s
  /\ dCoh sc.ms (ca_deps sc) 
+ /\ icoh sc.ms (ca_Tr sc (VApc sc.cs)) 
+ /\ clean sc.ms (ca_Tr sc (VApc sc.cs)) 
  /\ abs_ca_trans sc m dl sc'
         ==>
     ?s'. abs_cl_trans s m dl s' 
@@ -724,36 +671,29 @@ val Rsim_ca_step_lem = store_thm("Rsim_ca_step_lem", ``
   ) >>
   IMP_RES_TAC Rsim_dCoh_Cv_lem >>
   FULL_SIMP_TAC std_ss [] >>
-  IMP_RES_TAC core_bisim_dl_lem >>
-  FULL_SIMP_TAC std_ss [] >>
-  HINT_EXISTS_TAC >>
-  ASM_REWRITE_TAC []
-);
-
-val Rsim_cl_step_lem = store_thm("Rsim_cl_step_lem", ``
-!sc s m dl s'.
-    Rsim sc s
- /\ dCoh sc.ms (ca_deps sc) 
- /\ abs_cl_trans s m dl s'
-        ==>
-    ?sc'. abs_ca_trans sc m dl sc' 
-``,
-  REPEAT STRIP_TAC >>
-  ASSUME_TAC ( SPEC ``sc:hw_state`` abs_ca_progress_lem ) >> 
-  FULL_SIMP_TAC std_ss [] >>
-  IMP_RES_TAC Rsim_cs_lem >>
-  `mode sc = m` by (
-      IMP_RES_TAC abs_cl_trans_mode_lem >>
-      REV_FULL_SIMP_TAC std_ss [cl_mode_def, mode_def]
+  `ca_Tr sc (VApc sc.cs) IN ca_deps sc` by (
+      REWRITE_TAC [ca_deps_pc_lem]
   ) >>
-  IMP_RES_TAC Rsim_dCoh_Cv_lem >>
-  FULL_SIMP_TAC std_ss [] >>
+  `VApc sc.cs IN ca_vdeps sc` by (
+      REWRITE_TAC [ca_vdeps_PC_lem]
+  ) >>
+  `cl_Tr s (VApc s.cs) = ca_Tr sc (VApc sc.cs)` by (
+      RW_TAC std_ss [] >>
+      IMP_RES_TAC deps_Tr_eq_lem 
+  ) >>
+  `cl_Cv s (MEM (cl_Tr s (VApc s.cs))) = 
+   imv sc.ms T (ca_Tr sc (VApc sc.cs))` by (
+      RW_TAC std_ss [Cv_mem_lem] >>
+      MATCH_MP_TAC EQ_SYM >>
+      MATCH_MP_TAC imv_dmv_lem >>
+      IMP_RES_TAC dCoh_lem >>
+      ASM_REWRITE_TAC []
+  ) >>
   IMP_RES_TAC core_bisim_dl_lem >>
   FULL_SIMP_TAC std_ss [] >>
   HINT_EXISTS_TAC >>
   ASM_REWRITE_TAC []
 );
-
 
 (* top level proof *)
 
