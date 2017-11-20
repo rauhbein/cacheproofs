@@ -8,13 +8,7 @@ open cachememTheory;
 
 val _ = new_theory "msIf";
 
-(* TODO: 
-- ms record type
-- accessor functions
-- transition function / relation
-- lift deriveability lemmas
-- IC lemmas / invariant
-*)
+(* memory system instantiation: L1 Data and Instruction cache *)
 
 val _ = Datatype `memsys_state = <| 
     dc  : cache_state;
@@ -916,7 +910,7 @@ val Invic_preserve_oblg = store_thm("Invic_preserve_oblg", ``
      ]
 );
 
-(* Instruction Cache Coherency *) (* TODO: check, ihit -> ~dirty*)
+(* Instruction Cache Coherency *)
 
 val icoh_def = Define `icoh ms pa = 
 ihit ms pa ==> (icnt ms pa = M ms pa) /\ clean ms pa`;
