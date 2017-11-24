@@ -87,8 +87,8 @@ definitions, lemmas and proof obligations.
 * *Mode*: cl_mode for the cacheless model, mode for the cache-aware model
 * *MMU*: Mmu in the hardware model, to check permissions this is mapped to
    cl_Mon and Mon, the translated address is obtained by cl_Tr and ca_Tr
-* *->* abs_cl_trans and abs_ca_trans are the transition relations for the
-       cacheless and cache-aware model, respectively
+* *->*: abs_cl_trans and abs_ca_trans are the transition relations for the
+      cacheless and cache-aware model, respectively
 * *squiggly arrow*: the weak kernel transition is denoted by cl_kcomp and
    ca_kcomp, it takes a number of steps as a parameter
 * *d-hit*: dhit
