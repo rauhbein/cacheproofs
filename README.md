@@ -78,7 +78,108 @@ for the latter countermeasure.
 
 ## Lemmas and Proof Obligations
 
-TODO
+The formal development matches the proof as presented in the paper closely,
+however there are some minor differences. Here we present a mapping of
+definitions, lemmas and proof obligations.
+
+### Definitions
+
+* *Mode*: cl_mode for the cacheless model, mode for the cache-aware model
+* *MMU*: Mmu in the hardware model, to check permissions this is mapped to
+   cl_Mon and Mon, the translated address is obtained by cl_Tr and ca_Tr
+* *->* abs_cl_trans and abs_ca_trans are the transition relations for the
+       cacheless and cache-aware model, respectively
+* *squiggly arrow*: the weak kernel transition is denoted by cl_kcomp and
+   ca_kcomp, it takes a number of steps as a parameter
+* *d-hit*: dhit
+* *d-dirty*: dirty, though this differs from the definition in the paper. Here,
+   dirty means that the corresponding line is marked dirty. The definition of
+   the paper is equivalent to ~clean.
+* *d-cnt*: dcnt
+* *i-hit*: ihit
+* *i-dirty*: not used
+* *i-hit*: icnt
+* *Dv*: Cv for the cache-aware model, cl_Cv is the memory view of the cacheless
+   model, defined on resources rather than addresses to cover also registers
+* *Iv*: imv, takes a cacheability parameter for legacy reasons
+* *Mv*: dmvalt, takes a cacheability parameter for legacy reasons
+* *K_vm*: Kvm
+* *K_ex*: Kcode
+* *CR*: cl_CR and CR
+* *EX*: cl_CRex and CRex
+* *ex-entry*: cl_exentry and exentry
+* *R_sim*: Rsim
+* *D-Coh*: dCoh
+* *I-Coh*: this is the conjunction of iCoh and isafe
+* *MD*: cl_MDVA and MDVA, cl_MD and MD denote the complete MMU domain
+* *derivability*: drvbl
+* *p-deps*: cl_deps and ca_deps
+* *v-deps*: cl_vdeps and ca_vdeps
+* *cache-aware invariant I*: Inv, takes Icoh, Icode, and Icm as parameters
+* *cacheless invariant*: cl_Inv
+* *I_fun*: Ifun, introduced as a specification function
+* *I_coh*: split into Icoh and Icode to cover data and instruction coherency
+* *I_cm*: Icm
+* *cache-aware II*: ca_II, parametrized by Icoh, Icode, Icm, ca_Icmf, and
+   ca_Icodef, here ca_II only contains II_cm, all properties constraining the
+   virtual address space of the kernel are pushed into the countermeasure II_cm
+* *cache-aware II_cm*: split into ca_Icmf and ca_Icodef for countermeasures
+   against data and instruction cache incoherency
+* *cacheless II*: cl_II, parametrized by cl_Icmf and cl_Icodef
+* *cacheless II_cm*: split into cl_Icmf and cl_Icodef for countermeasures
+   against data and instruction cache incoherency
+
+### Lemmas
+
+* *Lemma 1*: dCoh_alt_lem and imv_dmv_lem
+* *Lemma 2*: Inv_CR_lem
+* *Lemma 3*: Inv_Coh_CR_lem and Inv_iCoh_lem
+* *Lemma 4*: Inv_Ifun_lem
+* *Lemma 5*: Inv_user_preserved_thm
+* *Lemma 6*: since II consists solely of II_cm here, this Lemma is reduced to
+   SW-I Obligation 7
+* *Lemma 7*: kernel_wrel_sim_lem
+* *Lemma 8*: kernel_integrity_sim_thm
+
+### Proof obligations
+
+* *HW Obligation 1.1*: MD_monotonic_oblg
+* *HW Obligation 1.2*: MD_oblg, MD_coreg_oblg, and Mmu_oblg
+* *HW Obligation 2.1*: abs_ca_trans_drvbl_oblg
+* *HW Obligation 2.2*: abs_ca_trans_switch_oblg
+* *HW Obligation 3.1*: cl_deps_eq_oblg, deps_eq_oblg, and deps_vdeps_eq_lem 
+* *HW Obligation 3.2*: core_bisim_oblg, abs_cl_trans_not_write_oblg, and
+   abs_ca_trans_dmvalt_not_write_oblg, in contrast to the paper the core
+   bisimulation obligation constrains the data-view of *cache-aware*
+   dependencies and requires that dependencies are the same in both models. This
+   is discharged in the proof using deps_eq_oblg.
+* *HW Obligation 4.1*: abs_ca_trans_dcoh_write_oblg,
+   abs_ca_trans_dCoh_preserve_oblg, abs_ca_trans_icoh_clean_preserve_oblg, and
+   abs_ca_trans_clean_oblg
+* *HW Obligation 4.2*: abs_ca_trans_dcoh_flush_lem and abs_ca_trans_clean_lem
+* *HW Obligation 4.3*: abs_ca_trans_icoh_flush_oblg and
+   abs_ca_trans_clean_preserve_oblg
+* *SW-I Obligation 1.1*: Ifun_CR_oblg
+* *SW-I Obligation 1.2*: Icoh_CR_oblg and Icode_CR_oblg
+* *SW-I Obligation 1.3*: Icm_oblg
+* *SW-I Obligation 2.1*: Ifun_Mon_oblg 
+* *SW-I Obligation 2.2*: Icoh_dCoh_oblg, Icode_iCoh_oblg, and Icode_isafe_oblg
+* *SW-I Obligation 3.1*: CR_oblg, CRex_eq_oblg, and CRex_oblg
+* *SW-I Obligation 3.2*: Ifun_MD_oblg
+* *SW-C Obligation 1*: cl_Inv_po
+* *SW-I Obligation 4*: fixing the kernel address translation is part of the
+   countermeasure in the formal proof, i.e., it is achieved by moving all of
+   Definition 4 into II_cm (see cl_Inv_Mmu_fixed_def and ca_Inv_Mmu_fixed_def).
+* *SW-C Obligation 2*: cl_II_po
+* *SW-I Obligation 5*: ca_Icmf_po and cl_Icodef_po
+* *SW-I Obligation 6.1*: Rsim_cl_Inv_lem, Icmf_init_xfer_po, Icodef_init_xfer_po
+* *SW-I Obligation 6.2*: Inv_rebuild_po
+* *SW-I Obligation 6.3*: Icm_f_po
+* *SW-I Obligation 7*: Icmf_xfer_po and Icodef_xfer_po
+* *SW-I Obligation 8*: Ifun_AC_user_po
+
+All software invariant obligations for the application integrity proof are
+collected in cm_user_po. For the kernel we similarly introduce cm_kernel_po.
 
 ## Hardware Abstraction Layers
 

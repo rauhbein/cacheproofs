@@ -1284,6 +1284,9 @@ Inv_rebuild_po Icoh Icode Icm ca_Icmf ca_Icodef cl_Icmf cl_Icodef =
 val Icm_f_po = Define `Icm_f_po Icmf Icodef Icoh Icode Icm =
 !sc sc' n. 
     cm_user_po Icoh Icode Icm 
+ /\ Ifun sc'
+ /\ Icoh sc' 
+ /\ Icode sc'
  /\ ca_II Icoh Icode Icm Icmf Icodef sc sc' n
  /\ (mode sc' = USER)
         ==> 
