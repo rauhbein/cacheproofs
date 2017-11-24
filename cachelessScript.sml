@@ -992,7 +992,7 @@ val cl_deps_MD_lem = store_thm("cl_deps_MD_lem", ``
      ]
 );
 
-val deps_vdeps_eq_lem = store_thm("deps_vdeps_eq_lem", ``
+val deps_vdeps_eq_oblg = store_thm("deps_vdeps_eq_oblg", ``
 !s sc. (s.cs = sc.cs)
     /\ (!pa. pa IN ca_deps sc ==> (cl_Cv s (MEM pa) = Cv sc (MEM pa)))
         ==>
@@ -1017,7 +1017,7 @@ val deps_MD_eq_lem = store_thm("deps_MD_eq_lem", ``
     (cl_MDVA s (cl_vdeps s) = MDVA sc (ca_vdeps sc))
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC deps_vdeps_eq_lem >>
+  IMP_RES_TAC deps_vdeps_eq_oblg >>
   IMP_RES_TAC deps_MD_lem >>
   FULL_SIMP_TAC  std_ss [cl_MDVA_def, MDVA_def, cl_Cv_def, Cv_def] >>
   MATCH_MP_TAC EQ_SYM >>
@@ -1050,7 +1050,7 @@ val deps_Tr_eq_lem = store_thm("deps_Tr_eq_lem", ``
     (!va. va IN ca_vdeps sc ==> (cl_Tr s va = ca_Tr sc va))
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC deps_vdeps_eq_lem >>
+  IMP_RES_TAC deps_vdeps_eq_oblg >>
   IMP_RES_TAC deps_MD_lem >>
   `MDVA sc (ca_vdeps sc) = cl_MDVA s (cl_vdeps s)` by (
       IMP_RES_TAC deps_MD_eq_lem >>

@@ -174,6 +174,10 @@ model in the bisimulation proof for kernel execution:
    configuration, the states agree on the data view of the dependencies of the
    next instruction of the cacheless model, then the dependencies of the next
    instruction in both states are equal
+* *deps_vdeps_eq_oblg*: if a cache-aware and cacheless state have the same core
+   configuration, the states agree on the data view of the dependencies of the
+   next instruction of the cache-aware model, then the virtual dependencies of
+   the next instruction in both states are equal
 
 In addition to these properties, the proof of the *selective eviction*
 countermeasure introduces the following proof obligations on the hardware:
