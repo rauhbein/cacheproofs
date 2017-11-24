@@ -125,7 +125,8 @@ Below we list all proof obligations on the abstract cache-aware hardware model.
    data-coherent
 * *abs_ca_trans_dCoh_preserve_oblg*: cacheable accesses preserve data-coherence
 * *abs_ca_trans_drvbl_oblg*: the transition relation for USER steps of the
-   cache-aware model is a subset of the deriveability relation
+   cache-aware model is a subset of the deriveability relation, if the MMU
+   domain is data-coherent and not writable in user mode
 * *abs_ca_trans_switch_lem*: any user step of the cache-aware model that
    switches mode to privileged leads into an exception entry state, i.e., only
    exceptions may escalate the execution mode privileges
