@@ -369,7 +369,9 @@ val dc_cacheable_other_lem = store_thm("dc_cacheable_other_lem", ``
              /\ (dw ms' pa <> dw ms pa) ==> 
     (~dhit ms' pa  /\ (dirty ms pa ==> (M ms' pa = dcnt ms pa))) \/
     (wt dop /\ dhit ms pa /\ ~dirty ms pa /\ dirty ms' pa 
-            /\ (dcnt ms' pa = dcnt ms pa))
+            /\ (dcnt ms' pa = dcnt ms pa)) \/
+    (rd dop /\ ~dhit ms pa /\ dhit ms' pa /\ ~dirty ms' pa 
+            /\ (dcnt ms' pa = M ms pa))
 ``,
   REWRITE_TAC [dc_cacheable_other_oblg]
 );
@@ -493,7 +495,8 @@ val M_uncacheable_write_lem = store_thm("M_uncacheable_write_lem", ``
 val ic_cacheable_other_lem = store_thm("ic_cacheable_other_lem", ``
 !ms pa ms' pa'. (ms' = msca_trans ms (FREQ pa')) /\ (pa <> pa')
              /\ (iw ms' pa <> iw ms pa) ==> 
-    ~ihit ms' pa
+    (~ihit ms' pa \/
+     ~ihit ms pa /\ ihit ms' pa /\ (icnt ms' pa = M ms pa))
 ``,
   REWRITE_TAC [ic_cacheable_other_oblg]
 );
@@ -501,7 +504,7 @@ val ic_cacheable_other_lem = store_thm("ic_cacheable_other_lem", ``
 val ic_cacheable_read_lem = store_thm("ic_cacheable_read_lem", ``
 !ms pa ms'. (ms' = msca_trans ms (FREQ pa)) /\ (iw ms' pa <> iw ms pa) 
         ==>
-    ~ihit ms pa /\ (icnt ms' pa = M ms pa)
+    ~ihit ms pa /\ ihit ms' pa /\ (icnt ms' pa = M ms pa)
 ``,
   REWRITE_TAC [ic_cacheable_read_oblg]
 );
@@ -1684,9 +1687,11 @@ store_thm("hw_trans_icoh_clean_preserve_lem", ``
 val drvbl_non_def = Define `drvbl_non s s' pa = 
    (M s'.ms pa <> M s.ms pa ==> dirty s.ms pa /\ (M s'.ms pa = dcnt s.ms pa))
 /\ (dw s'.ms pa <> dw s.ms pa ==> 
-       (((~dhit s'.ms pa /\ (dirty s.ms pa ==> (M s'.ms pa = dcnt s.ms pa))))
+       (~dhit s'.ms pa /\ (dirty s.ms pa ==> (M s'.ms pa = dcnt s.ms pa))
         \/ dhit s.ms pa /\ ~dirty s.ms pa /\ dirty s'.ms pa 
-	                /\ (dcnt s'.ms pa = dcnt s.ms pa)))
+	                /\ (dcnt s'.ms pa = dcnt s.ms pa)
+        \/ ~dhit s.ms pa /\ dhit s'.ms pa /\ ~dirty s'.ms pa 
+	                /\ (dcnt s'.ms pa = M s.ms pa)))
 `;
 
 (* NOTE: need cleanness here to preserve isafe later *)
@@ -1694,7 +1699,8 @@ val drvbl_rd_def = Define `drvbl_rd s s' pa =
    (Mon s (MEM pa) USER R \/ MEM pa IN MD s)
 /\ (M s'.ms pa = M s.ms pa)
 /\ (dw s'.ms pa <> dw s.ms pa ==> 
-        ~dhit s.ms pa /\ ~dirty s'.ms pa /\ (dcnt s'.ms pa = M s.ms pa))
+        ~dhit s.ms pa /\ dhit s'.ms pa /\ ~dirty s'.ms pa 
+		      /\ (dcnt s'.ms pa = M s.ms pa))
 `;
 
 val drvbl_wt_def = Define `drvbl_wt s s' pa = 
@@ -1714,12 +1720,15 @@ val drvbl_data_def = Define `drvbl_data s s' =
 (* instruction cache deriveability *)
 
 val drvbl_ic_non_def = Define `drvbl_ic_non s s' pa = 
-iw s'.ms pa <> iw s.ms pa ==> ~ihit s'.ms pa
+iw s'.ms pa <> iw s.ms pa ==> 
+     (~ihit s'.ms pa \/ 
+      ~ihit s.ms pa /\ ihit s'.ms pa /\ (icnt s'.ms pa = M s.ms pa))
 `;
 
 val drvbl_ic_ex_def = Define `drvbl_ic_ex s s' pa = 
    Mon s (MEM pa) USER EX 
-/\ (iw s'.ms pa <> iw s.ms pa ==> ~ihit s.ms pa /\ (icnt s'.ms pa = M s.ms pa))
+/\ (iw s'.ms pa <> iw s.ms pa ==> 
+       ~ihit s.ms pa /\ ihit s'.ms pa /\ (icnt s'.ms pa = M s.ms pa))
 `;
 
 val drvbl_ic_def = Define `drvbl_ic s s' = 
@@ -1944,7 +1953,9 @@ val drvbl_lem = store_thm("drvbl_lem", ``
 	          DISJ1_TAC >>
 	          REWRITE_TAC [drvbl_ic_non_def] >>
 	          STRIP_TAC >>
-	          IMP_RES_TAC ic_cacheable_other_lem
+	          IMP_RES_TAC ic_cacheable_other_lem >> (
+		      RW_TAC std_ss []
+		  )
 		 ]
 	      ,
 	      (* flush *)
@@ -1959,12 +1970,14 @@ val drvbl_lem = store_thm("drvbl_lem", ``
 	          IMP_RES_TAC msca_ICFR_lem >>
 	          REWRITE_TAC [drvbl_ic_non_def] >>
 	          STRIP_TAC >>
-	          IMP_RES_TAC ic_cacheable_cl_lem
+	          IMP_RES_TAC ic_cacheable_cl_lem >>
+		  RW_TAC std_ss []
 	          ,
 	          (* other address *)
 	          REWRITE_TAC [drvbl_ic_non_def] >>
 	          STRIP_TAC >>
-	          IMP_RES_TAC ic_cacheable_cl_other_lem
+	          IMP_RES_TAC ic_cacheable_cl_other_lem >>
+		  RW_TAC std_ss []
 	         ]
 	     ]
 	 ]
@@ -2073,7 +2086,7 @@ val drvbl_Coh_mem_lem = store_thm("drvbl_Coh_mem_lem", ``
       fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
   ) >>
   FULL_SIMP_TAC std_ss [drvbl_non_def(* , drvbl_rd_def *), drvbl_wt_def]
-  >| [(* eviction *)
+  >| [(* eviction, dirtying, or line fill *)
       Cases_on `dw s'.ms pa = dw s.ms pa`
       >| [(* cache unchanged *)
 	  Cases_on `M s'.ms pa = M s.ms pa`
@@ -2117,6 +2130,14 @@ val drvbl_Coh_mem_lem = store_thm("drvbl_Coh_mem_lem", ``
 	      (* dirtied entry *)
 	      IMP_RES_TAC dirty_hit_lem >>
 	      RW_TAC std_ss [dmvca_hit_lem]
+	      ,
+	      (* line fill *)
+	      IMP_RES_TAC not_dhit_not_dirty_lem >>
+	      `M s'.ms pa = M s.ms pa` by (
+	          CCONTR_TAC >>
+	      	  FULL_SIMP_TAC std_ss []
+	      ) >>
+	      RW_TAC std_ss [dmvca_hit_lem, dmvca_miss_lem]
 	     ]	      
 	 ]
       ,
@@ -2192,6 +2213,15 @@ val drvbl_non_dcoh_lem = store_thm("drvbl_non_dcoh", ``
 	  ,
 	  (* dirtied line *)
 	  IMP_RES_TAC dcoh_dirty_lem
+	  ,
+	  (* line fill *)
+	  IMP_RES_TAC not_dhit_not_dirty_lem >>
+	  `M s'.ms pa = M s.ms pa` by (
+	      CCONTR_TAC >>
+	      FULL_SIMP_TAC std_ss []
+	  ) >>
+	  MATCH_MP_TAC dcoh_equal_lem >>
+	  ASM_REWRITE_TAC []
 	 ]
      ]
 );
@@ -2384,6 +2414,15 @@ val drvbl_clean_lem = store_thm("drvbl_clean_lem", ``
 		  (* mem changed -> contradiction *)
 		  RES_TAC
 		 ]
+	      ,
+	      (* line fill *)
+	      IMP_RES_TAC not_dhit_not_dirty_lem >>
+	      `M s'.ms pa = M s.ms pa` by (
+	          CCONTR_TAC >>
+	          FULL_SIMP_TAC std_ss []
+	      ) >>
+	      MATCH_MP_TAC clean_equal_lem >>
+	      ASM_REWRITE_TAC []
 	     ]
 	 ]
       ,
@@ -2467,7 +2506,8 @@ val drvbl_iCoh_lem = store_thm("drvbl_iCoh_lem", ``
 	  `drvbl_ic_non s s' pa \/ drvbl_ic_ex s s' pa` by (
 	      FULL_SIMP_TAC std_ss [drvbl_def, drvbl_ic_def] )
 	  >| [(* eviction -> contradiction with hit *)
-	      FULL_SIMP_TAC std_ss [drvbl_ic_non_def]
+	      FULL_SIMP_TAC std_ss [drvbl_ic_non_def] >>
+	      RES_TAC
 	      ,
 	      (* cache fill on fetch *)
 	      FULL_SIMP_TAC std_ss [drvbl_ic_ex_def]
@@ -2503,12 +2543,17 @@ val drvbl_iCoh_mem_lem = store_thm("drvbl_iCoh_mem_lem", ``
       (* cache changed *)
       `drvbl_ic_non s s' pa \/ drvbl_ic_ex s s' pa` by (
       FULL_SIMP_TAC std_ss [drvbl_def, drvbl_ic_def] )
-      >| [(* eviction *)
+      >| [(* eviction or fill *)
 	  FULL_SIMP_TAC std_ss [drvbl_ic_non_def] >>
-	  RES_TAC >>
-	  `ihit s.ms pa` by ( METIS_TAC [double_not_ihit_lem] ) >>
-	  RW_TAC std_ss [imv_hit_lem, imv_miss_lem] >>
-	  FULL_SIMP_TAC std_ss [icoh_def] 
+	  RES_TAC
+	  >| [(* eviction *)
+	      `ihit s.ms pa` by ( METIS_TAC [double_not_ihit_lem] ) >>
+	      RW_TAC std_ss [imv_hit_lem, imv_miss_lem] >>
+	      FULL_SIMP_TAC std_ss [icoh_def] 
+	      ,
+	      (* line fill *)
+	      RW_TAC std_ss [imv_hit_lem, imv_miss_lem]
+	     ]	      
 	  ,
 	  (* cache fill on fetch *)
 	  FULL_SIMP_TAC std_ss [drvbl_ic_ex_def] >>

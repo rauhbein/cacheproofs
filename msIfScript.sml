@@ -345,7 +345,9 @@ val dc_cacheable_other_oblg = store_thm("dc_cacheable_other_oblg", ``
              /\ (dw ms' pa <> dw ms pa) ==> 
     (~dhit ms' pa  /\ (dirty ms pa ==> (M ms' pa = dcnt ms pa))) \/
     (wt dop /\ dhit ms pa /\ ~dirty ms pa /\ dirty ms' pa 
-            /\ (dcnt ms' pa = dcnt ms pa))
+            /\ (dcnt ms' pa = dcnt ms pa)) \/
+    (rd dop /\ ~dhit ms pa /\ dhit ms' pa /\ ~dirty ms' pa 
+            /\ (dcnt ms' pa = M ms pa))
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -561,19 +563,21 @@ val M_uncacheable_write_oblg = store_thm("M_uncacheable_write_oblg", ``
 val ic_cacheable_other_oblg = store_thm("ic_cacheable_other_oblg", ``
 !ms pa ms' pa'. (ms' = msca_trans ms (FREQ pa')) /\ (pa <> pa')
              /\ (iw ms' pa <> iw ms pa) ==> 
-    ~ihit ms' pa
+    (~ihit ms' pa \/
+     ~ihit ms pa /\ ihit ms' pa /\ (icnt ms' pa = M ms pa))
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   IMP_RES_TAC msca_FREQ_lem >>
   FULL_SIMP_TAC std_ss [iw_def, ihit_def] >>
+  DISJ1_TAC >>
   IMP_RES_TAC ca_cacheable_other_lem
 );
 
 val ic_cacheable_read_oblg = store_thm("ic_cacheable_read_oblg", ``
 !ms pa ms'. (ms' = msca_trans ms (FREQ pa)) /\ (iw ms' pa <> iw ms pa) 
         ==>
-    ~ihit ms pa /\ (icnt ms' pa = M ms pa)
+    ~ihit ms pa /\ ihit ms' pa /\ (icnt ms' pa = M ms pa)
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -801,7 +805,7 @@ val dmvalt_unchanged_oblg = store_thm("dmvalt_unchanged_oblg", ``
 );
 
 val dmvalt_not_write_oblg = store_thm("dmvalt_not_write_oblg", ``
-!ms dop ms' pa. ~wt dop /\ (ms' = msca_trans ms (DREQ dop))
+!ms dop ms'. ~wt dop /\ (ms' = msca_trans ms (DREQ dop))
         ==>
     (dmvalt ms' T (PA dop) = dmvalt ms T (PA dop))
 ``,
@@ -1436,23 +1440,30 @@ val msca_clean_preserve_oblg = store_thm("msca_clean_preserve_oblg", ``
 	      FULL_SIMP_TAC std_ss [] >>
 	      Cases_on `dhit ms' pa`
 	      >| [(* dirty but clean *)
-		  IMP_RES_TAC dc_cacheable_other_oblg >>
 		  Cases_on `M ms' pa = M ms pa`
 		  >| [(* mem unchanged *)
 		      FULL_SIMP_TAC std_ss [clean_def] >>
 		      Cases_on `dirty ms pa`
 		      >| [(* dirty before *)
 			  RES_TAC >>
-			  RW_TAC std_ss []
+			  IMP_RES_TAC dc_cacheable_other_oblg >>
+			  RW_TAC std_ss []			  
 			  ,
 			  (* not dirty before -> use coherency *)
-			  IMP_RES_TAC dcoh_clean_oblg >>
-			  RW_TAC std_ss []
+			  IMP_RES_TAC dc_cacheable_other_oblg
+			  >| [(* write *)
+			      IMP_RES_TAC dcoh_clean_oblg >>
+			      RW_TAC std_ss []
+			      ,
+			      (* read -> not dirty *)
+			      RW_TAC std_ss []
+			     ]			      
 			 ]
 		      ,
 		      (* mem changed *)
 		      IMP_RES_TAC M_cacheable_other_oblg >>
-		      RW_TAC std_ss [clean_def]
+		      IMP_RES_TAC dc_cacheable_other_oblg >>
+		      IMP_RES_TAC not_dhit_not_dirty_oblg
 		     ]
 		  ,
 		  (* evicted *)
