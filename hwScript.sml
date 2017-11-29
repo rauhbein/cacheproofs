@@ -676,11 +676,14 @@ val dmvalt_lem = store_thm("dmvalt_lem", ``
 );
 
 val dmvalt_unchanged_lem = store_thm("dmvalt_unchanged_lem", ``
-!ms dop ms' pa. pa <> PA dop /\ (ms' = msca_trans ms (DREQ dop))
+!ms dop ms' pa. 
+    pa <> PA dop
+ /\ (ms' = msca_trans ms (DREQ dop))
+ /\ (wt dop ==> dcoh ms (PA dop))
         ==>
     (dmvalt ms' T pa = dmvalt ms T pa)
 ``,
-  REWRITE_TAC [dmvalt_unchanged_oblg]
+  METIS_TAC [dmvalt_unchanged_oblg]
 );
 
 val dmvalt_not_write_lem = store_thm("dmvalt_not_write_lem", ``
@@ -1470,7 +1473,10 @@ val hw_trans_user_MD_lem = store_thm("hw_trans_user_MD_lem", ``
 );
 
 val hw_trans_dmvalt_lem = store_thm("hw_trans_dmvalt_lem", ``
-!s m req s' pa. pa <> Adr req /\ hw_trans s m req s'
+!s m req s' pa. 
+    pa <> Adr req 
+ /\ hw_trans s m req s'
+ /\ (Wreq req ==> dcoh s.ms (Adr req))
          ==>
     (dmvalt s'.ms T pa = dmvalt s.ms T pa)
 ``,
@@ -1478,7 +1484,7 @@ val hw_trans_dmvalt_lem = store_thm("hw_trans_dmvalt_lem", ``
   Cases_on `Dreq req`
   >| [(* Dreq *)
       IMP_RES_TAC Dreq_lem >>
-      FULL_SIMP_TAC std_ss [Adr_def] >>
+      FULL_SIMP_TAC std_ss [Adr_def, Wreq_def] >>
       IMP_RES_TAC hw_trans_data_lem >>
       IMP_RES_TAC dmvalt_unchanged_lem 
       ,
@@ -2698,13 +2704,28 @@ val abs_ca_trans_dmvalt_oblg = store_thm("abs_ca_trans_dmvalt_oblg", ``
       ,
       (* non-empty *)
       IMP_RES_TAC abs_ca_req_lem >>
-      FULL_SIMP_TAC list_ss [] >>
-      MATCH_MP_TAC hw_trans_dmvalt_lem >>
-      EXISTS_TAC ``m:mode`` >>
-      HINT_EXISTS_TAC >>
-      RW_TAC std_ss [] >>
-      CCONTR_TAC >>
-      FULL_SIMP_TAC std_ss []
+      FULL_SIMP_TAC list_ss []
+      >| [(* DOP *)
+          MATCH_MP_TAC hw_trans_dmvalt_lem >>
+          EXISTS_TAC ``m:mode`` >>
+          HINT_EXISTS_TAC >>
+          RW_TAC std_ss [] 
+          >| [(* address not touched *)
+              CCONTR_TAC >>
+              FULL_SIMP_TAC std_ss []
+              ,
+              (* written address coherent *)
+              FULL_SIMP_TAC list_ss [writes_def, opd_def, Wreq_def, Adr_def] >>
+              FULL_SIMP_TAC std_ss [dCoh_lem2, pred_setTheory.IN_SING]
+             ]
+	  ,
+	  (* IFL *)
+	  MATCH_MP_TAC hw_trans_dmvalt_lem >>
+          EXISTS_TAC ``m:mode`` >>
+          HINT_EXISTS_TAC >>
+	  RW_TAC std_ss [Wreq_def] >>
+	  FULL_SIMP_TAC list_ss [adrs_def]
+	 ]
      ]
 );
 

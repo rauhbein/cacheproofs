@@ -794,7 +794,10 @@ val dmvalt_oblg = store_thm("dmvalt_oblg", ``
 );
 
 val dmvalt_unchanged_oblg = store_thm("dmvalt_unchanged_oblg", ``
-!ms dop ms' pa. pa <> PA dop /\ (ms' = msca_trans ms (DREQ dop))
+!ms dop ms' pa. 
+    pa <> PA dop 
+ /\ (ms' = msca_trans ms (DREQ dop))
+ /\ (wt dop ==> dcoh ms (PA dop))
         ==>
     (dmvalt ms' T pa = dmvalt ms T pa)
 ``,
