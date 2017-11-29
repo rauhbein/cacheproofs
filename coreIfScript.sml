@@ -86,9 +86,12 @@ val Mmu_MD_exists = prove (``
 (* MD is monotonically defined set wrt. VAs *)
            /\ (!VAs'. VAs' SUBSET VAs ==> MD(c,mv,VAs') SUBSET MD(c,mv,VAs))
 (* reads and fetches have same translation for a given address, 
-   must be readable in ARM to be executable, 
+   must be readable in ARM to be executable,
+   similarly, writable addresses are always readable
    NOTE: just used to simplifiy the model, i.e., def of Tr / deps for PC *)
            /\ (!va m pa C. (Mmu(c,mv,va,m,EX) = SOME (pa,C)) ==>
+		           (Mmu(c,mv,va,m,R) = SOME (pa,C)))
+           /\ (!va m pa C. (Mmu(c,mv,va,m,W) = SOME (pa,C)) ==>
 		           (Mmu(c,mv,va,m,R) = SOME (pa,C)))
 ``,
   EXISTS_TAC ``\(c,mv,va,m,ac):core_state # mem_view # vadr # mode # acc.
@@ -110,6 +113,14 @@ val Mmu_read_fetch_oblg = store_thm("Mmu_read_fetch_oblg", ``
 ``,
   METIS_TAC [Mmu_MD_spec]
 );
+
+val Mmu_write_read_oblg = store_thm("Mmu_write_read_oblg", ``
+!c mv va m pa C. (Mmu_(c,mv,va,m,W) = SOME (pa,C)) ==>
+                 (Mmu_(c,mv,va,m,R) = SOME (pa,C))
+``,
+  METIS_TAC [Mmu_MD_spec]
+);
+
 
 val MD_monotonic_oblg = store_thm("MD_monotonic_oblg", ``
 !c mv VAs VAs'. VAs SUBSET VAs' ==> MD_(c,mv,VAs) SUBSET MD_(c,mv,VAs')

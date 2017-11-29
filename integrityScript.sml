@@ -141,7 +141,11 @@ val abs_ca_trans_mode_lem = store_thm("abs_ca_trans_mode_lem", ``
 );
 
 val abs_ca_trans_dmvalt_lem = store_thm("abs_ca_trans_dmvalt_lem", ``
-!s m dl s' pa. abs_ca_trans s m dl s' /\ pa NOTIN adrs dl ==> 
+!s m dl s' pa. 
+    abs_ca_trans s m dl s' 
+ /\ pa NOTIN adrs dl 
+ /\ dCoh s.ms (writes dl)
+        ==> 
     (dmvalt s'.ms T pa = dmvalt s.ms T pa)
 ``,
   REWRITE_TAC [abs_ca_trans_dmvalt_oblg]
@@ -149,7 +153,11 @@ val abs_ca_trans_dmvalt_lem = store_thm("abs_ca_trans_dmvalt_lem", ``
 
 val abs_ca_trans_dmvalt_not_write_lem = 
 store_thm("abs_ca_trans_dmvalt_not_write_lem", ``
-!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN adrs dl /\ pa NOTIN writes dl 
+!s m dl s' pa. 
+    abs_ca_trans s m dl s'
+ /\ pa IN adrs dl
+ /\ pa NOTIN writes dl 
+ /\ dCoh s.ms (writes dl)
         ==> 
     (dmvalt s'.ms T pa = dmvalt s.ms T pa)
 ``,
@@ -312,6 +320,12 @@ val ca_vdeps_PC_lem = store_thm("ca_vdeps_PC_lem", ``
 !s. VApc s.cs IN ca_vdeps s
 ``,
   REWRITE_TAC [ca_vdeps_PC_oblg]
+);
+
+val ca_deps_writes_lem = store_thm("ca_deps_writes_lem", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN writes dl ==> pa IN ca_deps s
+``,
+  REWRITE_TAC [ca_deps_writes_oblg]
 );
 
 val deps_vdeps_eq_lem = store_thm("deps_vdeps_eq_lem", ``
@@ -861,6 +875,11 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
 	      ASM_REWRITE_TAC []
 	  ) >>
 	  RW_TAC std_ss [] >>
+	  `writes dl SUBSET ca_deps s'''` by (
+	      RW_TAC std_ss [pred_setTheory.SUBSET_DEF] >>
+	      IMP_RES_TAC ca_deps_writes_lem
+	  ) >>
+	  IMP_RES_TAC dCoh_subset_lem >>
 	  Cases_on `pa IN adrs dl`
 	  >| [(* touched address *)
 	      Cases_on `pa IN writes dl`

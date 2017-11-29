@@ -81,6 +81,13 @@ val Mmu_read_fetch_lem = store_thm("Mmu_read_fetch_lem", ``
   REWRITE_TAC [Mmu_read_fetch_oblg]
 );
 
+val Mmu_write_read_lem = store_thm("Mmu_write_read_lem", ``
+!c mv va m pa C. (Mmu_(c,mv,va,m,W) = SOME (pa,C)) ==>
+                 (Mmu_(c,mv,va,m,R) = SOME (pa,C))
+``,
+  REWRITE_TAC [Mmu_write_read_oblg]
+);
+
 val exentry__lem = store_thm("exentry__lem", ``
 !c. exentry_ c ==> (Mode c = PRIV)
 ``,
@@ -2668,7 +2675,11 @@ val abs_ca_trans_not_write_oblg = store_thm("abs_ca_trans_not_write_oblg", ``
 );
 
 val abs_ca_trans_dmvalt_oblg = store_thm("abs_ca_trans_dmvalt_oblg", ``
-!s m dl s' pa. abs_ca_trans s m dl s' /\ pa NOTIN adrs dl ==> 
+!s m dl s' pa. 
+    abs_ca_trans s m dl s' 
+ /\ pa NOTIN adrs dl 
+ /\ dCoh s.ms (writes dl)
+        ==> 
     (dmvalt s'.ms T pa = dmvalt s.ms T pa)
 ``,
   REPEAT STRIP_TAC >>
@@ -2699,7 +2710,11 @@ val abs_ca_trans_dmvalt_oblg = store_thm("abs_ca_trans_dmvalt_oblg", ``
 
 val abs_ca_trans_dmvalt_not_write_oblg = 
 store_thm("abs_ca_trans_dmvalt_not_write_oblg", ``
-!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN adrs dl /\ pa NOTIN writes dl 
+!s m dl s' pa. 
+    abs_ca_trans s m dl s'
+ /\ pa IN adrs dl
+ /\ pa NOTIN writes dl 
+ /\ dCoh s.ms (writes dl)
         ==> 
     (dmvalt s'.ms T pa = dmvalt s.ms T pa)
 ``,
@@ -3282,6 +3297,44 @@ val ca_deps_reads_oblg = store_thm("ca_deps_reads_oblg", ``
 	  REV_FULL_SIMP_TAC list_ss [] >>
 	  IMP_RES_TAC reads_lem >>
 	  FULL_SIMP_TAC std_ss [rd_def, opd_def]
+	 ]
+     ]
+);
+
+val ca_deps_writes_oblg = store_thm("ca_deps_writes_oblg", ``
+!s m dl s' pa. abs_ca_trans s m dl s' /\ pa IN writes dl ==> pa IN ca_deps s
+``,
+  REPEAT STRIP_TAC >>
+  Cases_on `dl` 
+  >| [(* empty *)
+      FULL_SIMP_TAC std_ss [writes_def, listTheory.FILTER, listTheory.MAP, 
+			    listTheory.MEM]
+      ,
+      (* non-empty *)
+      Cases_on `h`
+      >| [(* Dreq *)
+	  FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+	  REV_FULL_SIMP_TAC list_ss [] >>
+	  IMP_RES_TAC writes_lem2 >>
+          IMP_RES_TAC hw_trans_core_req_lem >>
+          IMP_RES_TAC core_req_curr_mode_lem >>
+          `Dreq (DREQ d)` by ( FULL_SIMP_TAC std_ss [Dreq_def, opd_def] ) >>
+          IMP_RES_TAC core_req_mmu_Dreq_lem >>
+          RW_TAC std_ss [ca_deps_def, coreIfTheory.deps__def, 
+           		 pred_setTheory.IN_UNION] >>
+          DISJ1_TAC >>
+          FULL_SIMP_TAC std_ss [Acc_def, Adr_def, opd_def] >>
+          RW_TAC std_ss [pred_setTheory.IN_GSPEC_IFF, coreIfTheory.Tr__def] >>
+          HINT_EXISTS_TAC >>
+	  REV_FULL_SIMP_TAC std_ss [] >>
+	  IMP_RES_TAC Mmu_write_read_lem >> 
+	  RW_TAC std_ss []
+	  ,
+	  (* Ireq *)
+	  FULL_SIMP_TAC std_ss [abs_ca_trans_def] >>
+	  REV_FULL_SIMP_TAC list_ss [] >>
+	  IMP_RES_TAC writes_lem2 >>
+	  FULL_SIMP_TAC std_ss [wt_def, opd_def]
 	 ]
      ]
 );
