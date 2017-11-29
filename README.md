@@ -2,6 +2,11 @@
 HOL4 implementation of the proof strategy for the verification of cache storage
 channels countermeasures to ensure system integrity
 
+## Build Instructions
+
+To check the proofs, just run Holmake in the directory, it should work with the
+latest HOL build from Github: https://github.com/HOL-Theorem-Prover/HOL
+
 ## Files 
 
 The following files are provided:
