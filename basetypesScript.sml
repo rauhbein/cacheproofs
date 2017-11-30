@@ -11,9 +11,20 @@ val _ = Parse.type_abbrev("word", ``:bool[32]``);
 val _ = Datatype `padr = PADR bool[30]`;
 val _ = Datatype `vadr = VADR bool[30]`;
 
+val the_adr_def = Define `the_adr (PADR pa) = pa`;
+
+val the_adr_inj = store_thm("the_adr_inj", ``
+!x y. (the_adr x = the_adr y) ==> (x = y)
+``,
+  REPEAT Cases >> 
+  RW_TAC std_ss [the_adr_def]
+);
+
 val _ = Datatype `mode = PRIV | USER`;
 
 val _ = Datatype `acc = R | W | EX`;
+
+val _ = Parse.type_abbrev("mem_state", ``:padr -> word``);
 
 val _ = Parse.type_abbrev("mem_view", ``:bool -> padr -> word``);
 

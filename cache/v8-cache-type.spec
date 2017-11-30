@@ -12,11 +12,11 @@
 ---------------------------------------------
 -- Basic types
 ---------------------------------------------
--- type word = bits(32)
+type word = bits(32)
 -- maximal physical address size
--- type ADR  = bits(48)
+type ADR  = bits(48)
 -- effective virtual and physical address
--- type VA   = bits(64)     -- virtual address
+type VA   = bits(64)     -- virtual address
 type PA   = bits(48)     -- physical address
 
 record wrTyp 
