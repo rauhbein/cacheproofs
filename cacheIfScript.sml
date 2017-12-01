@@ -32,8 +32,6 @@ val lv_def = Define `lv (mv:mem_view) c (pa:padr) = CLINE (mv c pa)`;
 
 val lw_def = Define `lw l (pa:padr) = the_line l`;
 
-val lu_def = Define `lu (l:line) (pa:padr) (w:word) = CLINE w`;
-
 val hit_def = Define `
    (hit NONE = F)
 /\ (hit (SOME (w:line,d:bool)) = T)
@@ -398,6 +396,10 @@ val mllu_oblg = store_thm("mllu_oblg", ``
   FULL_SIMP_TAC std_ss [the_adr_def, the_line_def]
 ); 
 
+(* TODO?: mllu vs ccnt oblg
+(!pa. (tag pa = tag (PA dop)) ==> (ccntw_ ca' pa = m pa))
+*)
+
 val tag_oblg = store_thm("tag_oblg", ``
 !t. ?pa. t = tag pa
 ``,
@@ -583,19 +585,6 @@ val mllu_lv_oblg = store_thm("mllu_lv_oblg", ``
       FULL_SIMP_TAC std_ss [lw_lv_oblg, mllu_oblg]
      ]
 ); 
-
-val lu_oblg = store_thm("lu_oblg", ``
-!l pa w. lw (lu l pa w) pa = w
-``,
-  RW_TAC std_ss [lw_def, lu_def, the_line_def]
-);
-
-val lu_other_oblg = store_thm("lu_other_oblg", ``
-!l pa w pa'. (tag pa' = tag pa) /\ pa' <> pa ==> (lw (lu l pa w) pa' = lw l pa')
-``,
-  RW_TAC std_ss [tag_def, lw_def, lu_def, the_line_def] >>
-  REV_FULL_SIMP_TAC std_ss [the_adr_inj]
-);
 
 (* transitions *)
 

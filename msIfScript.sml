@@ -340,6 +340,7 @@ val msca_write_val_oblg = store_thm("msca_write_val_oblg", ``
 
 (* deriveability obligations *)
 
+(* TODO: fix dirtying case: not necessarily dirty due to WT, add write fill *)
 val dc_cacheable_other_oblg = store_thm("dc_cacheable_other_oblg", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
              /\ (dw ms' pa <> dw ms pa) ==> 
