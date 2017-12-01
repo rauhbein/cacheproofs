@@ -299,7 +299,7 @@ val ctf_wb_not_cl_lem = store_thm("ctf_wb_not_cl_lem", ``
 val ctf_wb_cl_lem = store_thm("ctf_wb_cl_lem", ``
 !ca mv dop. cl dop ==> 
     (ctf_wb ca mv dop = if cdirty_ ca (PA dop) 
-			then SOME (tag (PA dop), cnt (ca (tag (PA dop)))) 
+			then SOME (tag (PA dop), lcnt_ ca (tag (PA dop))) 
                         else NONE)
 ``,
   REPEAT STRIP_TAC >>
@@ -647,7 +647,7 @@ val ctf_cl_wb_oblg = store_thm("ctf_cl_wb_oblg", ``
   RW_TAC std_ss [] >> (
       IMP_RES_TAC cl_CA_lem >>
       FULL_SIMP_TAC std_ss [ctf_lem] >>
-      RW_TAC std_ss [ctf_wb_cl_lem, ccnt_def]
+      RW_TAC std_ss [ctf_wb_cl_lem, ccnt_def, lcnt_def]
   )
 );
 
@@ -745,7 +745,7 @@ val ctf_wt_fill_oblg = store_thm("ctf_wt_fill_oblg", ``
 !ca mv dop ca' y pa. CA dop /\ wt dop /\ pa <> PA dop /\ (tag pa = tag (PA dop))
 	          /\ ~chit_ ca (PA dop) /\ ((ca',y) = ctf ca mv dop) ==>
     chit_ ca' pa 
- /\ (ccnt_ ca' pa = lv mv T (PA dop))
+ /\ (ccntw_ ca' pa = mv T pa)
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -763,7 +763,7 @@ val ctf_wt_fill_oblg = store_thm("ctf_wt_fill_oblg", ``
 val ctf_wt_ccnt_oblg = store_thm("ctf_wt_ccnt_oblg", ``
 !ca mv dop ca' y. CA dop /\ wt dop /\ ((ca',y) = ctf ca mv dop) ==>
     (ccntw_ ca' (PA dop) = VAL dop) 
- /\ (!pa. pa <> PA dop /\ (tag pa = tag (PA dop)) ==> 
+ /\ (!pa. chit_ ca pa /\ pa <> PA dop /\ (tag pa = tag (PA dop)) ==> 
 	      (ccntw_ ca' pa = ccntw_ ca pa))
 ``,
   REPEAT GEN_TAC >> 

@@ -241,7 +241,7 @@ val ctf_not_cl_wb_lem = store_thm("ctf_not_cl_wb_lem", ``
 		else NONE))
 (* WT case *)
   \/ (y = if wt dop 
-	  then SOME (tag (PA dop), lu (ccnt_ ca (PA dop)) (PA dop) (VAL dop))
+	  then SOME (tag (PA dop), ccnt_ ca' (PA dop))
 	  else NONE) /\ clean_inv ca)
 ``,
   REPEAT STRIP_TAC >>
@@ -254,7 +254,7 @@ val ctf_wt_cdirty_lem = store_thm("ctf_wt_cdirty_lem", ``
     cdirty_ ca' (PA dop)
 (* WT case *)
  \/ ~cdirty_ ca' (PA dop) /\ 
-    (y = SOME (tag (PA dop), lu (ccnt_ ca (PA dop)) (PA dop) (VAL dop)))
+    (y = SOME (tag (PA dop), ccnt_ ca' (PA dop)))
 ``,
   REPEAT STRIP_TAC >>
   IMP_RES_TAC ctf_wt_cdirty_oblg >>
@@ -280,11 +280,11 @@ val ctf_rd_miss_lem = store_thm("ctf_rd_miss_lem", ``
   REWRITE_TAC [ctf_rd_miss_oblg]
 );
 
-val ctf_wt_fill_lem = store_thm("ctf_wt_miss_lem", ``
+val ctf_wt_fill_lem = store_thm("ctf_wt_fill_lem", ``
 !ca mv dop ca' y pa. CA dop /\ wt dop /\ pa <> PA dop /\ (tag pa = tag (PA dop))
 	          /\ ~chit_ ca (PA dop) /\ ((ca',y) = ctf ca mv dop) ==>
     chit_ ca' pa 
- /\ (ccnt_ ca' pa = lv mv T (PA dop))
+ /\ (ccntw_ ca' pa = mv T pa)
 ``,
   REWRITE_TAC [ctf_wt_fill_oblg]
 );
@@ -292,7 +292,7 @@ val ctf_wt_fill_lem = store_thm("ctf_wt_miss_lem", ``
 val ctf_wt_ccnt_lem = store_thm("ctf_wt_ccnt_lem", ``
 !ca mv dop ca' y. CA dop /\ wt dop /\ ((ca',y) = ctf ca mv dop) ==>
     (ccntw_ ca' (PA dop) = VAL dop) 
- /\ (!pa. pa <> PA dop /\ (tag pa = tag (PA dop)) ==> 
+ /\ (!pa. chit_ ca pa /\ pa <> PA dop /\ (tag pa = tag (PA dop)) ==> 
 	      (ccntw_ ca' pa = ccntw_ ca pa))
 ``,
   REWRITE_TAC [ctf_wt_ccnt_oblg]
@@ -302,8 +302,7 @@ val ctf_wb_not_cl_evpol_lem = store_thm("ctf_wb_evpol_lem", ``
 !ca mv dop ca' t v. CA dop /\ ~cl dop /\ ((ca',SOME(t,v)) = ctf ca mv dop) ==>
     (t = THE (evpol ca (PA dop))) /\ (v = lcnt_ ca t) /\ ldirty_ ca t 
 (* WT case *)
-  \/ wt dop /\ (t = tag (PA dop)) /\ ~ldirty_ ca t /\
-     (v = lu (lcnt_ ca t) (PA dop) (VAL dop))
+  \/ wt dop /\ (t = tag (PA dop)) /\ ~ldirty_ ca t /\ (v = lcnt_ ca' t)
 ``,
   REPEAT STRIP_TAC >>
   IMP_RES_TAC ctf_wb_not_cl_evpol_oblg >>
@@ -375,7 +374,7 @@ val ctf_wb_cases = store_thm("ctf_wb_cases", ``
 					   then t = tag (PA dop)
 					   else t <> tag (PA dop)))
      \/ wt dop /\ clean_inv ca /\ 
-	(y = SOME (tag (PA dop), lu (ccnt_ ca (PA dop)) (PA dop) (VAL dop))))
+	(y = SOME (tag (PA dop), ccnt_ ca' (PA dop))))
 ``,
   REPEAT STRIP_TAC >>
   Cases_on `cl dop` 
@@ -894,7 +893,7 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
            (?t. (y = SOME (t,lcnt_ ca t)) /\
             if cl dop then (t = tag (PA dop)) else t <> tag (PA dop)) \/
            wt dop /\ clean_inv ca /\
-           (y = SOME (tag (PA dop),lu (ccnt_ ca (PA dop)) (PA dop) (VAL dop)))`
+           (y = SOME (tag (PA dop), ccnt_ ca'' (PA dop)))`
 	  by ( METIS_TAC [ctf_wb_cases] )
 	  >| [(* wb NONE *)
 	      RW_TAC (srw_ss()) [] >>
@@ -931,17 +930,10 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 	      Cases_on `tag pa = tag (PA dop)`
 	      >| [(* evicted *)
 		  DISJ2_TAC >>
-		  IMP_RES_TAC ctf_wt_ccnt_lem >>
 	          PAT_X_ASSUM ``(x, SOME (y,z)) = ctf a b c`` 
                               (fn thm => ASSUME_TAC (SYM thm)) >>
 	          FULL_SIMP_TAC std_ss [wb_def] >>
-		  Cases_on `pa = PA dop`
-		  >| [(* PA dop *)
-		      RW_TAC std_ss [mlwb_lem, lu_lem] 
-		      ,
-		      (* other address on same line *)
-		      RW_TAC std_ss [mlwb_lem, lu_other_lem, lw_ccntw_lem] 
-		     ]		      
+		  RW_TAC std_ss [mlwb_lem, lw_ccntw_lem] 
 		  ,
 		  (* other address *)
 		  DISJ1_TAC >>
@@ -1071,15 +1063,9 @@ val ca_cacheable_ca = store_thm("ca_cacheable_ca", ``
 		      ,
 		      (* write fill *)
 		      FULL_SIMP_TAC std_ss [] >>
-		      IMP_RES_TAC chit_other_lem >>
 		      `~chit_ ca (PA dop)` by ( METIS_TAC [chit_other_lem] ) >>
 		      IMP_RES_TAC ctf_wt_fill_lem >>
-		      FULL_SIMP_TAC std_ss [ccnt_lcnt_lem] >>
-		      RW_TAC std_ss [GSYM lw_lcnt_lem] >>
-		      `lv (MVcl m) T (PA dop) = lv (MVcl m) T pa` by (
-		          RW_TAC std_ss [lv_lem]
-		      ) >>
-		      RW_TAC std_ss [lw_lv_lem, MVcl_def]
+		      RW_TAC std_ss [MVcl_def]
 		     ]
 		 ]
 	     ]
@@ -1104,7 +1090,7 @@ val ca_cacheable_ca = store_thm("ca_cacheable_ca", ``
 val ca_cacheable_miss_lem = store_thm("ca_cacheable_miss_lem", ``
 !ca m dop ca' m' pa. CA dop /\ ((ca',m') = mtfca (ca,m) dop) /\ ~chit_ ca' pa
         ==>
-    (cl dop \/ pa <> PA dop)
+    (cl dop \/ tag pa <> tag (PA dop))
 ``,
   RW_TAC std_ss [] >>
   IMP_RES_TAC ca_cacheable_ca >>
@@ -1124,7 +1110,7 @@ val cacheable_cl_lem = store_thm("cacheable_cl_lem", ``
 !ca m dop ca' m'. cl dop /\ ((ca',m') = mtfca (ca,m) dop)
         ==>
     ~chit_ ca' (PA dop) 
- /\ ((m' (PA dop) = m (PA dop)) \/ (m' (PA dop) = ccnt_ ca (PA dop)))
+ /\ ((m' (PA dop) = m (PA dop)) \/ (m' (PA dop) = ccntw_ ca (PA dop)))
 ``,
   RW_TAC std_ss [] >> ( IMP_RES_TAC cl_CA_lem ) 
   >| [(* miss *)
@@ -1147,9 +1133,10 @@ val cacheable_cl_lem = store_thm("cacheable_cl_lem", ``
 );
 
 val cacheable_cl_other_lem = store_thm("cacheable_cl_other_lem", ``
-!ca m dop ca' m' pa. cl dop /\ ((ca',m') = mtfca (ca,m) dop) /\ (pa <> PA dop)
+!ca m dop ca' m' pa. cl dop /\ ((ca',m') = mtfca (ca,m) dop) 
+		  /\ (tag pa <> tag (PA dop))
         ==>
-    (ca' pa = ca pa) /\ (m' pa = m pa)
+    (ca' (tag pa) = ca (tag pa)) /\ (m' pa = m pa)
 ``,
   RW_TAC std_ss [] >> ( IMP_RES_TAC cl_CA_lem )
   >| [(* cache unchanged *)
@@ -1174,7 +1161,7 @@ val cacheable_cl_other_lem = store_thm("cacheable_cl_other_lem", ``
 val ca_cacheable_cl_lem = store_thm("ca_cacheable_cl_lem", ``
 !ca m dop ca' m' pa. cl dop /\ ((ca',m') = mtfca (ca,m) dop)
         ==>
-    (~chit_ ca' pa \/ (ca' pa = ca pa))
+    (~chit_ ca' pa \/ (ca' (tag pa) = ca (tag pa)))
 ``,
   REPEAT STRIP_TAC >>
   Cases_on `pa = PA dop`
