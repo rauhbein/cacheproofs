@@ -371,12 +371,12 @@ val dc_cacheable_other_oblg = store_thm("dc_cacheable_other_oblg", ``
 val M_cacheable_other_oblg = store_thm("M_cacheable_other_oblg", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
                   /\ (M ms' pa <> M ms pa) ==>
-    dirty ms pa /\ (M ms' pa = dcnt ms pa)
+    dirty ms pa /\ ~dhit ms' pa /\ (M ms' pa = dcnt ms pa)
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   IMP_RES_TAC msca_DREQ_lem >>
-  FULL_SIMP_TAC std_ss [dirty_def, dcnt_def, M_def] >>
+  FULL_SIMP_TAC std_ss [dirty_def, dcnt_def, dhit_def, M_def] >>
   IMP_RES_TAC mem_cacheable_other_lem >>
   ASM_REWRITE_TAC []
 );
@@ -483,7 +483,8 @@ val M_cacheable_cl_oblg = store_thm("M_cacheable_cl_oblg", ``
 !ms dop ms'. CA dop /\ cl dop /\ (ms' = msca_trans ms (DREQ dop))
 	  /\ (M ms' (PA dop) <> M ms (PA dop)) 
         ==>
-    dirty ms (PA dop) /\ (M ms' (PA dop) = dcnt ms (PA dop))
+    dirty ms (PA dop) /\ ~dhit ms' (PA dop) 
+ /\ (M ms' (PA dop) = dcnt ms (PA dop))
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -652,6 +653,15 @@ val dcoh_oblg = store_thm("dcoh_oblg", ``
 ``,
   RW_TAC std_ss [dcoh_def, dw_def, M_def] >>
   IMP_RES_TAC coh_lem 
+);
+
+val dcoh_tag_oblg = store_thm("dcoh_tag_oblg", ``
+!ms pa pa'. dcoh ms pa /\ (tag pa' = tag pa)
+        ==>
+    dcoh ms pa'
+``,
+  RW_TAC std_ss [dcoh_def] >>
+  IMP_RES_TAC coh_other_lem
 );
 
 val dCoh_oblg = store_thm("dCoh_oblg", ``

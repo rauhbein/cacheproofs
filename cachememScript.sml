@@ -866,7 +866,7 @@ val SYM_CTF_TAC2 = PAT_X_ASSUM ctf_pat2 (fn thm => ASSUME_TAC (SYM thm));
 val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 !ca m dop ca' m'. CA dop /\ ((ca',m') = mtfca (ca,m) dop) ==>
     !pa. (m' pa = m pa) 
-      \/ cdirty_ ca pa /\ (m' pa = ccntw_ ca pa) /\ 
+      \/ cdirty_ ca pa /\ ~chit_ ca' pa /\ (m' pa = ccntw_ ca pa) /\ 
 	 (if cl dop then (tag pa = tag (PA dop)) else tag pa <> tag (PA dop))
 (* WT case *)
       \/ ~cdirty_ ca pa /\ ~cdirty_ ca' pa /\ (m' pa = ccntw_ ca' pa) /\
@@ -888,6 +888,7 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 	  (* wb SOME (pa',v) *) 
 	  RW_TAC std_ss [] >>
 	  IMP_RES_TAC ctf_wb_dirty_lem >> 
+	  `~chit_ ca'' (PA dop)` by ( METIS_TAC [ctf_cl_miss_lem] ) >> 
           SYM_CTF_TAC >>
 	  FULL_SIMP_TAC std_ss [wb_def] >>
 	  REV_FULL_SIMP_TAC std_ss [] >>
@@ -896,6 +897,7 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 	      DISJ2_TAC >>
 	      IMP_RES_TAC cdirty_ldirty_lem >>
 	      IMP_RES_TAC cdirty_other_lem >>
+	      `~chit_ ca'' pa` by ( METIS_TAC [chit_other_lem] ) >>
               RW_TAC std_ss [mlwb_lem] >>
 	      METIS_TAC [lw_lcnt_lem]
 	      ,
@@ -931,6 +933,10 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 		  DISJ2_TAC >>
 		  IMP_RES_TAC cdirty_ldirty_lem >>
 		  IMP_RES_TAC cdirty_other_lem >>
+		  IMP_RES_TAC ctf_wb_not_cl_evpol_some_lem >>
+		  IMP_RES_TAC cdirty_chit_lem >>
+		  `~chit_ ca'' pa'` by ( METIS_TAC [ctf_not_cl_chit_lem] ) >>
+		  `~chit_ ca'' pa` by ( METIS_TAC [chit_other_lem] ) >>
 	          PAT_X_ASSUM ``(x, SOME (y,z)) = ctf a b c`` 
                               (fn thm => ASSUME_TAC (SYM thm)) >>
 	          FULL_SIMP_TAC std_ss [wb_def] >>
@@ -1004,6 +1010,7 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 	      (* wb SOME (pa',v) *) 
 	      RW_TAC std_ss [] >>
 	      IMP_RES_TAC ctf_wb_dirty_lem >> 
+	      IMP_RES_TAC ctf_wb_not_cl_evpol_some_lem >>
               SYM_CTF_TAC >>
 	      FULL_SIMP_TAC std_ss [wb_def] >>
 	      REV_FULL_SIMP_TAC std_ss [] >>
@@ -1014,6 +1021,9 @@ val ca_cacheable_mem = store_thm("ca_cacheable_mem", ``
 		  DISJ2_TAC >>
 		  IMP_RES_TAC cdirty_ldirty_lem >>
 		  IMP_RES_TAC cdirty_other_lem >>
+		  IMP_RES_TAC cdirty_chit_lem >>
+		  `~chit_ ca'' pa'` by ( METIS_TAC [ctf_not_cl_chit_lem] ) >>
+		  `~chit_ ca'' pa` by ( METIS_TAC [chit_other_lem] ) >>
 		  RW_TAC std_ss [mlwb_lem] >>
 		  METIS_TAC [lw_lcnt_lem]
 		  ,
@@ -1405,7 +1415,7 @@ val ca_cacheable_other_lem = store_thm("ca_cacheable_other_lem", ``
 val mem_cacheable_other_lem = store_thm("mem_cacheable_other_lem", ``
 !ca m dop ca' m' pa. CA dop /\ ((ca',m') = mtfca (ca,m) dop) /\ (pa <> PA dop)
                   /\ (m' pa <> m pa) ==>
-    cdirty_ ca pa /\ (m' pa = ccntw_ ca pa)
+    cdirty_ ca pa /\ ~chit_ ca' pa /\ (m' pa = ccntw_ ca pa)
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
@@ -1839,7 +1849,7 @@ val coh_ca_trans_lem = store_thm("coh_ca_trans_lem", ``
      ]
 );
 
-val coh_trans_other__lem = store_thm("coh_trans_other_lem", ``
+val coh_trans_other_lem = store_thm("coh_trans_other_lem", ``
 !ca m dop ca' m' pa. coh ca m pa /\ ((ca',m') = mtfca (ca,m) dop) 
                   /\ (tag pa <> tag (PA dop))
         ==>
@@ -2039,14 +2049,9 @@ val ca_other_unchanged_lem = store_thm("ca_other_unchanged_lem", ``
 	      PAT_X_ASSUM ``!pa. X`` ( 
 	          fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
 	      ) >>
-	      REV_FULL_SIMP_TAC std_ss []
-	      >| [(* hit and hit' *)
-		  RW_TAC std_ss [MVca_def, ccntw_ccnt_lem]
-		  ,
-		  (* miss' *)
-		  RW_TAC std_ss [MVca_def] >>
-		  IMP_RES_TAC not_chit_not_cdirty_lem
-		 ]
+	      REV_FULL_SIMP_TAC std_ss [] >>
+	      RW_TAC std_ss [MVca_def] >>
+	      IMP_RES_TAC not_chit_not_cdirty_lem
 	     ]
 	  ,
 	  (* uncacheable *)
