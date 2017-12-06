@@ -76,10 +76,22 @@ val imv_miss_oblg = store_thm("imv_miss_oblg", ``
   RW_TAC std_ss [ihit_def, imv_def, M_def, MVca_def] 
 );
 
+val dw_other_oblg = store_thm("dw_other_oblg", ``
+!ms pa pa'. (tag pa = tag pa') ==> (dw ms pa = dw ms pa')
+``,
+  RW_TAC std_ss [dw_def]
+);
+
 val dhit_oblg = store_thm("dhit_oblg", ``
 !ms ms' pa. (dw ms' pa = dw ms pa) ==> (dhit ms' pa <=> dhit ms pa)
 ``,
   RW_TAC std_ss [dhit_def, dw_def, chit_lem]
+);
+
+val dhit_other_oblg = store_thm("dhit_other_oblg", ``
+!ms pa pa'. (tag pa = tag pa') ==> (dhit ms pa <=> dhit ms pa')
+``,
+  RW_TAC std_ss [dhit_def, chit_other_lem]
 );
 
 val double_not_dhit_oblg = store_thm("double_not_dhit_oblg", ``
@@ -93,6 +105,12 @@ val dirty_oblg = store_thm("dirty_oblg", ``
 !ms ms' pa. (dw ms' pa = dw ms pa) ==> (dirty ms' pa <=> dirty ms pa)
 ``,
   RW_TAC std_ss [dirty_def, dw_def, cdirty_lem]
+);
+
+val dirty_other_oblg = store_thm("dirty_other_oblg", ``
+!ms pa pa'. (tag pa = tag pa') ==> (dirty ms pa <=> dirty ms pa')
+``,
+  RW_TAC std_ss [dirty_def, cdirty_other_lem]
 );
 
 val not_dhit_not_dirty_oblg = store_thm("not_dhit_not_dirty_oblg", ``
@@ -109,6 +127,18 @@ val dcnt_oblg = store_thm("dcnt_oblg", ``
   IMP_RES_TAC ccnt_lem >>
   IMP_RES_TAC chit_lem >>
   IMP_RES_TAC ccntw_ccnt_lem 
+);
+
+val dcnt_not_eq_oblg = store_thm("dcnt_not_eq_oblg", ``
+!pa ca ca'. dhit ca pa /\ dhit ca' pa /\ (dirty ca pa <=> dirty ca' pa)
+         /\ (dw ca pa <> dw ca' pa) ==> 
+    ?pa'. (tag pa' = tag pa) /\ dcnt ca pa' <> dcnt ca' pa'
+``,
+  RW_TAC std_ss [dhit_def, dirty_def, dw_def, dcnt_def] >>
+  `ccnt_ ca.dc pa <> ccnt_ ca'.dc pa` by (
+      IMP_RES_TAC ccnt_not_eq_lem
+  ) >>
+  METIS_TAC [ccntw_ccnt_diff_lem]
 );
 
 val dirty_hit_oblg = store_thm("dirty_hit_oblg", ``
@@ -355,7 +385,8 @@ val dc_cacheable_other_oblg = store_thm("dc_cacheable_other_oblg", ``
 !ms dop ms' pa. CA dop /\ (ms' = msca_trans ms (DREQ dop)) /\ (pa <> PA dop)
              /\ (dw ms' pa <> dw ms pa) ==> 
     (~dhit ms' pa  /\ (dirty ms pa ==> (M ms' pa = dcnt ms pa))) \/
-    (wt dop /\ dhit ms pa /\ dhit ms' pa /\ (dcnt ms' pa = dcnt ms pa)) \/
+    (wt dop /\ dhit ms pa /\ dhit ms' pa /\ (dirty ms pa ==> dirty ms' pa)
+            /\ (dcnt ms' pa = dcnt ms pa)) \/
     (wt dop /\ ~dhit ms pa /\ dhit ms' pa /\ (dcnt ms' pa = M ms pa)) \/
     (rd dop /\ ~dhit ms pa /\ dhit ms' pa /\ ~dirty ms' pa 
             /\ (dcnt ms' pa = M ms pa))

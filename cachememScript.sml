@@ -1359,7 +1359,7 @@ val ca_cacheable_other_lem = store_thm("ca_cacheable_other_lem", ``
 !ca m dop ca' m' pa. CA dop /\ ((ca',m') = mtfca (ca,m) dop) /\ (pa <> PA dop)
                   /\ (ca' (tag pa) <> ca (tag pa)) ==> 
     (~chit_ ca' pa /\ (cdirty_ ca pa ==> (m' pa = ccntw_ ca pa))) \/
-    (wt dop /\ chit_ ca pa /\ chit_ ca' pa 
+    (wt dop /\ chit_ ca pa /\ chit_ ca' pa /\ (cdirty_ ca pa ==> cdirty_ ca' pa)
         /\ (ccntw_ ca' pa = ccntw_ ca pa) /\ (tag pa = tag (PA dop))) \/
     (wt dop /\ ~chit_ ca pa /\ chit_ ca' pa 
         /\ (ccntw_ ca' pa = m pa) /\ (tag pa = tag (PA dop))) \/
@@ -1388,6 +1388,12 @@ val ca_cacheable_other_lem = store_thm("ca_cacheable_other_lem", ``
       ,
       (* contradiction *)
       FULL_SIMP_TAC std_ss []
+      ,
+      (* dirty write hit *)
+      STRIP_TAC >>
+      IMP_RES_TAC cdirty_other_lem >>
+      IMP_RES_TAC ca_cacheable_wt_dirty_lem >>
+      IMP_RES_TAC cdirty_other_lem
       ,
       (* dirty flush *)
       STRIP_TAC >>
