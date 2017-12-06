@@ -4,6 +4,7 @@ open HolKernel boolLib bossLib;
 open wordsLib blastLib; 
 
 open basetypesTheory;
+open cacheIfTheory;
 
 val _ = new_theory "coreIf";
 
@@ -93,6 +94,11 @@ val Mmu_MD_exists = prove (``
 		           (Mmu(c,mv,va,m,R) = SOME (pa,C)))
            /\ (!va m pa C. (Mmu(c,mv,va,m,W) = SOME (pa,C)) ==>
 		           (Mmu(c,mv,va,m,R) = SOME (pa,C)))
+(* pages span at least one cache line, 
+   i.e., addresses with same cache tag have same access permissions *)
+           /\ (!va m pa acc C pa'. 
+                  (Mmu(c,mv,va,m,acc) = SOME (pa,C)) /\ (tag pa' = tag pa) ==>
+		      ?va'. Mmu(c,mv,va',m,acc) = SOME (pa',C))
 ``,
   EXISTS_TAC ``\(c,mv,va,m,ac):core_state # mem_view # vadr # mode # acc.
 		NONE:(padr # bool) option`` >>
@@ -121,6 +127,13 @@ val Mmu_write_read_oblg = store_thm("Mmu_write_read_oblg", ``
   METIS_TAC [Mmu_MD_spec]
 );
 
+val Mmu_tag_lem = store_thm("Mmu_tag_lem", ``
+!c mv va m pa acc C pa'. 
+    (Mmu_(c,mv,va,m,acc) = SOME (pa,C)) /\ (tag pa' = tag pa) ==>
+	?va'. Mmu_(c,mv,va',m,acc) = SOME (pa',C)
+``,
+  METIS_TAC [Mmu_MD_spec]
+);
 
 val MD_monotonic_oblg = store_thm("MD_monotonic_oblg", ``
 !c mv VAs VAs'. VAs SUBSET VAs' ==> MD_(c,mv,VAs) SUBSET MD_(c,mv,VAs')
@@ -416,6 +429,17 @@ val Mon_reg_oblg = store_thm("Mon_reg_oblg", ``
 !c mv r c' mv' m ac. reg_res r ==> (Mon_ (c,mv,r,m,ac) <=> Mon_ (c',mv',r,m,ac))
 ``,
   METIS_TAC [Mon_spec]
+);
+
+val Mon_tag_oblg = store_thm("Mon_tag_oblg", ``
+!c mv pa pa' m ac. (tag pa = tag pa') ==>
+    (Mon_ (c,mv,MEM pa,m,ac) <=> Mon_ (c,mv,MEM pa',m,ac))
+``,
+  RW_TAC std_ss [GSYM Mon_mem_oblg] >>
+  EQ_TAC >> (
+      STRIP_TAC >>
+      METIS_TAC [Mmu_tag_lem]
+  )
 );
 
 val core_req_curr_mode_oblg = store_thm("core_req_curr_mode_oblg", ``

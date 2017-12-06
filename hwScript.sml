@@ -74,6 +74,13 @@ val Mon__reg_lem = store_thm("Mon__reg_lem", ``
   REWRITE_TAC [Mon_reg_oblg]
 );
 
+val Mon__tag_lem = store_thm("Mon__tag_lem", ``
+!c mv pa pa' m ac. (tag pa = tag pa') ==>
+    (Mon_ (c,mv,MEM pa,m,ac) <=> Mon_ (c,mv,MEM pa',m,ac))
+``,
+  REWRITE_TAC [Mon_tag_oblg]
+);
+
 val Mmu_read_fetch_lem = store_thm("Mmu_read_fetch_lem", ``
 !c mv va m pa C. (Mmu_(c,mv,va,m,EX) = SOME (pa,C)) ==>
                  (Mmu_(c,mv,va,m,R) = SOME (pa,C))
@@ -889,6 +896,13 @@ val Mon_lem = store_thm("Mon_lem", ``
 ``,
   RW_TAC std_ss [MD_def, Mon_def, Cv_def] >>
   RW_TAC std_ss [Mon__lem]
+);
+
+val Mon_tag_lem = store_thm("Mon_tag_lem", ``
+!s pa pa' m ac. (tag pa = tag pa') ==>
+    (Mon s (MEM pa) m ac <=> Mon s (MEM pa') m ac)
+``,
+  RW_TAC std_ss [Mon_def, Mon__tag_lem]
 );
 
 val MD_lem = store_thm("MD_lem", ``
@@ -2854,6 +2868,7 @@ val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
       IMP_RES_TAC drvbl_rd_dcoh_lem
       ,
       (* write -> not possible *)
+      `~Mon s (MEM pa') USER W` by ( METIS_TAC [Mon_tag_lem] ) >>
       FULL_SIMP_TAC std_ss [drvbl_wt_def]
      ]
 );
