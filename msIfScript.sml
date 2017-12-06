@@ -446,12 +446,13 @@ val dc_cacheable_write_oblg = store_thm("dc_cacheable_write_oblg", ``
         ==>
     (dirty ms' (PA dop) 
 (* WT case *)
-  \/ ~dirty ms' (PA dop) /\ (dcnt ms' (PA dop) = M ms' (PA dop)))
+  \/ ~dirty ms' (PA dop) /\ dhit ms' (PA dop) /\ 
+     (dcnt ms' (PA dop) = M ms' (PA dop)))
 ``,
   REPEAT GEN_TAC >>
   STRIP_TAC >>
   IMP_RES_TAC msca_DREQ_lem >>
-  FULL_SIMP_TAC std_ss [dirty_def, dcnt_def, M_def] >>
+  FULL_SIMP_TAC std_ss [dirty_def, dcnt_def, dhit_def, M_def] >>
   IMP_RES_TAC ca_cacheable_write_lem >> (
       RW_TAC std_ss []
   )

@@ -839,7 +839,7 @@ val kernel_bisim_lem = store_thm("kernel_bisim_lem", ``
            (cl_Cv s'' (MEM pa) = Cv s''' (MEM pa))` by (
 	      RW_TAC std_ss [cl_Cv_mem_lem, Cv_mem_lem] >>
 	      MATCH_MP_TAC EQ_SYM >>
-	      FULL_SIMP_TAC std_ss [dCoh_alt_lem]
+	      IMP_RES_TAC dCoh_alt_lem
 	  ) >>
 	  `ca_Tr s''' (VApc s'''.cs) IN ca_deps s'''` by (
 	      REWRITE_TAC [ca_deps_pc_lem]

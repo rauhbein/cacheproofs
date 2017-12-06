@@ -535,7 +535,9 @@ val Rsim_dCoh_lem = store_thm("Rsim_dCoh_lem", ``
 !sc s As. Rsim sc s /\ dCoh sc.ms As ==>
     !pa. pa IN As ==> (MVcl s.M T pa = dmvca sc.ms T pa)
 ``,
-  RW_TAC std_ss [Rsim_lem, dCoh_alt_lem]
+  RW_TAC std_ss [Rsim_lem] >>
+  IMP_RES_TAC dCoh_alt_lem >>
+  RW_TAC std_ss []
 );
 
 val Rsim_dCoh_Cv_lem = store_thm("Rsim_dCoh_Cv_lem", ``

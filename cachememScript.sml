@@ -241,7 +241,7 @@ val ctf_wt_cdirty_lem = store_thm("ctf_wt_cdirty_lem", ``
 !ca mv dop ca' y. CA dop /\ wt dop /\ ((ca',y) = ctf ca mv dop) ==>
     cdirty_ ca' (PA dop) /\ (y <> SOME (tag (PA dop), ccnt_ ca' (PA dop)))
 (* WT case *)
- \/ clean_inv ca /\ clean_inv ca' /\ 
+ \/ clean_inv ca /\ clean_inv ca' /\ chit_ ca' (PA dop) /\
     (y = SOME (tag (PA dop), ccnt_ ca' (PA dop))) /\
     (!pa. (tag pa = tag (PA dop)) ==> (ccntw_ ca pa = mv T pa))
 ``,
@@ -1517,7 +1517,7 @@ val ca_cacheable_write_lem = store_thm("ca_cacheable_write_lem", ``
         ==>
     (cdirty_ ca' (PA dop) 
 (* WT case *)
-  \/ ~cdirty_ ca' (PA dop) /\ 
+  \/ ~cdirty_ ca' (PA dop) /\ chit_ ca' (PA dop) /\ 
      (!pa. (tag pa = tag (PA dop)) ==> (ccntw_ ca' pa = m' pa)))
 ``,
   RW_TAC (std_ss++boolSimps.CONJ_ss) [mtfca_cacheable] >>

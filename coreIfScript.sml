@@ -127,7 +127,7 @@ val Mmu_write_read_oblg = store_thm("Mmu_write_read_oblg", ``
   METIS_TAC [Mmu_MD_spec]
 );
 
-val Mmu_tag_lem = store_thm("Mmu_tag_lem", ``
+val Mmu_tag_oblg = store_thm("Mmu_tag_oblg", ``
 !c mv va m pa acc C pa'. 
     (Mmu_(c,mv,va,m,acc) = SOME (pa,C)) /\ (tag pa' = tag pa) ==>
 	?va'. Mmu_(c,mv,va',m,acc) = SOME (pa',C)
@@ -438,7 +438,7 @@ val Mon_tag_oblg = store_thm("Mon_tag_oblg", ``
   RW_TAC std_ss [GSYM Mon_mem_oblg] >>
   EQ_TAC >> (
       STRIP_TAC >>
-      METIS_TAC [Mmu_tag_lem]
+      METIS_TAC [Mmu_tag_oblg]
   )
 );
 
