@@ -916,6 +916,14 @@ val Mon_lem = store_thm("Mon_lem", ``
   RW_TAC std_ss [Mon__lem]
 );
 
+val Mon_mem_not_lem = store_thm("Mon_mem_not_lem", ``
+!s pa m ac.
+  ~Mon s (MEM pa) m ac ==> !va ca. Mmu s va m ac <> SOME (pa,ca)
+``,
+  RW_TAC std_ss [Mon_def, Mmu_def] >>
+  METIS_TAC [Mon__mem_lem]
+);
+
 val Mon_tag_lem = store_thm("Mon_tag_lem", ``
 !s pa pa' m ac. (tag pa = tag pa') ==>
     (Mon s (MEM pa) m ac <=> Mon s (MEM pa') m ac)
@@ -2686,7 +2694,213 @@ val drvbl_wt_tagged_dw_neq_lem = store_thm ("drvbl_wt_tagged_dw_neq_lem", ``
      ]
 );
 
+val drvbl_data_dw_eq_lem = store_thm("drvbl_data_dw_eq_lem", ``
+!s s' pa. drvbl_local s s' /\ (dw s'.ms pa = dw s.ms pa) 
+       /\ ~dirty s'.ms pa /\ dhit s'.ms pa
+    ==>
+!pa'. (tag pa' = tag pa) /\ M s'.ms pa' <> M s.ms pa' ==>
+          (    (M s'.ms pa' = dcnt s'.ms pa')
+	    \/ (?va. Mmu s va USER W = SOME (pa,F)))
+``,
+  RW_TAC std_ss [drvbl_local_def, drvbl_data_def] >>
+  `drvbl_non s s' pa' \/ drvbl_rd s s' pa' \/ drvbl_wt s s' pa'` by (
+      FULL_SIMP_TAC std_ss [] )
+  >| [(* non *)
+      IMP_RES_TAC drvbl_non_def >>
+      IMP_RES_TAC dhit_other_lem
+      ,
+      (* rd *)
+      IMP_RES_TAC drvbl_rd_def
+      ,
+      (* wt *)
+      IMP_RES_TAC not_dirty_other_lem >>
+      IMP_RES_TAC dhit_other_lem >>
+      IMP_RES_TAC drvbl_wt_def
+      >| [(* uncacheable alias *)
+	  DISJ2_TAC >>
+	  METIS_TAC [Mmu_tag_lem]
+	  ,
+	  (* WT case *)
+	  RW_TAC std_ss []
+	 ]
+     ]
+);
 
+val drvbl_data_dw_neq_lem = store_thm("drvbl_data_dw_neq_lem", ``
+!s s' pa. drvbl_local s s' /\ dw s'.ms pa <> dw s.ms pa 
+    ==>
+    dirty s'.ms pa
+ \/ ~dhit s'.ms pa
+ \/ (~dirty s'.ms pa /\ dhit s'.ms pa /\ 
+        (!pa'. (tag pa' = tag pa) ==>
+	       (    (M s'.ms pa' = dcnt s'.ms pa')
+	         \/ dhit s.ms pa' /\ ~dirty s.ms pa' /\ 
+		    (dcnt s'.ms pa' = dcnt s.ms pa') /\ 
+                    (M s'.ms pa' = M s.ms pa'))))
+``,
+  RW_TAC std_ss [drvbl_local_def, drvbl_data_def] >>
+  `drvbl_non s s' pa \/ drvbl_rd s s' pa \/ drvbl_wt s s' pa` by (
+      FULL_SIMP_TAC std_ss [] )
+  >| [(* non *)
+      IMP_RES_TAC drvbl_non_def
+      >| [(* eviction *)
+	  ASM_REWRITE_TAC []
+	  ,
+	  (* hit *)
+	  Cases_on `dirty s'.ms pa`
+	  >| [(* dirty' *)
+	      ASM_REWRITE_TAC []
+	      ,
+	      (* ~dirty' *)
+	      DISJ2_TAC >>
+	      DISJ2_TAC >>
+	      RW_TAC std_ss [] >>
+	      `~dirty s.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
+	      IMP_RES_TAC not_dirty_other_lem >>
+	      IMP_RES_TAC dhit_other_lem >>
+	      `dw s'.ms pa' <> dw s.ms pa'` by ( 
+	          METIS_TAC [dw_other_lem] 
+	      ) >>
+	      `drvbl_non s s' pa' \/ drvbl_rd s s' pa' 
+	        \/ drvbl_wt s s' pa'` by (
+	          FULL_SIMP_TAC std_ss [] )
+	      >| [(* non *)
+		  IMP_RES_TAC drvbl_non_def >>
+		  DISJ2_TAC >>
+		  RW_TAC std_ss [] >>
+		  CCONTR_TAC >>
+		  FULL_SIMP_TAC std_ss []
+		  ,
+		  (* rd *)
+		  IMP_RES_TAC drvbl_rd_def
+		  ,
+		  (* wt *)
+		  IMP_RES_TAC drvbl_wt_def >>
+		  ASM_REWRITE_TAC []
+		 ]
+	     ]
+	  ,
+	  (* fill *)
+	  Cases_on `dirty s'.ms pa`
+	  >| [(* dirty' *)
+	      ASM_REWRITE_TAC []
+	      ,
+	      (* ~dirty' *)
+	      DISJ2_TAC >>
+	      DISJ2_TAC >>
+	      RW_TAC std_ss [] >>
+	      IMP_RES_TAC not_dhit_not_dirty_lem >>
+	      IMP_RES_TAC not_dirty_other_lem >>
+	      IMP_RES_TAC dhit_other_lem >>
+	      IMP_RES_TAC not_dhit_other_lem >>
+	      `dw s'.ms pa' <> dw s.ms pa'` by ( 
+	          METIS_TAC [dw_other_lem] 
+	      ) >>
+	      `drvbl_non s s' pa' \/ drvbl_rd s s' pa' 
+	        \/ drvbl_wt s s' pa'` by (
+	          FULL_SIMP_TAC std_ss [] )
+	      >| [(* non *)
+		  IMP_RES_TAC drvbl_non_def >>
+		  DISJ1_TAC >>
+		  RW_TAC std_ss [] >>
+		  CCONTR_TAC >>
+		  FULL_SIMP_TAC std_ss []
+		  ,
+		  (* rd *)
+		  IMP_RES_TAC drvbl_rd_def >> (
+		      ASM_REWRITE_TAC []
+		  )
+		  ,
+		  (* wt *)
+		  IMP_RES_TAC drvbl_wt_def >>
+		  ASM_REWRITE_TAC []
+		 ]
+	     ]
+	 ]	  
+      ,
+      (* rd -> fill *)
+      IMP_RES_TAC drvbl_rd_def >> (
+	  DISJ2_TAC >>
+	  DISJ2_TAC >>
+	  RW_TAC std_ss [] >>
+	  IMP_RES_TAC not_dhit_not_dirty_lem >>
+	  IMP_RES_TAC not_dirty_other_lem >>
+	  IMP_RES_TAC dhit_other_lem >>
+	  IMP_RES_TAC not_dhit_other_lem >>
+	  `dw s'.ms pa' <> dw s.ms pa'` by ( 
+	      METIS_TAC [dw_other_lem] 
+	  ) >>
+	  `drvbl_non s s' pa' \/ drvbl_rd s s' pa' 
+	    \/ drvbl_wt s s' pa'` by (
+	      FULL_SIMP_TAC std_ss [] )
+	  >| [(* non *)
+	      IMP_RES_TAC drvbl_non_def >>
+	      DISJ1_TAC >>
+	      RW_TAC std_ss [] >>
+	      CCONTR_TAC >>
+	      FULL_SIMP_TAC std_ss []
+	      ,
+	      (* rd *)
+	      `(M s'.ms pa' = M s.ms pa') /\ 
+	       (dcnt s'.ms pa' = M s.ms pa')` by (
+	          METIS_TAC [drvbl_rd_def]
+	      ) >>
+	      ASM_REWRITE_TAC []
+	      ,
+	      (* wt *)
+	      IMP_RES_TAC drvbl_wt_def >>
+	      ASM_REWRITE_TAC []
+	     ]
+          )
+      ,
+      (* wt *)
+      IMP_RES_TAC drvbl_wt_def
+      >| [(* dirty *)
+	  ASM_REWRITE_TAC []
+	  ,
+	  (* WT case or uncacheable alias *)
+	  DISJ2_TAC >>
+	  DISJ2_TAC >>
+	  RW_TAC std_ss [] >>
+	  IMP_RES_TAC not_dirty_other_lem >>
+	  IMP_RES_TAC dhit_other_lem >>
+	  `dw s'.ms pa' <> dw s.ms pa'` by ( 
+	      METIS_TAC [dw_other_lem] 
+	  ) >>
+	  `drvbl_non s s' pa' \/ drvbl_rd s s' pa' 
+	    \/ drvbl_wt s s' pa'` by (
+	      FULL_SIMP_TAC std_ss [] )
+	  >| [(* non *)
+	      IMP_RES_TAC drvbl_non_def
+	      >| [(* hit *)
+		  `~dirty s.ms pa'` by ( 
+		      CCONTR_TAC >>
+		      FULL_SIMP_TAC std_ss [] 
+		  ) >>
+		  DISJ2_TAC >>
+		  RW_TAC std_ss [] >>
+		  CCONTR_TAC >>
+		  FULL_SIMP_TAC std_ss []
+		  ,
+		  (* fill *)
+		  DISJ1_TAC >>
+		  RW_TAC std_ss [] >>
+		  CCONTR_TAC >>
+		  FULL_SIMP_TAC std_ss []
+		 ]
+	      ,
+	      (* rd *)
+	      IMP_RES_TAC drvbl_rd_def >> (
+	          ASM_REWRITE_TAC []
+	      )
+	      ,
+	      (* wt *)
+	      IMP_RES_TAC drvbl_wt_def >>
+	      ASM_REWRITE_TAC []
+	     ]
+	 ]
+     ]
+);
 
 (********** MMU safety ************)
 
@@ -2979,6 +3193,79 @@ val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
      ]
 );
 
+val drvbl_dCoh_lem2 = store_thm("drvbl_dCoh_lem2", ``
+!s s' As. drvbl_local s s' 	
+       /\ (!pa. pa IN As ==> ~Mon s (MEM pa) USER W)
+       /\ dCoh s.ms As
+           ==> 
+       dCoh s'.ms As
+``,
+  RW_TAC std_ss [dCoh_lem2] >>
+  RES_TAC >>
+  IMP_RES_TAC Mon_mem_not_lem >>
+  Cases_on `dw s'.ms pa = dw s.ms pa`
+  >| [(* cache unchanged *)
+      Cases_on `dhit s'.ms pa /\ ~dirty s'.ms pa`
+      >| [(* hit' and ~dirty' *)
+	  FULL_SIMP_TAC std_ss [] >>
+	  MATCH_MP_TAC dcoh_equal_lem >>
+	  RW_TAC std_ss [] >>
+	  `dw s'.ms pa' = dw s.ms pa'` by (
+	      METIS_TAC [dw_other_lem]
+	  ) >>
+	  Cases_on `M s'.ms pa' = M s.ms pa'`
+	  >| [(* mem unchanged *)
+	      IMP_RES_TAC dhit_other_lem >>
+	      IMP_RES_TAC dhit_lem >>
+	      IMP_RES_TAC dcnt_lem >>
+	      ASM_REWRITE_TAC [] >>
+	      `~dirty s.ms pa'` by ( METIS_TAC [dirty_other_lem, dirty_lem] ) >>
+	      IMP_RES_TAC dcoh_tag_lem >>
+	      IMP_RES_TAC dcoh_clean_lem >>
+	      ASM_REWRITE_TAC []
+	      ,
+	      (* mem changed *)
+	      `(M s'.ms pa' = dcnt s'.ms pa') \/
+	       ?va. Mmu s va USER W = SOME (pa,F)` by (
+	           METIS_TAC [drvbl_data_dw_eq_lem] )
+	      >| [(* WT case *)
+		  ASM_REWRITE_TAC []
+		  ,
+		  (* uncacheable alias -> not possible *)
+		  REV_FULL_SIMP_TAC std_ss []
+		 ]
+	     ]
+	  ,
+	  (* miss or dirty *)
+	  FULL_SIMP_TAC std_ss [] 
+	  >| [(* miss *)
+	      IMP_RES_TAC dcoh_miss_lem
+	      ,
+	      (* dirty *)
+	      IMP_RES_TAC dcoh_dirty_lem
+	     ]
+	 ]
+      ,
+      (* cache changed *)
+      IMP_RES_TAC drvbl_data_dw_neq_lem >> (
+          TRY ( METIS_TAC [dcoh_miss_lem, dcoh_dirty_lem] )
+      ) >>
+      MATCH_MP_TAC dcoh_equal_lem >>
+      RW_TAC std_ss [] >>
+      RES_TAC
+      >| [(* WT or fill *)
+	  ASM_REWRITE_TAC []
+	  ,
+	  (* write hit *)
+	  ASM_REWRITE_TAC [] >>
+	  IMP_RES_TAC dcoh_tag_lem >>
+	  IMP_RES_TAC dcoh_clean_lem >>
+	  ASM_REWRITE_TAC []
+	 ]
+     ]
+);
+
+
 val only_CA__def = Define `only_CA_ (cs,mv) pa =
 !va m ac c. (Mmu_(cs,mv,va,m,ac) = SOME (pa,c)) ==> (c = T)
 `;
@@ -3083,6 +3370,84 @@ val drvbl_dCoh_cacheable_lem = store_thm("drvbl_dCoh_cacheable_lem", ``
 		  METIS_TAC [dcoh_clean_lem]
 		 ]
 	     ]
+	 ]
+     ]
+);
+
+
+val drvbl_dCoh_cacheable_lem2 = store_thm("drvbl_dCoh_cacheable_lem2", ``
+!s s' As. drvbl_local s s' 	
+       /\ (!pa. pa IN As ==> only_CA s pa)	       
+       /\ dCoh s.ms As
+           ==> 
+       dCoh s'.ms As
+``,
+  REPEAT STRIP_TAC >>
+  REWRITE_TAC [dCoh_lem2] >>
+  REPEAT STRIP_TAC >>
+  IMP_RES_TAC dCoh_lem2 >>
+  SPEC_ASSUM_TAC ``!pa. X`` ``pa:padr`` >>
+  REV_FULL_SIMP_TAC std_ss [] >>
+  Cases_on `dw s'.ms pa = dw s.ms pa`
+  >| [(* cache unchanged *)
+      Cases_on `dhit s'.ms pa /\ ~dirty s'.ms pa`
+      >| [(* hit' and ~dirty' *)
+	  FULL_SIMP_TAC std_ss [] >>
+	  MATCH_MP_TAC dcoh_equal_lem >>
+	  RW_TAC std_ss [] >>
+	  `dw s'.ms pa' = dw s.ms pa'` by (
+	      METIS_TAC [dw_other_lem]
+	  ) >>
+	  Cases_on `M s'.ms pa' = M s.ms pa'`
+	  >| [(* mem unchanged *)
+	      IMP_RES_TAC dhit_other_lem >>
+	      IMP_RES_TAC dhit_lem >>
+	      IMP_RES_TAC dcnt_lem >>
+	      ASM_REWRITE_TAC [] >>
+	      `~dirty s.ms pa'` by ( METIS_TAC [dirty_other_lem, dirty_lem] ) >>
+	      IMP_RES_TAC dcoh_tag_lem >>
+	      IMP_RES_TAC dcoh_clean_lem >>
+	      ASM_REWRITE_TAC []
+	      ,
+	      (* mem changed *)
+	      `(M s'.ms pa' = dcnt s'.ms pa') \/
+	       ?va. Mmu s va USER W = SOME (pa,F)` by (
+	           METIS_TAC [drvbl_data_dw_eq_lem] )
+	      >| [(* WT case *)
+		  ASM_REWRITE_TAC []
+		  ,
+		  (* uncacheable alias -> not possible *)
+		  IMP_RES_TAC Mmu_tag_lem >>
+		  IMP_RES_TAC only_CA_tag_lem >>
+		  FULL_SIMP_TAC std_ss []
+		 ]
+	     ]
+	  ,
+	  (* miss or dirty *)
+	  FULL_SIMP_TAC std_ss [] 
+	  >| [(* miss *)
+	      IMP_RES_TAC dcoh_miss_lem
+	      ,
+	      (* dirty *)
+	      IMP_RES_TAC dcoh_dirty_lem
+	     ]
+	 ]
+      ,
+      (* cache changed *)
+      IMP_RES_TAC drvbl_data_dw_neq_lem >> (
+          TRY ( METIS_TAC [dcoh_miss_lem, dcoh_dirty_lem] )
+      ) >>
+      MATCH_MP_TAC dcoh_equal_lem >>
+      RW_TAC std_ss [] >>
+      RES_TAC
+      >| [(* WT or fill *)
+	  ASM_REWRITE_TAC []
+	  ,
+	  (* write hit *)
+	  ASM_REWRITE_TAC [] >>
+	  IMP_RES_TAC dcoh_tag_lem >>
+	  IMP_RES_TAC dcoh_clean_lem >>
+	  ASM_REWRITE_TAC []
 	 ]
      ]
 );
