@@ -1812,89 +1812,6 @@ val drvbl_data_def = Define `drvbl_data s s' =
 !pa. drvbl_non s s' pa \/ drvbl_rd s s' pa \/ drvbl_wt s s' pa
 `;
 
-(* stronger definition to account for bigger line sizes *)
-val drvbl_data_tagged_def = Define `drvbl_data_tagged s s' = 
-!t. (!pa. (tag pa = t) ==> drvbl_non s s' pa)
- \/ (!pa. (tag pa = t) ==> drvbl_non s s' pa \/ drvbl_rd s s' pa)
- \/ (!pa. (tag pa = t) ==> drvbl_non s s' pa \/ drvbl_wt s s' pa)
-`;
-
-val drvbl_data_tagged_lem = store_thm("drvbl_data_tagged_lem", ``
-!s s'. drvbl_data_tagged s s' ==> drvbl_data s s'
-``,
-  RW_TAC std_ss [drvbl_data_def] >>
-  `?t. tag pa = t` by ( METIS_TAC [cacheIfTheory.tag_oblg] ) >>
-  FULL_SIMP_TAC std_ss [drvbl_data_tagged_def] >>
-  PAT_X_ASSUM ``!t. x`` (
-      fn thm => ASSUME_TAC ( SPEC ``t:tag`` thm )
-  ) >>
-  FULL_SIMP_TAC std_ss [] >> (
-      RES_TAC >> (
-          ASM_REWRITE_TAC []
-      )
-  )
-);
-
-val drvbl_non_tagged_def = Define `drvbl_non_tagged s s' t = 
-!pa. (tag pa = t) ==> drvbl_non s s' pa
-`;
-
-val drvbl_rd_tagged_def = Define `drvbl_rd_tagged s s' t = 
-    (!pa. (tag pa = t) ==> drvbl_non s s' pa \/ drvbl_rd s s' pa)
- /\ ?pa. (tag pa = t) /\ drvbl_rd s s' pa
-`;
-
-val drvbl_wt_tagged_def = Define `drvbl_wt_tagged s s' t = 
-    (!pa. (tag pa = t) ==> drvbl_non s s' pa \/ drvbl_wt s s' pa)
- /\ ?pa. (tag pa = t) /\ drvbl_wt s s' pa
-`;
-
-fun SPEC_ASSUM_TAC pat inst = 
-  PAT_X_ASSUM pat (
-      fn thm => ASSUME_TAC ( SPEC inst thm )
-  )
-;
-
-val drvbl_data_tagged_cases = store_thm("drvbl_data_tagged_cases", ``
-!s s'. drvbl_data_tagged s s' ==>
-    !t. drvbl_non_tagged s s' t 
-     \/ drvbl_rd_tagged s s' t 
-     \/ drvbl_wt_tagged s s' t
-``,
-  RW_TAC std_ss [drvbl_data_tagged_def] >>
-  SPEC_ASSUM_TAC ``!t. x`` ``t:tag`` >>
-  FULL_SIMP_TAC std_ss []
-  >| [(* all non *)
-      DISJ1_TAC >>
-      ASM_REWRITE_TAC [drvbl_non_tagged_def]
-      ,
-      (* non or rd *)
-      Cases_on `?pa. (tag pa = t) /\ drvbl_rd s s' pa`
-      >| [(* rd exists *)
-	  DISJ2_TAC >>
-	  DISJ1_TAC >>
-	  ASM_REWRITE_TAC [drvbl_rd_tagged_def]
-	  ,
-	  (* all non *)
-	  DISJ1_TAC >>
-	  FULL_SIMP_TAC std_ss [GSYM IMP_DISJ_THM] >>
-	  ASM_REWRITE_TAC [drvbl_non_tagged_def]
-	 ]
-      ,
-      (* non or wt *)
-      Cases_on `?pa. (tag pa = t) /\ drvbl_wt s s' pa`
-      >| [(* wt exists *)
-	  DISJ2_TAC >>
-	  DISJ2_TAC >>
-	  ASM_REWRITE_TAC [drvbl_wt_tagged_def]
-	  ,
-	  (* all non *)
-	  DISJ1_TAC >>
-	  FULL_SIMP_TAC std_ss [GSYM IMP_DISJ_THM] >>
-	  ASM_REWRITE_TAC [drvbl_non_tagged_def]
-	 ]
-     ]      
-);
 
 (* instruction cache deriveability *)
 
@@ -1915,30 +1832,9 @@ val drvbl_ic_def = Define `drvbl_ic s s' =
 `;
 
 
-val drvbl_local_def = Define `drvbl_local s s' = 
+val drvbl_def = Define `drvbl s s' = 
 (s'.cs.coreg = s.cs.coreg) /\ drvbl_data s s' /\ drvbl_ic s s' 
 `;
-
-val drvbl_def = Define `drvbl s s' = 
-(s'.cs.coreg = s.cs.coreg) /\ drvbl_data_tagged s s' /\ drvbl_ic s s' 
-`;
-
-val drvbl_local_lem = store_thm("drvbl_local_lem", ``
-!s s'. drvbl s s' ==> drvbl_local s s'
-``,
-  RW_TAC std_ss [drvbl_local_def, drvbl_def, drvbl_data_tagged_lem]
-);
-
-val drvbl_data_cases = store_thm("drvbl_data_cases", ``
-!s s'. drvbl s s' ==>
-    !t. drvbl_non_tagged s s' t 
-     \/ drvbl_rd_tagged s s' t 
-     \/ drvbl_wt_tagged s s' t
-``,
-  RW_TAC std_ss [drvbl_def] >> 
-  IMP_RES_TAC drvbl_data_tagged_cases >>
-  ASM_REWRITE_TAC []
-);
 
 (* deriveability lemmas *)
 
@@ -1948,17 +1844,6 @@ val drvbl_data_unchanged_lem = store_thm("drvbl_data_unchanged_lem", ``
 drvbl_data s s'
 ``,
   RW_TAC std_ss [drvbl_data_def] >>
-  DISJ1_TAC >>
-  RW_TAC std_ss [drvbl_non_def]
-);
-
-val drvbl_data_tagged_unchanged_lem = 
-store_thm("drvbl_data_tagged_unchanged_lem", ``
-!s s'. (!pa. (dw s'.ms pa = dw s.ms pa) /\ (M s'.ms pa = M s.ms pa))
-    ==>
-drvbl_data_tagged s s'
-``,
-  RW_TAC std_ss [drvbl_data_tagged_def] >>
   DISJ1_TAC >>
   RW_TAC std_ss [drvbl_non_def]
 );
@@ -1982,14 +1867,14 @@ val drvbl_unchanged_lem = store_thm("drvbl_unchanged_lem", ``
 drvbl s s'
 ``,
   RW_TAC std_ss [drvbl_def]
-  >| [METIS_TAC [drvbl_data_tagged_unchanged_lem]
+  >| [METIS_TAC [drvbl_data_unchanged_lem]
       ,
       METIS_TAC [drvbl_ic_unchanged_lem]
      ]
 );
    
-val drvbl_l_lem = store_thm("drvbl_l_lem", ``
-!s req s'. hw_trans s USER req s' ==> drvbl_local s s'
+val drvbl_lem = store_thm("drvbl_lem", ``
+!s req s'. hw_trans s USER req s' ==> drvbl s s'
 ``,
   REPEAT STRIP_TAC >>
   IMP_RES_TAC hw_trans_coreg_lem >>
@@ -2003,7 +1888,7 @@ val drvbl_l_lem = store_thm("drvbl_l_lem", ``
           IMP_RES_TAC hw_trans_data_ic_lem >>
           IMP_RES_TAC drvbl_ic_unchanged_lem
       ) >>
-      RW_TAC std_ss [drvbl_local_def] >>
+      RW_TAC std_ss [drvbl_def] >>
       IMP_RES_TAC hw_trans_data_lem >>
       RW_TAC std_ss [drvbl_data_def] >>
       Cases_on `CA dop` 
@@ -2134,279 +2019,6 @@ val drvbl_l_lem = store_thm("drvbl_l_lem", ``
           IMP_RES_TAC hw_trans_not_Dreq_lem >>
           METIS_TAC [drvbl_data_unchanged_lem]
       ) >>
-      RW_TAC std_ss [drvbl_local_def] >>
-      Cases_on `req = NOREQ`
-      >| [(* NOREQ *)
-	  FULL_SIMP_TAC std_ss [] >>
-	  IMP_RES_TAC hw_trans_noreq_lem >>
-	  `!pa. iw s'.ms pa = iw s.ms pa` by ( FULL_SIMP_TAC std_ss [] ) >>
-	  IMP_RES_TAC drvbl_ic_unchanged_lem
-	  ,
-	  (* fetch or flush *)
-	  IMP_RES_TAC hw_trans_mon_lem >>
-	  IMP_RES_TAC not_NOREQ_lem
-	  >| [(* fetch *)
-	      IMP_RES_TAC hw_trans_fetch_lem >>
-	      IMP_RES_TAC Freq_lem >>
-	      FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
-	      RW_TAC std_ss [drvbl_ic_def] >>
-	      Cases_on `pa' = pa`
-	      >| [(* fetched address *)
-	          RW_TAC std_ss [] >>
-	          DISJ2_TAC >>
-	          REWRITE_TAC [drvbl_ic_ex_def] >>
-	          STRIP_TAC >- ( ASM_REWRITE_TAC [] ) >>
-	          STRIP_TAC >>
-	          IMP_RES_TAC ic_cacheable_read_lem >>
-	          ASM_REWRITE_TAC []
-	          ,
-	          (* other address *)
-	          DISJ1_TAC >>
-	          REWRITE_TAC [drvbl_ic_non_def] >>
-	          STRIP_TAC >>
-	          IMP_RES_TAC ic_cacheable_other_lem >> (
-		      RW_TAC std_ss []
-		  )
-		 ]
-	      ,
-	      (* flush *)
-	      IMP_RES_TAC hw_trans_flush_lem >>
-	      IMP_RES_TAC Ireq_lem >>
-	      FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
-	      RW_TAC std_ss [drvbl_ic_def] >>
-	      DISJ1_TAC >>
-	      Cases_on `pa' = pa`
-	      >| [(* fetched address *)
-		  FULL_SIMP_TAC std_ss [] >>
-	          IMP_RES_TAC msca_ICFR_lem >>
-	          REWRITE_TAC [drvbl_ic_non_def] >>
-	          STRIP_TAC >>
-	          IMP_RES_TAC ic_cacheable_cl_lem >>
-		  RW_TAC std_ss []
-	          ,
-	          (* other address *)
-	          REWRITE_TAC [drvbl_ic_non_def] >>
-	          STRIP_TAC >>
-	          IMP_RES_TAC ic_cacheable_cl_other_lem >>
-		  RW_TAC std_ss []
-	         ]
-	     ]
-	 ]
-     ]
-);
-
-
-
-val drvbl_lem = store_thm("drvbl_lem", ``
-!s req s'. hw_trans s USER req s' ==> drvbl s s'
-``,
-  REPEAT STRIP_TAC >>
-  IMP_RES_TAC hw_trans_coreg_lem >>
-  Cases_on `Dreq req`
-  >| [(* Dreq *)
-      IMP_RES_TAC Dreq_lem >>
-      `req <> NOREQ` by ( METIS_TAC [req_cases_lem] ) >>
-      IMP_RES_TAC hw_trans_mon_lem >>
-      FULL_SIMP_TAC std_ss [] >>
-      `drvbl_ic s s'` by (
-          IMP_RES_TAC hw_trans_data_ic_lem >>
-          IMP_RES_TAC drvbl_ic_unchanged_lem
-      ) >>
-      RW_TAC std_ss [drvbl_def] >>
-      IMP_RES_TAC hw_trans_data_lem >>
-      RW_TAC std_ss [drvbl_data_tagged_def] >>
-      Cases_on `CA dop` 
-      >| [(* CA dop *)
-	  Cases_on `t = tag (PA dop)`
-	  >| [(* same line *)
-	      ASSUME_TAC ( SPEC ``dop:dop`` dop_cases_lem2 ) >>
-	      FULL_SIMP_TAC std_ss []
-	      >| [(* read *)
-		  DISJ2_TAC >>
-		  DISJ1_TAC >>
-		  RW_TAC std_ss [] >>
-		  Cases_on `pa = PA dop`
-	          >| [(* PA dop *)
-		      DISJ2_TAC >>
-		      FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
-		      REWRITE_TAC [drvbl_rd_def] >>
-		      STRIP_TAC >- ( 
-		          (* Monitor permission *)
-		          ASM_REWRITE_TAC [] ) >>
-		      STRIP_TAC >- ( 		  
-		          (* mem unchanged *)
-		          IMP_RES_TAC M_cacheable_read_lem ) >>
-		      STRIP_TAC >> (
-		          (* miss and cache fill *)
-		          IMP_RES_TAC dc_cacheable_read_lem >>
-		          ASM_REWRITE_TAC []
-		      )
-		      ,
-		      (* other address on same line *)
-		      DISJ1_TAC >>
-		      REWRITE_TAC [drvbl_non_def] >>
-	              STRIP_TAC
-	              >| [(* mem changed *)
-	               	  STRIP_TAC >>
-	               	  IMP_RES_TAC M_cacheable_other_lem >>
-	               	  ASM_REWRITE_TAC []
-	               	  ,
-	               	  (* cache changed *)
-	               	  STRIP_TAC >>
-	               	  IMP_RES_TAC dc_cacheable_other_lem >> (
-	               	      ASM_REWRITE_TAC []
-	               	  )
-	               	 ]
-		     ]
-		  ,
-		  (* write *)
-		  DISJ2_TAC >>
-		  DISJ2_TAC >>
-		  RW_TAC std_ss [] >>
-		  Cases_on `pa = PA dop`
-	          >| [(* PA dop *)
-		      DISJ2_TAC >>
-		      FULL_SIMP_TAC std_ss [Adr_def, Acc_def] >>
-		      REWRITE_TAC [drvbl_wt_def] >>
-		      STRIP_TAC >- ( 
-		          (* Monitor permission *)
-		          ASM_REWRITE_TAC [] ) >>
-		      STRIP_TAC >- ( 		  
-		          (* dirty or WT *)
-		          STRIP_TAC >>
-		          IMP_RES_TAC dc_cacheable_write_lem >> (
-		              ASM_REWRITE_TAC []
-		          )
-		      ) >>
-		      STRIP_TAC >> (
-		          (* clean write = WT *)
-		          STRIP_TAC >>
-		          DISJ2_TAC >>
-		          IMP_RES_TAC M_cacheable_not_cl_lem >>
-		          ASM_REWRITE_TAC []
-		      )
-		      ,
-		      (* other address on same line *)
-		      DISJ1_TAC >>
-		      REWRITE_TAC [drvbl_non_def] >>
-	              STRIP_TAC
-	              >| [(* mem changed *)
-	               	  STRIP_TAC >>
-	               	  IMP_RES_TAC M_cacheable_other_lem >>
-	               	  ASM_REWRITE_TAC []
-	               	  ,
-	               	  (* cache changed *)
-	               	  STRIP_TAC >>
-	               	  IMP_RES_TAC dc_cacheable_other_lem >> (
-	               	      ASM_REWRITE_TAC []
-	               	  )
-	               	 ]
-		     ]
-		  ,
-		  (* clean *)
-		  DISJ1_TAC >>
-		  RW_TAC std_ss [] >>
-		  Cases_on `pa = PA dop`
-	          >| [(* PA dop *)
-		      REWRITE_TAC [drvbl_non_def] >>
-		      STRIP_TAC >- ( 		  
-		          (* dirty write back *)
-		          STRIP_TAC >>
-		          METIS_TAC [M_cacheable_cl_lem]
-		      ) >>
-		      STRIP_TAC >> (
-		          (* miss and dirty write back *)
-		          METIS_TAC [dc_cacheable_cl_lem]
-		      )
-		      ,
-		      (* other address on same line *)
-		      REWRITE_TAC [drvbl_non_def] >>
-	              STRIP_TAC
-	              >| [(* mem changed *)
-	               	  STRIP_TAC >>
-	               	  IMP_RES_TAC M_cacheable_other_lem >>
-	               	  ASM_REWRITE_TAC []
-	               	  ,
-	               	  (* cache changed *)
-	               	  STRIP_TAC >>
-	               	  IMP_RES_TAC dc_cacheable_other_lem >> (
-	               	      ASM_REWRITE_TAC []
-	               	  )
-	               	 ]
-		     ]
-		 ]
-	      ,
-	      (* others *)
-	      DISJ1_TAC >>
-	      RW_TAC std_ss [] >>
-	      IMP_RES_TAC cachememTheory.tag_neq_lem >>
-	      REWRITE_TAC [drvbl_non_def] >>
-	      STRIP_TAC
-	      >| [(* mem changed *)
-		  STRIP_TAC >>
-		  IMP_RES_TAC M_cacheable_other_lem >>
-		  ASM_REWRITE_TAC []
-		  ,
-		  (* cache changed *)
-		  STRIP_TAC >>
-		  IMP_RES_TAC dc_cacheable_other_lem >> (
-		      ASM_REWRITE_TAC []
-		  )
-		 ]
-	     ]
-	  ,
-	  (* uncacheable *)
-	  IMP_RES_TAC dc_uncacheable_unchanged_lem >>
-	  Cases_on `wt dop`
-	  >| [(* write *)
-	      DISJ2_TAC >>
-	      DISJ2_TAC >>
-	      RW_TAC std_ss [] >>
-	      Cases_on `pa = PA dop`
-	      >| [(* same line *)
-		  Cases_on `M s'.ms pa = M s.ms pa`
-		  >| [(* mem unchanged *)
-		      DISJ1_TAC >>
-		      RW_TAC std_ss [drvbl_non_def]
-		      ,
-		      (* mem changed *)
-		      RW_TAC std_ss [] >>
-		      DISJ2_TAC >>
-		      RW_TAC std_ss [drvbl_wt_def]
-		      >| [(* Monitor permission *)
-			  FULL_SIMP_TAC std_ss [Acc_def, Adr_def]
-			  ,
-			  (* uncacheable alias *)
-			  `~CAreq (DREQ dop)` by ( 
-			      FULL_SIMP_TAC std_ss [CAreq_def]
-			  ) >>
-			  IMP_RES_TAC hw_trans_CA_lem >>
-			  DISJ1_TAC >>
-			  REV_FULL_SIMP_TAC std_ss [Acc_def, Adr_def] >>
-			  HINT_EXISTS_TAC >>
-			  RW_TAC std_ss []
-			 ]
-		     ]
-		  ,
-		  (* others *)
-		  IMP_RES_TAC M_uncacheable_others_lem >>
-		  DISJ1_TAC >>
-		  RW_TAC std_ss [drvbl_non_def]
-		 ]
-	      ,
-	      (* not write *)
-	      DISJ1_TAC >>
-	      RW_TAC std_ss [] >>
-	      IMP_RES_TAC ms_uncacheable_unchanged_lem >>
-	      RW_TAC std_ss [drvbl_non_def]
-	     ]
-	 ]
-      ,
-      (* not Dreq *)
-      `drvbl_data_tagged s s'` by (
-          IMP_RES_TAC hw_trans_not_Dreq_lem >>
-          METIS_TAC [drvbl_data_tagged_unchanged_lem]
-      ) >>
       RW_TAC std_ss [drvbl_def] >>
       Cases_on `req = NOREQ`
       >| [(* NOREQ *)
@@ -2467,6 +2079,7 @@ val drvbl_lem = store_thm("drvbl_lem", ``
 	 ]
      ]
 );
+
 
 val not_dhit_other_lem = store_thm("not_dhit_other_lem", ``
 !ms pa pa'. (tag pa = tag pa') ==> (~dhit ms pa <=> ~dhit ms pa')
@@ -2480,229 +2093,15 @@ val not_dirty_other_lem = store_thm("not_dirty_other_lem", ``
   METIS_TAC [dirty_other_lem]
 );
 
-val drvbl_non_tagged_dw_neq_lem = store_thm ("drvbl_rd_tagged_dw_neq_lem", ``
-!s s' pa. drvbl_non_tagged s s' (tag pa) /\ dw s'.ms pa <> dw s.ms pa 
-    ==>
-    ~dhit s'.ms pa /\ 
-        (dirty s.ms pa ==> (!pa'. (tag pa' = tag pa) ==>
-	                          (M s'.ms pa' = dcnt s.ms pa'))) \/
-    dhit s.ms pa /\ dhit s'.ms pa /\ (dirty s.ms pa ==> dirty s'.ms pa) /\
-        (!pa'. (tag pa' = tag pa) ==> (dcnt s'.ms pa' = dcnt s.ms pa')) \/
-    ~dhit s.ms pa /\ dhit s'.ms pa /\ (!pa'. (tag pa' = tag pa) ==> 
-					     (dcnt s'.ms pa' = M s.ms pa'))
-``,
-  RW_TAC std_ss [drvbl_non_tagged_def] >>
-  `drvbl_non s s' pa` by ( FULL_SIMP_TAC std_ss [] ) >>
-  IMP_RES_TAC drvbl_non_def
-  >| [(* eviction *)
-      DISJ1_TAC >>
-      RW_TAC std_ss [] >>
-      IMP_RES_TAC dirty_hit_lem >>
-      IMP_RES_TAC dhit_other_lem >>
-      IMP_RES_TAC not_dhit_other_lem >>
-      IMP_RES_TAC dirty_other_lem >>
-      RES_TAC >>
-      `dw s'.ms pa' <> dw s.ms pa'` by ( 
-          METIS_TAC [dw_other_lem] 
-      ) >>
-      IMP_RES_TAC drvbl_non_def >>
-      FULL_SIMP_TAC std_ss []
-      ,
-      (* hit *)
-      DISJ2_TAC >>
-      DISJ1_TAC >>
-      RW_TAC std_ss [] >>
-      `dw s'.ms pa' <> dw s.ms pa'` by ( 
-          METIS_TAC [dw_other_lem] 
-      ) >>
-      IMP_RES_TAC dhit_other_lem >>
-      RES_TAC >>
-      IMP_RES_TAC drvbl_non_def
-      ,
-      (* read or wt fill *)
-      DISJ2_TAC >>
-      DISJ2_TAC >>
-      RW_TAC std_ss [] >>
-      `dw s'.ms pa' <> dw s.ms pa'` by ( 
-          METIS_TAC [dw_other_lem] 
-      ) >>
-      IMP_RES_TAC dhit_other_lem >>
-      IMP_RES_TAC not_dhit_other_lem >>
-      RES_TAC >>
-      IMP_RES_TAC drvbl_non_def
-     ]
-);
-
-val drvbl_rd_tagged_dw_eq_lem = store_thm ("drvbl_rd_tagged_dw_eq_lem", ``
-!s s' pa. drvbl_rd_tagged s s' (tag pa) /\ (dw s'.ms pa = dw s.ms pa) 
-    ==>
-!pa'. (tag pa' = tag pa) ==> 
-          (M s'.ms pa' = M s.ms pa')
-       /\ (dhit s.ms pa' ==> (dcnt s'.ms pa' = dcnt s.ms pa'))
-``,
-  RW_TAC std_ss [drvbl_rd_tagged_def]
-  >| [(* mem unchanged *)
-      `drvbl_non s s' pa'' \/ drvbl_rd s s' pa''` by ( 
-          FULL_SIMP_TAC std_ss [] )
-      >| [(* non *)
-	  CCONTR_TAC >>
-	  FULL_SIMP_TAC std_ss [drvbl_non_def] >>
-	  IMP_RES_TAC dirty_hit_lem >>
-	  `dw s'.ms pa'' = dw s.ms pa''` by ( METIS_TAC [dw_other_lem] ) >>
-	  METIS_TAC [dhit_lem]
-	  ,
-	  (* rd *)
-	  FULL_SIMP_TAC std_ss [drvbl_rd_def]
-	 ]
-      ,
-      (* dcnt unchanged *)
-      `dw s'.ms pa'' = dw s.ms pa''` by ( METIS_TAC [dw_other_lem] ) >>
-      IMP_RES_TAC dcnt_lem
-     ]      
-);
-
-val drvbl_rd_tagged_dw_neq_lem = store_thm ("drvbl_rd_tagged_dw_neq_lem", ``
-!s s' pa. drvbl_rd_tagged s s' (tag pa) /\ dw s'.ms pa <> dw s.ms pa 
-    ==>
-    ~dhit s.ms pa /\ dhit s'.ms pa /\ ~dirty s'.ms pa 
- /\ !pa'. (tag pa' = tag pa) ==> 
-              (M s'.ms pa' = M s.ms pa')
-	   /\ (dcnt s'.ms pa' = M s.ms pa')
-``,
-  REPEAT GEN_TAC >>
-  STRIP_TAC >>
-  FULL_SIMP_TAC std_ss [drvbl_rd_tagged_def] >>
-  `dw s'.ms pa' <> dw s.ms pa'` by ( 
-      METIS_TAC [dw_other_lem] 
-  ) >>
-  `(M s'.ms pa' = M s.ms pa') /\ ~dhit s.ms pa' /\ dhit s'.ms pa' /\
-   ~dirty s'.ms pa' /\ (dcnt s'.ms pa' = M s.ms pa')` by (
-       METIS_TAC [drvbl_rd_def] 
-  ) >> 
-  IMP_RES_TAC dhit_other_lem >>
-  IMP_RES_TAC not_dhit_other_lem >>
-  IMP_RES_TAC not_dirty_other_lem >>
-  FULL_SIMP_TAC std_ss [] >>
-  NTAC 2 STRIP_TAC >>
-  `drvbl_non s s' pa'' \/ drvbl_rd s s' pa''` by ( FULL_SIMP_TAC std_ss [] )
-  >| [(* non *)
-      RW_TAC std_ss []
-      >| [(* mem unchanged *)
-	  CCONTR_TAC >>
-	  FULL_SIMP_TAC std_ss [drvbl_non_def] >>
-	  IMP_RES_TAC dhit_other_lem
-	  ,
-	  (* cache filled *)
-	  `dw s'.ms pa'' <> dw s.ms pa''` by ( 
-               METIS_TAC [dw_other_lem] 
-	  ) >>
-	  FULL_SIMP_TAC std_ss [drvbl_non_def] >> (
-	      IMP_RES_TAC dhit_other_lem
-	  )	      
-	 ]
-      ,
-      (* rd *)
-      `dw s'.ms pa'' <> dw s.ms pa''` by ( 
-          METIS_TAC [dw_other_lem] 
-      ) >>
-      FULL_SIMP_TAC std_ss [drvbl_rd_def]
-     ]
-);
-
-val drvbl_wt_tagged_dw_eq_lem = store_thm ("drvbl_wt_tagged_dw_neq_lem", ``
-!s s' pa pa'. drvbl_wt_tagged s s' (tag pa) /\ (dw s'.ms pa = dw s.ms pa) 
-           /\ ~dirty s'.ms pa /\ dhit s'.ms pa /\ (tag pa' = tag pa)
-           /\ M s'.ms pa' <> M s.ms pa' 
-         ==>
-     (    (?va. Mmu s va USER W = SOME (pa',F))
-       \/ (M s'.ms pa' = dcnt s'.ms pa'))
-``,
-  RW_TAC std_ss [drvbl_wt_tagged_def] >>
-  `drvbl_non s s' pa' \/ drvbl_wt s s' pa'` by ( FULL_SIMP_TAC std_ss [] )
-  >| [(* non *)
-      IMP_RES_TAC dhit_other_lem >>
-      IMP_RES_TAC drvbl_non_def
-      ,
-      (* wt *)
-      IMP_RES_TAC not_dirty_other_lem >>
-      IMP_RES_TAC drvbl_wt_def
-      >| [(* uncacheable alias *)
-	  DISJ1_TAC >>
-	  METIS_TAC []
-	  ,
-	  (* WT case *)
-	  RW_TAC std_ss []
-	 ]
-     ]      
-);
-
-val drvbl_wt_tagged_dw_neq_lem = store_thm ("drvbl_wt_tagged_dw_neq_lem", ``
-!s s' pa. drvbl_wt_tagged s s' (tag pa) /\ dw s'.ms pa <> dw s.ms pa 
-    ==>
-    dirty s'.ms pa
- \/ (~dirty s'.ms pa /\ dhit s'.ms pa /\ 
-        (!pa'. (tag pa' = tag pa) ==>
-	       (    (M s'.ms pa' = dcnt s'.ms pa')
-	         \/ dhit s.ms pa' /\ ~dirty s.ms pa' /\ 
-		    (dcnt s'.ms pa' = dcnt s.ms pa') /\ 
-                    (M s'.ms pa' = M s.ms pa'))))
-``,
-  RW_TAC std_ss [drvbl_wt_tagged_def] >>
-  `dw s'.ms pa' <> dw s.ms pa'` by ( 
-      METIS_TAC [dw_other_lem] 
-  ) >>
-  IMP_RES_TAC drvbl_wt_def
-  >| [(* dirty *)
-      DISJ1_TAC >>
-      IMP_RES_TAC dirty_other_lem
-      ,
-      (* WT case *)
-      DISJ2_TAC >>
-      IMP_RES_TAC not_dirty_other_lem >>
-      IMP_RES_TAC dhit_other_lem >>
-      RW_TAC std_ss [] >>
-      `drvbl_non s s' pa'' \/ drvbl_wt s s' pa''` by ( FULL_SIMP_TAC std_ss [] )
-      >| [(* non *)
-	  `dw s'.ms pa'' <> dw s.ms pa''` by ( 
-               METIS_TAC [dw_other_lem] 
-	  ) >>
-          IMP_RES_TAC not_dirty_other_lem >>
-          IMP_RES_TAC dhit_other_lem >>
-	  IMP_RES_TAC drvbl_non_def 
-	  >| [(* write hit *)
-	      DISJ2_TAC >>
-	      FULL_SIMP_TAC std_ss [] >>
-	      CCONTR_TAC >>
-	      FULL_SIMP_TAC std_ss [] >> (
-	          FULL_SIMP_TAC std_ss []
-	      )
-	      ,
-	      (* write fill *)
-	      DISJ1_TAC >>
-	      ASM_REWRITE_TAC [] >>
-	      CCONTR_TAC >>
-	      RES_TAC 
-	     ]
-	  ,
-	  (* wt *)
-	  `dw s'.ms pa'' <> dw s.ms pa''` by ( 
-               METIS_TAC [dw_other_lem] 
-	  ) >>
-          IMP_RES_TAC not_dirty_other_lem >>
-	  METIS_TAC [drvbl_wt_def]
-	 ]
-     ]
-);
-
 val drvbl_data_dw_eq_lem = store_thm("drvbl_data_dw_eq_lem", ``
-!s s' pa. drvbl_local s s' /\ (dw s'.ms pa = dw s.ms pa) 
+!s s' pa. drvbl s s' /\ (dw s'.ms pa = dw s.ms pa) 
        /\ ~dirty s'.ms pa /\ dhit s'.ms pa
     ==>
 !pa'. (tag pa' = tag pa) /\ M s'.ms pa' <> M s.ms pa' ==>
           (    (M s'.ms pa' = dcnt s'.ms pa')
 	    \/ (?va. Mmu s va USER W = SOME (pa,F)))
 ``,
-  RW_TAC std_ss [drvbl_local_def, drvbl_data_def] >>
+  RW_TAC std_ss [drvbl_def, drvbl_data_def] >>
   `drvbl_non s s' pa' \/ drvbl_rd s s' pa' \/ drvbl_wt s s' pa'` by (
       FULL_SIMP_TAC std_ss [] )
   >| [(* non *)
@@ -2727,7 +2126,7 @@ val drvbl_data_dw_eq_lem = store_thm("drvbl_data_dw_eq_lem", ``
 );
 
 val drvbl_data_dw_neq_lem = store_thm("drvbl_data_dw_neq_lem", ``
-!s s' pa. drvbl_local s s' /\ dw s'.ms pa <> dw s.ms pa 
+!s s' pa. drvbl s s' /\ dw s'.ms pa <> dw s.ms pa 
     ==>
     dirty s'.ms pa
  \/ ~dhit s'.ms pa
@@ -2738,7 +2137,7 @@ val drvbl_data_dw_neq_lem = store_thm("drvbl_data_dw_neq_lem", ``
 		    (dcnt s'.ms pa' = dcnt s.ms pa') /\ 
                     (M s'.ms pa' = M s.ms pa'))))
 ``,
-  RW_TAC std_ss [drvbl_local_def, drvbl_data_def] >>
+  RW_TAC std_ss [drvbl_def, drvbl_data_def] >>
   `drvbl_non s s' pa \/ drvbl_rd s s' pa \/ drvbl_wt s s' pa` by (
       FULL_SIMP_TAC std_ss [] )
   >| [(* non *)
@@ -2998,8 +2397,7 @@ val drvbl_Coh_mem_lem = store_thm("drvbl_Coh_mem_lem", ``
 ``,
   RW_TAC std_ss [Cv_dmv_eq, Cv_def] >>
   RES_TAC >>
-  IMP_RES_TAC drvbl_local_lem >>
-  FULL_SIMP_TAC std_ss [drvbl_local_def, drvbl_data_def] >>
+  FULL_SIMP_TAC std_ss [drvbl_def, drvbl_data_def] >>
   PAT_X_ASSUM ``!pa. X \/ Y \/ Z`` (
       fn thm => ASSUME_TAC ( SPEC ``pa:padr`` thm ) 
   ) >>
@@ -3104,97 +2502,14 @@ val Mon_Coh_safe_lem = store_thm("Mon_Coh_safe_lem", ``
   RW_TAC std_ss [drvbl_MD_unchanged_lem]
 );
 
-val drvbl_non_dcoh_lem = store_thm("drvbl_non_dcoh", ``
-!s s' pa. drvbl_non_tagged s s' (tag pa) /\ dcoh s.ms pa ==> dcoh s'.ms pa
-``,
-  RW_TAC std_ss [] >>
-  Cases_on `!pa'. (tag pa' = tag pa) ==> (M s'.ms pa' = M s.ms pa')`
-  >| [(* memory unchanged *)
-      Cases_on `dw s'.ms pa = dw s.ms pa`
-      >| [(* cache unchanged *)
-	  IMP_RES_TAC dcoh_unchanged_lem
-	  ,
-	  (* cache changed *)
-	  IMP_RES_TAC drvbl_non_tagged_dw_neq_lem
-	  >| [(* eviction *)
-	      IMP_RES_TAC dcoh_miss_lem
-	      ,
-	      (* hit *)
- 	      Cases_on `dirty s'.ms pa`
-	      >| [(* dirty' *)
-		  IMP_RES_TAC dcoh_dirty_lem
-		  ,
-		  (* not dirty' -> read or WT hit *)
-		  `~dirty s.ms pa` by ( METIS_TAC [] ) >>
-		  MATCH_MP_TAC dcoh_equal_lem >>
-		  RW_TAC std_ss [] >>
-		  IMP_RES_TAC dcoh_tag_lem >>
-		  IMP_RES_TAC dhit_other_lem >>
-		  IMP_RES_TAC not_dirty_other_lem >>
-		  METIS_TAC [dcoh_clean_lem]
-		 ]
-	      ,
-	      (* read or wt fill *)
-	      MATCH_MP_TAC dcoh_equal_lem >>
-	      RW_TAC std_ss []
-	     ]
-	 ]
-      ,
-      (* memory changed -> miss *)
-      FULL_SIMP_TAC std_ss [drvbl_non_tagged_def] >>
-      RES_TAC >>
-      FULL_SIMP_TAC std_ss [drvbl_non_def] >>
-      RES_TAC >>
-      IMP_RES_TAC not_dhit_other_lem >>
-      IMP_RES_TAC dcoh_miss_lem
-     ]
-);
-
-
-val drvbl_rd_dcoh_lem = store_thm("drvbl_rd_dcoh", ``
-!s s' pa. drvbl_rd_tagged s s' (tag pa) /\ dcoh s.ms pa ==> dcoh s'.ms pa
-``,
-  REPEAT STRIP_TAC >>
-  Cases_on `dw s'.ms pa = dw s.ms pa`
-  >| [(* cache and memory unchanged *)
-      MATCH_MP_TAC dcoh_unchanged_lem >>
-      HINT_EXISTS_TAC >>
-      IMP_RES_TAC drvbl_rd_tagged_dw_eq_lem >>
-      ASM_REWRITE_TAC []
-      ,
-      (* only cache changed *)
-      IMP_RES_TAC drvbl_rd_tagged_dw_neq_lem >>
-      MATCH_MP_TAC dcoh_equal_lem >>
-      RW_TAC std_ss []
-     ]
-);
+fun SPEC_ASSUM_TAC pat inst = 
+  PAT_X_ASSUM pat (
+      fn thm => ASSUME_TAC ( SPEC inst thm )
+  )
+;
 
 val drvbl_dCoh_lem = store_thm("drvbl_dCoh_lem", ``
 !s s' As. drvbl s s' 	
-       /\ (!pa. pa IN As ==> ~Mon s (MEM pa) USER W)
-       /\ dCoh s.ms As
-           ==> 
-       dCoh s'.ms As
-``,
-  RW_TAC std_ss [dCoh_lem2] >>
-  RES_TAC >>
-  IMP_RES_TAC drvbl_data_cases >>
-  SPEC_ASSUM_TAC ``!pa. X \/ Y \/ Z`` ``tag pa`` >>
-  FULL_SIMP_TAC std_ss [drvbl_wt_tagged_def]
-  >| [(* eviction *)
-      IMP_RES_TAC drvbl_non_dcoh_lem
-      ,
-      (* read *)
-      IMP_RES_TAC drvbl_rd_dcoh_lem
-      ,
-      (* write -> not possible *)
-      `~Mon s (MEM pa') USER W` by ( METIS_TAC [Mon_tag_lem] ) >>
-      FULL_SIMP_TAC std_ss [drvbl_wt_def]
-     ]
-);
-
-val drvbl_dCoh_lem2 = store_thm("drvbl_dCoh_lem2", ``
-!s s' As. drvbl_local s s' 	
        /\ (!pa. pa IN As ==> ~Mon s (MEM pa) USER W)
        /\ dCoh s.ms As
            ==> 
@@ -3300,93 +2615,6 @@ val drvbl_dCoh_cacheable_lem = store_thm("drvbl_dCoh_cacheable_lem", ``
   REPEAT STRIP_TAC >>
   IMP_RES_TAC dCoh_lem2 >>
   SPEC_ASSUM_TAC ``!pa. X`` ``pa:padr`` >>
-  IMP_RES_TAC drvbl_data_cases >>
-  SPEC_ASSUM_TAC ``!pa. X \/ Y \/ Z`` ``tag pa`` >>
-  FULL_SIMP_TAC std_ss []
-  >| [(* eviction *)
-      IMP_RES_TAC drvbl_non_dcoh_lem
-      ,
-      (* read *)
-      IMP_RES_TAC drvbl_rd_dcoh_lem
-      ,
-      (* write *)
-      Cases_on `dw s'.ms pa = dw s.ms pa`
-      >| [(* cache unchanged *)
-	  Cases_on `dhit s'.ms pa /\ ~dirty s'.ms pa`
-	  >| [(* not dirty' *)
-	      MATCH_MP_TAC dcoh_equal_lem >>
-	      RW_TAC std_ss [] >>
-	      Cases_on `M s'.ms pa' = M s.ms pa'`
-	      >| [(* memory unchanged *)
-		  IMP_RES_TAC dcoh_tag_lem >>
-		  `dw s'.ms pa' = dw s.ms pa'` by ( 
-		       METIS_TAC [dw_other_lem] 
-		  ) >>
-		  IMP_RES_TAC dhit_other_lem >>
-		  IMP_RES_TAC dhit_lem >>
-		  IMP_RES_TAC dcnt_lem >>
-		  IMP_RES_TAC not_dirty_other_lem >>
-		  `~dirty s.ms pa'` by ( METIS_TAC [dirty_lem] ) >>
-		  METIS_TAC [dcoh_clean_lem]
-		  ,
-		  (* memory changed -> becomes equal*)
-		  `(?va. Mmu s va USER W = SOME (pa',F)) \/
-	           (M s'.ms pa' = dcnt s'.ms pa')` by (
-		      METIS_TAC [drvbl_wt_tagged_dw_eq_lem] )
-		  >| [(* uncacheable alias *)
-		      RES_TAC >>
-		      IMP_RES_TAC only_CA_tag_lem >>
-		      FULL_SIMP_TAC std_ss []
-		      ,
-		      (* WT case *)
-		      RW_TAC std_ss []
-		     ]
-		  ]
-	      ,
-	      (* ~hit' or ~dirty' *)
-		  FULL_SIMP_TAC std_ss []
-		  >| [(* not hit' *)
-		      IMP_RES_TAC dcoh_miss_lem
-		      ,
-		      (* not dirty' *)
-		      IMP_RES_TAC dcoh_dirty_lem
-		     ]		  		 
-	     ]
-	  ,
-	  (* cache changed *)
-	  IMP_RES_TAC drvbl_wt_tagged_dw_neq_lem 
-	  >| [(* dirty case *)
-	      IMP_RES_TAC dcoh_dirty_lem
-	      ,
-	      (* WT case *)
-	      MATCH_MP_TAC dcoh_equal_lem >>
-	      RW_TAC std_ss [] >>
-	      RES_TAC
-	      >| [(* fill *)
-		  FULL_SIMP_TAC std_ss []
-		  ,
-		  (* hit *)
-		  IMP_RES_TAC dcoh_tag_lem >>
-		  METIS_TAC [dcoh_clean_lem]
-		 ]
-	     ]
-	 ]
-     ]
-);
-
-
-val drvbl_dCoh_cacheable_lem2 = store_thm("drvbl_dCoh_cacheable_lem2", ``
-!s s' As. drvbl_local s s' 	
-       /\ (!pa. pa IN As ==> only_CA s pa)	       
-       /\ dCoh s.ms As
-           ==> 
-       dCoh s'.ms As
-``,
-  REPEAT STRIP_TAC >>
-  REWRITE_TAC [dCoh_lem2] >>
-  REPEAT STRIP_TAC >>
-  IMP_RES_TAC dCoh_lem2 >>
-  SPEC_ASSUM_TAC ``!pa. X`` ``pa:padr`` >>
   REV_FULL_SIMP_TAC std_ss [] >>
   Cases_on `dw s'.ms pa = dw s.ms pa`
   >| [(* cache unchanged *)
@@ -3452,7 +2680,6 @@ val drvbl_dCoh_cacheable_lem2 = store_thm("drvbl_dCoh_cacheable_lem2", ``
      ]
 );
 
-
 (* instruction cache integrity *)
 
 (* NOTE: former region only restricted executable addresses,
@@ -3471,8 +2698,7 @@ val drvbl_clean_lem = store_thm("drvbl_clean_lem", ``
     clean s'.ms pa
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC drvbl_local_lem >>
-  FULL_SIMP_TAC std_ss [drvbl_local_def, drvbl_data_def] >>
+  FULL_SIMP_TAC std_ss [drvbl_def, drvbl_data_def] >>
   SPEC_ASSUM_TAC ``!pa. X`` ``pa:padr`` >>
   REV_FULL_SIMP_TAC std_ss [drvbl_wt_def]
   >| [(* eviction *)
@@ -3568,8 +2794,7 @@ val drvbl_mem_unchanged_lem = store_thm("drvbl_mem_unchanged_lem", ``
     (M s'.ms pa = M s.ms pa)
 ``,
   REPEAT STRIP_TAC >>
-  IMP_RES_TAC drvbl_local_lem >>
-  FULL_SIMP_TAC std_ss [drvbl_local_def, drvbl_data_def] >>
+  FULL_SIMP_TAC std_ss [drvbl_def, drvbl_data_def] >>
   SPEC_ASSUM_TAC ``!pa. X`` ``pa:padr`` >>
   CCONTR_TAC >>
   REV_FULL_SIMP_TAC std_ss [drvbl_wt_def]
