@@ -1,0 +1,1 @@
+cacheLib.uo: cacheLib.ui /home/hol4/HOL/sigobj/HolKernel.ui /home/hol4/HOL/sigobj/boolLib.ui /home/hol4/HOL/sigobj/bossLib.ui cacheTheory.ui /home/hol4/HOL/sigobj/numLib.ui /home/hol4/HOL/examples/l3-machine-code/common/utilsLib.ui /home/hol4/HOL/sigobj/wordsLib.ui 

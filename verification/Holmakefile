@@ -1,0 +1,15 @@
+INCLUDES = ${HOLDIR}/examples/l3-machine-code/common ${HOLDIR}/examples/l3-machine-code/arm/step ../model Lib/
+OPTIONS = QUIT_ON_FAILURE
+
+ifdef POLY
+HOLHEAP = mineheap
+EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
+
+BARE_THYS = ../model/cacheTheory
+DEPS = $(patsubst %,%.uo,$(BARE_THYS))
+
+$(HOLHEAP): $(DEPS)
+	$(protect $(HOLDIR)/bin/buildheap) -o $(HOLHEAP) $(BARE_THYS)
+
+endif
+

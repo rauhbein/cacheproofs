@@ -1,0 +1,989 @@
+(* ------------------------------------------------------------------- 
+   Definitions
+   ------------------------------------------------------------------- *)
+
+val cr_coherent_axiom = new_axiom("cr_coherent_axiom",
+   ``!va pa ms state. let (i, t, wi) = lineSpec(va, pa) state in 
+    CrResource(pa) ==>  
+    (~LineDirty(i,t, ms.CACHE)) ==> 
+    (CellRead(i, t, wi, ms.CACHE) = (v2w(read_mem32(pa, ms.PM)):word32))``
+);
+
+
+ (* redefining the real_state *)
+val _ = Hol_datatype `real_state =
+  <| ms      : MEM_SYSTEM;
+     cc      : CORE_CONFIG
+  |>`;
+
+val cohere_prop_def = Define`
+  cohere_prop dc  pm state (res:resource_class#word48) = 
+   let (cls, pa) = res in
+   let (i, t, wi)  = lineSpec(0w, pa) state in
+   (~LineDirty(i,t, dc) ) ==> (CellRead(i, t, wi, dc) = v2w(read_mem32(pa, pm)))`;
+
+val drivedByInvariant_real_inst_def = Define` drivedByInvariant_real_inst (rs:real_state) =
+    !va (req:access_type) state.
+     (let (pa, cbl) = THE (rtranslation(rs, rs.cc.PC, K, req)) in KMemory((memory, pa))) /\
+     (cohere (rdomain(rs, cr) ∪ rgcr(rs)) (cohere_prop rs.ms.CACHE rs.ms.PM state)) /\
+     (let (_, cbl) = THE (rtranslation(rs, va, K, req)) in (cacheable cbl))
+`;
+
+val drivedByInvariant_isa_inst_def = Define` drivedByInvariant_isa_inst (is:real_state) =
+    !va (req:access_type).
+     (let (pa, cbl) = THE (rtranslation(is, is.cc.PC, K, req)) in KMemory((memory, pa))) /\
+     (let (_, cbl) = THE (rtranslation(is, va, K, req)) in (cacheable cbl))
+`;
+
+(* ------------------------------------------------------------------- 
+   Axioms
+   ------------------------------------------------------------------- *)
+
+ (* No aliasing inside the kernel *)
+val no_aliasing_kernel_axiom = new_axiom("no_aliasing_kernel_axiom",
+  ``!va va' rs req. 
+   let (p1, a1) = THE (rtranslation(rs, va , K, req)) in
+   let (p2, a2) = THE (rtranslation(rs, va', K, req)) in
+   (p1 = p2) ==> ((a1 = a2) /\ (va = va'))``
+);
+
+ (* Physical address in the current request is the translation of its virtual address *)
+val req_pa_drivd_req_va_axiom = new_axiom("req_pa_drivd_req_va_axiom",
+  ``!rs em req. (rs.ms.MC.curr.desc.paddress, rs.ms.MC.curr.desc.memattrs.inner.attrs) 
+                = THE(rtranslation(rs, rs.ms.MC.curr.va, em, req))``
+);
+
+(* ------------------------------------------------------------------- 
+   Proof
+   ------------------------------------------------------------------- *)
+
+local
+val tac1 = 
+      (undisch_all_tac
+    \\ fs_lambda_elim[Fill_def, combinTheory.UPDATE_def]
+    \\ rpt CASE_TAC
+    \\ rwsimp[]
+    \\ abr_lineSpec_tac_sgl
+    \\ abr_tac_goal is_linespec "lspc" (SOME ``state:dharma8_state``)
+    \\ Q.ABBREV_TAC`t = FST (SND lspc)`
+    >-(`t' <> t` by (CCONTR_TAC >> fs[] >> rfs[])
+    \\ assume_tac(Fill_NotchgTag'_thm |> spec_let_elim[`ms.MC.curr.va`, `ms.MC.curr.desc.paddress`, `ms.PM`, 
+                                        `ms.CACHE`, `2 ** w2n state.DC.ctr.DminLine − 1`, `va`, `pa`, `state`])
+    \\ rfs[])
+    \\ `t' <> t` by (CCONTR_TAC >> fs[] >> rfs[])
+    \\ abr_tac_goal is_writeBackLine "wbs'" (SOME ``state:dharma8_state``)
+    \\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
+    \\ abr_tac_goal is_snd "h'" NONE
+    \\ abr_tac_goal is_pabs "proc" NONE
+    \\`t' <> x` by(assume_tac(Fill_NotchgHitDC'Tag_thm 
+         |> spec_let_elim [`ms.MC.curr.va`, `ms.MC.curr.desc.paddress`,`va`, `pa`,`ms.PM`,`ms.CACHE`,`x`,`state` ]
+	 |> SIMP_RULE(srw_ss())[Fill_def, Hit_def, LET_DEF, combinTheory.UPDATE_def])
+        \\ fs[Abbr`proc`]
+	\\ undisch_all_tac
+	\\ PairedLambda.GEN_BETA_TAC
+	\\ lrw[])
+    \\ mk_subgoal_then ``T`` ``2 ** nl − 1``
+    >-(Induct
+     >-(fs[LineFill_def, combinTheory.UPDATE_def, FOR_FOLDL, EVAL ``COUNT_LIST 1``, Hit_def, Abbr`proc`, Abbr`wbs'`]
+       \\ fs_lambda_elim[Evict_def, combinTheory.UPDATE_def]
+       \\ THM_SPECL_ASSM "WriteBackLine" writBckLine_NotchgTag'_thm [`t'`, `state`]
+       \\ line_size_lt_dimword15 ``nl:num``
+       \\ fs[]
+       \\ THM_SPECL_ASSM "WriteBackLine" writebackline_mem_eq_thm [`va`, `pa`, `state`]
+       \\ rfs[]
+       \\ FIRST_ASSUM (fn thm => let val trm = (fst o dest_imp o concl) thm in `^trm`by all_tac end)
+       >- (abr_tac_goal wordsSyntax.is_w2n "ns" NONE
+         \\ assume_tac(adr_thm 
+              |> spec_let_elim [`x`, `i'`, `t'`, `i'`, `ns`, `(nl + 2)`]
+	      |> SIMP_RULE(arith_ss)[])
+     	   \\ rfs[]
+     	   \\ THM_KEEP_TAC``invariant_cache`` (fs[invariant_cache_def])
+     	   \\ qpat_assum `!i t wi ni nt s. P` 
+              (qspecl_then [`i'`, `x`, `_`, `nl + 2n`, `ns`, `state`] ASSUME_TAC)
+     	   \\ rpt (WEAKEN_TAC is_forall)
+	   \\ fs[])
+	   \\ rfs[])
+       \\ UNDISCH_MATCH_TAC``a``
+       \\ simp[LineFill_def, combinTheory.UPDATE_def]
+       \\ fs[DECIDE``SUC n = n + 1``, FOR_FOLDL]
+       \\ ASSUME_TAC( rich_listTheory.COUNT_LIST_ADD
+			 |> Q.ISPECL[`(n:num) + 1`, `1:num`]
+			 |> SIMP_RULE(srw_ss())[listTheory.MAP, EVAL ``COUNT_LIST  (1)``])
+       \\ rfs[rich_listTheory.FOLDL_APPEND |> SIMP_RULE(srw_ss())[]])
+    \\ qpat_assum`!a. b`(qspecl_then[`n`] assume_tac)
+    \\ rfs[])
+
+val tac2 =
+     undisch_all_tac
+    \\ fs_lambda_elim[Fill_def, combinTheory.UPDATE_def]
+    \\ rpt CASE_TAC
+    \\ rwsimp[]
+    \\ abr_tac_goal is_linespec "lspc" (SOME ``state:dharma8_state``)
+    \\ Q.ABBREV_TAC`i' = (FST (lineSpec (va,pa) state))`
+    \\ Q.ABBREV_TAC`t' = (FST (SND(lineSpec (va,pa) state)))`
+    \\ Q.ABBREV_TAC`wi' = (SND (SND(lineSpec (va,pa) state)))`
+    \\ THM_SPECL_ASSM "WriteBackLine" writebackline_mem_eq_thm [`va`, `pa`, `state`]
+    \\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
+    \\ FIRST_ASSUM (fn thm => let val trm = (fst o dest_imp o concl) thm in `^trm`by all_tac end)
+    >- (abr_tac_goal wordsSyntax.is_w2n "ns" NONE
+             \\ assume_tac(adr_thm 
+                  |> spec_let_elim [`x`, `FST (lspc :word48 # word48 # num)`, `t'`, `i'`, `ns`, `(nl + 2)`]
+     		  |> SIMP_RULE(arith_ss)[])
+         	   \\ THM_KEEP_TAC``invariant_cache`` (fs[invariant_cache_def])
+         	   \\ qpat_assum `!i t wi ni nt s. P` 
+                   (qspecl_then [`FST (lspc :word48 # word48 # num)`, `x`, `_`, `nl + 2n`, `ns`, `state`] ASSUME_TAC)				        \\ fs[invariant_cache_def]
+         	   \\ qpat_assum `!i t wi ni nt s. P` 
+                  (qspecl_then [`i'`, `t'`, `_`, `nl + 2n`, `ns`, `state`] ASSUME_TAC)
+     	   \\ fs[])
+    \\ line_size_lt_dimword15``nl:num``
+    \\ assume_tac( writBckLine_NotchgSidx'_thm 
+    |> spec_let_elim [`FST (lspc:word48#word48#num)`,`i'`, `x`, `t'`, `ms.PM`, `ms.CACHE`, `state`, `2 ** nl - 1`])
+    \\ mfs[]
+in
+val readReq_notInLoadedLine_eqMemCache_thm = Q.prove(
+`!ms (va:word64) (pa:word48) state.
+    let (i, t, wi) = lineSpec(va, pa) state in
+    let (ms', vl) =  readReq(4, ms.MC.curr.desc.memattrs.inner.attrs,ms.MC.curr.va,
+             ms.MC.curr.desc.paddress, ms) state in
+    invariant_cache ==> 
+    Hit(va, pa, ms.CACHE) state ==>
+    Hit(va, pa, ms'.CACHE) state ==>
+    (CellRead(i,t,wi, ms.CACHE) = (v2w(read_mem32(pa, ms.PM)):word32)) ==>
+    (CellRead(i,t,wi, ms'.CACHE) = (v2w(read_mem32(pa, ms'.PM)):word32))
+`,
+
+    fs_lambda_elim[CellRead_def, Hit_def, readReq_def, read_cache_def, CacheRead_def, Touch_def, 
+                   combinTheory.UPDATE_def]
+    \\ lrw[]
+    \\ rpt CASE_TAC
+    \\ rfs[]
+    >|[tac1, tac2, tac1, tac2]
+)
+end;
+
+(* --------------------------------------------------------------------------------------------------------- *)
+val readReq_inLoadedLine_eqMemCache_thm = Q.prove(
+`!ms (va:word64) (pa:word48) state.
+    let (i, t, wi) = lineSpec(va, pa) state in
+    let (ms', vl) =  readReq(4, ms.MC.curr.desc.memattrs.inner.attrs,ms.MC.curr.va,
+             ms.MC.curr.desc.paddress, ms) state in
+    invariant_cache ==> 
+    ~Hit(va, pa, ms.CACHE) state ==>
+    Hit(va, pa, ms'.CACHE) state ==>   
+    (CellRead(i,t,wi, ms'.CACHE) = (v2w(read_mem32(pa, ms'.PM)):word32))`,
+
+       fs_lambda_elim[CellRead_def, Hit_def, readReq_def, read_cache_def, CacheRead_def, Touch_def, 
+             combinTheory.UPDATE_def]
+    \\ lrw[]
+    \\ rpt CASE_TAC
+    \\ rfs[]
+    \\ THM_SPECL_GOAL "Fill" Fill_ifInLineRange_HitDC'Pa_thm [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ rfs[Hit_def]
+    \\ ntac 3 PAIR_SPLIT_TAC >> rfs[]
+    \\ (undisch_all_tac
+      \\ fs_lambda_elim[Fill_def, combinTheory.UPDATE_def]
+      \\ rpt CASE_TAC
+      \\ rwsimp[]
+      \\ abr_lineSpec_tac_sgl
+      >-(THM_SPECL_GOAL "LineFill" linefill_memeq_thm [``state:dharma8_state``]
+      \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine``>> fs[]
+      \\ qpat_assum`!a. b`(qspecl_then[`wi'`] assume_tac)
+      \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+      \\ mfs[]
+      \\ (THM_SPECL_ASSM "lineSpec" lineSpec_thm [`state`] >> rfs[]))
+
+      \\ abr_tac_goal is_writeBackLine "wbs'" (SOME ``state:dharma8_state``)
+      \\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
+      \\ abr_tac_goal is_snd "h'" NONE
+      \\ abr_tac_goal is_pabs "proc" NONE
+      \\ THM_SPECL_GOAL "LineFill" linefill_memeq_thm [``state:dharma8_state``]
+      \\ line_size_lt_dimword15 ``nl:num`` >> fs[]
+      \\ qpat_assum`!a. b`(qspecl_then[`wi'`] assume_tac)
+      \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+      \\ mfs[]
+      \\ (THM_SPECL_ASSM "lineSpec" lineSpec_thm [`state`] >> rfs[]))
+);
+
+(* --------------------------------------------------------------------------------------------------------- *)
+
+val CacheWrite_DiffPa_EqReadMemPa'_thm2 = Q.store_thm("CacheWrite_DiffPa_EqReadMemPa'_thm2",
+  `!(va:word64) (pa:word48) data  (pm:(word48->word8)) (dc:(48 word -> CSET))  (va':word64) (pa':word48) state.
+   let (dc',pm')   = CacheWrite (va, pa, data, pm, dc) state in
+   let (i',t',wi') = lineSpec(va', pa') state    in
+    (pa <> pa')                 ==>
+    (invariant_cache)           ==>
+    (Hit(va', pa', dc) state)  ==>
+    (Hit(va', pa', dc') state) ==>
+    (v2w(read_mem32(pa', pm)):word32 = v2w(read_mem32(pa', pm')))`,
+
+       fs_lambda_elim[CacheWrite_def, Touch_def,  combinTheory.UPDATE_def, Hit_def]
+    \\ lrw[]       
+    \\ Cases_on` FST (lineSpec (va,pa) state) <> FST (lineSpec (va',pa') state)`
+    \\ fs[]
+
+     >-(fs_lambda_elim[Fill_def, combinTheory.UPDATE_def]
+        \\ abr_lineSpec_tac_sgl
+	\\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
+	\\ (CASE_TAC >> rfs[])
+	\\ THM_SPECL_GOAL "WriteBackLine" writebackline_mem_eq_thm 
+          [``va':word64``, ``pa':word48``, ``state:dharma8_state``]
+        \\ Q.ABBREV_TAC`i = FST (lineSpec (va',pa') state)`
+	\\ Q.ABBREV_TAC`t = FST (SND (lineSpec (va',pa') state))`
+	\\ Q.ABBREV_TAC`ns = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))`
+	\\ FIRST_ASSUM (fn thm => let val trm = (fst o dest_imp o concl) thm in `^trm`by all_tac end)
+        >- (assume_tac(adr_thm 
+              |> spec_let_elim [`x`, `i'`, `t`, `i`, `ns`, `(nl + 2)`]
+	      |> SIMP_RULE(arith_ss)[])
+     	   \\ THM_KEEP_TAC``invariant_cache`` (fs[invariant_cache_def])
+     	   \\ qpat_assum `!i t wi ni nt s. P` 
+               (qspecl_then [`i'`, `x`, `_`, `nl + 2n`, `ns`, `state`] ASSUME_TAC)
+	   \\ fs[invariant_cache_def]
+	   \\ qpat_assum `!i t wi ni nt s. P` 
+               (qspecl_then [`i`, `t`, `_`, `nl + 2n`, `ns`, `state`] ASSUME_TAC)
+	   \\ fs[])
+	   \\ line_size_lt_dimword15``nl:num``
+	   \\ fs[]
+       )
+
+    \\ undisch_all_tac
+    \\ fs_lambda_elim[Fill_def, combinTheory.UPDATE_def]
+    \\ lrw[]
+    \\ mfs[]
+    \\ abr_lineSpec_tac_sgl
+    \\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
+    \\ (CASE_TAC >> rfs[])
+    \\ (assume_tac(Fill_NotchgHitDC'Tag_thm 
+        |> spec_let_elim [`va`, `pa`, `va'`, `pa'`,`pm`, `dc`, `x`, `state` ]
+	|> SIMP_RULE(srw_ss())[Fill_def, Hit_def, LET_DEF, combinTheory.UPDATE_def])
+       \\ undisch_all_tac
+       \\ PairedLambda.GEN_BETA_TAC
+       \\ lrw[])
+
+    \\ THM_SPECL_GOAL "WriteBackLine" writebackline_mem_eq_thm 
+       [``va':word64``,``pa':word48``,``state:dharma8_state``]
+    \\ Q.ABBREV_TAC`t = FST (SND (lineSpec (va',pa') state))`
+    \\ Q.ABBREV_TAC`ns = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))`
+    \\ Q.ABBREV_TAC`i = FST (lineSpec (va,pa) state)`
+    \\ FIRST_ASSUM (fn thm => let val trm = (fst o dest_imp o concl) thm in `^trm`by all_tac end)
+    >- (assume_tac(adr_thm 
+              |> spec_let_elim [`x`, `i`, `t`, `i`, `ns`, `(nl + 2)`]
+	      |> SIMP_RULE(arith_ss)[])
+     	   \\ THM_KEEP_TAC``invariant_cache`` (fs[invariant_cache_def])
+     	   \\ qpat_assum `!i t wi ni nt s. P` 
+              (qspecl_then [`i`, `x`, `_`, `nl + 2n`, `ns`, `state`] ASSUME_TAC)
+ 	   \\ fs[])
+	   \\ fs[]
+    \\ line_size_lt_dimword15``nl:num``
+    \\ fs[]
+);
+
+val writeReq_NotEqMemCache_imp_dirty_notInLoadedLine_thm = Q.prove(
+ `!rs (va:word64) (pa:word48) req attrs state.
+    let (i, t, wi) = lineSpec(va, pa) state in
+    let ms' =  writeReq(4, rs.ms.MC.curr.desc.memattrs.inner.attrs, rs.ms.MC.curr.va,
+             rs.ms.MC.curr.desc.paddress, rs.ms.MC.curr.data, rs.ms) state in
+    invariant_cache ==> 
+    (drivedByInvariant_real_inst rs) ==>
+    Hit(va, pa, rs.ms.CACHE) state   ==>
+    Hit(va, pa, ms'.CACHE) state     ==>
+    (LENGTH rs.ms.MC.curr.data = 32) ==> 
+    ((pa, attrs) = THE(rtranslation(rs, va, K, req))) ==>
+    ((CellRead(i,t,wi, rs.ms.CACHE) = (v2w(read_mem32(pa, rs.ms.PM)):word32)) /\ 
+       (~LineDirty(i, t, rs.ms.CACHE))) ==>
+    ((CellRead(i,t,wi, ms'.CACHE) <> (v2w(read_mem32(pa, ms'.PM)):word32)) ==> (LineDirty(i, t, ms'.CACHE)))`,
+
+     fs_lambda_elim[CellRead_def, LineDirty_def, Hit_def, writeReq_def, write_cache_def, 
+  Once state_transformerTheory.FOR_def, state_transformerTheory.BIND_DEF, combinTheory.UPDATE_def ]
+    \\ lrw[]
+    \\ (NTAC 3 (rfs[Once state_transformerTheory.FOR_def, state_transformerTheory.BIND_DEF]))
+    \\ lrw[]
+    \\ rpt CASE_TAC
+    \\ rfs[field_id_imp]
+
+    >-(rfs[]
+      \\ abr_lineSpec_tac_sgl
+      \\ Cases_on `rs.ms.MC.curr.desc.paddress = pa`
+      >-(assume_tac(req_pa_drivd_req_va_axiom |> spec_let_elim[`rs`, `K`, `req`])
+        \\ assume_tac(no_aliasing_kernel_axiom 
+           |> INST_TYPE[alpha |-> ``:real_state``]
+	   |> spec_let_elim[`rs.ms.MC.curr.va`, `va`, `rs`, `req`])
+        \\ PAIR_SPLIT_TAC
+	\\ fs[]
+	\\ THM_SPECL_ASSM "CacheWrite" (cacheWrite_setCell_thm |> SIMP_RULE(srw_ss())[LET_DEF]) [`state`]
+	\\ rfs[field_id_imp])
+	\\ THM_SPECL_ASSM "CacheWrite" cacheWrite_read_DiffAdr_thm [`va`, `pa`, `state`]
+	\\ THM_SPECL_ASSM "CacheWrite" cacheWrite_paHitdc'_thm [`state`]
+	\\ fs[]
+	\\ rw[]
+	\\ undisch_all_tac
+	\\ fs_lambda_elim[CacheRead_def, Touch_def, combinTheory.UPDATE_def, Hit_def]
+	\\ lrw[]
+	\\ (fs[field_id_imp] >> rfs[])
+	\\ THM_SPECL_ASSM "CacheWrite" CacheWrite_DiffPa_EqReadMemPa'_thm2 [`va`, `pa`, `state`]
+	\\ mfs[]
+	\\ rw[]
+	\\ undisch_all_tac
+	\\ fs_lambda_elim[Hit_def]
+	\\ lrw[]
+	\\ CCONTR_TAC
+	\\ UNDISCH_MATCH_TAC``a <> v2w(b)``
+	\\ mfs[w2vWordsEq_impl_wordsEq])
+
+    >-(PAT_ASSUM ``a`` (fn thm => let val c = concl thm in assume_tac thm \\ `~^c` by rfs[] end)
+    \\ (UNDISCH_MATCH_TAC``a`` >> fs[])
+    \\ EVAL_TAC
+    \\ rfs[]
+    \\ abr_lineSpec_tac_sgl
+    \\ abr_tac_goal is_cacheWrite "cw" (SOME ``state:dharma8_state``)
+    \\ Q.ABBREV_TAC`conf = rs.ms.MC with CW := (47 >< 3) rs.ms.MC.curr.desc.paddress::rs.ms.MC.CW`
+    \\ fs[(write_mem32_thm2 |> SIMP_RULE(srw_ss())[LET_DEF] |> PairedLambda.GEN_BETA_RULE)]
+    \\ Cases_on `rs.ms.MC.curr.desc.paddress = pa`
+
+    >-(rfs[(write_read_thm |> SIMP_RULE(srw_ss())[LET_DEF])]
+      \\ assume_tac(req_pa_drivd_req_va_axiom |> spec_let_elim[`rs`, `K`, `req`])
+      \\ assume_tac(no_aliasing_kernel_axiom 
+          |> INST_TYPE[alpha |-> ``:real_state``]
+	  |> spec_let_elim[`rs.ms.MC.curr.va`, `va`, `rs`, `req`])
+      \\ ntac 2 PAIR_SPLIT_TAC
+      \\ THM_SPECL_ASSM "CacheWrite" (cacheWrite_setCell_thm |> SIMP_RULE(srw_ss())[LET_DEF]) [`state`]
+      \\ fs[field_id_imp]
+      \\ unabbrev_all_tac
+      \\ rfs[])
+
+    (* cacheWrite_read_DiffAdr_thm *)
+    \\ THM_SPECL_ASSM "CacheWrite" cacheWrite_read_DiffAdr_thm [`va`, `pa`, `state`]
+    \\ rfs[]
+    \\ THM_SPECL_ASSM "CacheWrite" cacheWrite_paHitdc'_thm [`state`]
+    \\ fs[]
+    \\ rw[]
+    \\ undisch_all_tac
+    \\ fs_lambda_elim[CacheRead_def, Touch_def, combinTheory.UPDATE_def, Hit_def]
+    \\ lrw[]
+    \\ rfs[field_id_imp]
+    \\ (fs[field_id_imp] >> rfs[])
+
+    (* write_read_unch_thm cacheWrite_paNOTCHGpm_thm *)
+    \\ assume_tac(write_read_unch_thm 
+        |> spec_let_elim[`rs.ms.MC.curr.desc.paddress`, `pa`,`v2w rs.ms.MC.curr.data`, 
+                 `SND (cw :(word48 -> CSET) # (word48 -> word8))`])
+    \\ PAT_ASSUM ``a ==> b`` (fn thm => let val c = (fst o dest_imp o concl) thm 
+                                   in assume_tac thm \\ `^c` by fs[] end)
+    >- (THM_KEEP_TAC ``invariant_cache`` (fs[invariant_cache_def])
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`rs.ms.MC.curr.desc.paddress`] assume_tac)
+       \\ fs[invariant_cache_def]
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`pa`] assume_tac)
+       \\ (ntac 2 (UNDISCH_MATCH_TAC ``a``) >> UNDISCH_MATCH_TAC `` a <> b``)
+       \\ blastLib.BBLAST_PROVE_TAC)
+       \\ fs[]
+    \\ EVERY [THM_SPECL_ASSM "CacheWrite" CacheWrite_DiffPa_EqReadMemPa'_thm2 [`va`, `pa`, `state`]
+       \\ mfs[]
+       \\ rw[]
+       \\ undisch_all_tac
+       \\ fs_lambda_elim[Hit_def]
+       \\ lrw[]
+       \\ mfs[]
+       \\ CCONTR_TAC
+       \\ UNDISCH_MATCH_TAC``a <> v2w(b)``
+       \\ fs[]
+       \\ rfs[w2vWordsEq_impl_wordsEq]]
+    )
+    \\ fs[drivedByInvariant_real_inst_def]
+    \\ assume_tac(req_pa_drivd_req_va_axiom |> spec_let_elim[`rs`, `K`, `req`])
+    \\ qpat_assum`!a. b`(qspecl_then [`va`, `req`, `state`]assume_tac)
+    \\ PAIR_SPLIT_TAC
+    \\ fs[]
+    \\ Cases_on `rs.ms.MC.curr.desc.paddress = pa`
+    >-(assume_tac(no_aliasing_kernel_axiom 
+           |> INST_TYPE[alpha |-> ``:real_state``]
+	   |> spec_let_elim[`rs.ms.MC.curr.va`, `va`, `rs`, `req`])
+      \\ mfs[cacheable_def]
+      )
+    \\ fs[(write_mem32_thm2 |> SIMP_RULE(srw_ss())[LET_DEF] |> PairedLambda.GEN_BETA_RULE)]
+
+    \\ assume_tac(write_read_unch_thm 
+        |> spec_let_elim[`rs.ms.MC.curr.desc.paddress`, `pa`,`v2w rs.ms.MC.curr.data`, `rs.ms.PM`])
+    \\ PAT_ASSUM ``a ==> b`` (fn thm => let val c = (fst o dest_imp o concl) thm 
+                                   in assume_tac thm \\ `^c` by fs[] end)
+    >- (THM_KEEP_TAC ``invariant_cache`` (fs[invariant_cache_def])
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`rs.ms.MC.curr.desc.paddress`] assume_tac)
+       \\ fs[invariant_cache_def]
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`pa`] assume_tac)
+       \\ (ntac 2 (UNDISCH_MATCH_TAC ``a``) >> UNDISCH_MATCH_TAC `` a <> b``)
+       \\ rfs[]
+       \\ blastLib.BBLAST_PROVE_TAC)
+       \\ rfs[]
+);
+
+(* --------------------------------------------------------------------------------------------------------- *)
+
+val writeReq_NotEqMemCache_imp_dirty_inLoadedLine_thm = Q.prove(
+ `!rs (va:word64) (pa:word48) req attrs state.
+    let (i, t, wi) = lineSpec(va, pa) state in
+    let ms' =  writeReq(4, rs.ms.MC.curr.desc.memattrs.inner.attrs, rs.ms.MC.curr.va,
+             rs.ms.MC.curr.desc.paddress, rs.ms.MC.curr.data, rs.ms) state in
+    invariant_cache ==> 
+    (drivedByInvariant_real_inst rs) ==>
+    ~Hit(va, pa, rs.ms.CACHE) state  ==>
+    Hit(va, pa, ms'.CACHE) state     ==>
+    (LENGTH rs.ms.MC.curr.data = 32) ==> 
+    ((pa, attrs) = THE(rtranslation(rs, va, K, req))) ==>
+    ((CellRead(i,t,wi, ms'.CACHE) <> (v2w(read_mem32(pa, ms'.PM)):word32)) ==> (LineDirty(i, t, ms'.CACHE)))`,
+  
+       fs_lambda_elim[CellRead_def, LineDirty_def, Hit_def, writeReq_def, write_cache_def, 
+  Once state_transformerTheory.FOR_def, state_transformerTheory.BIND_DEF, combinTheory.UPDATE_def ]
+    \\ lrw[]
+    \\ (NTAC 3 (rfs[Once state_transformerTheory.FOR_def, state_transformerTheory.BIND_DEF]))
+    \\ lrw[]
+    \\ rpt CASE_TAC
+    \\ rfs[field_id_imp]
+
+    >-(rfs[]
+      \\ abr_lineSpec_tac_sgl
+      \\ Cases_on `rs.ms.MC.curr.desc.paddress = pa`
+      >-(assume_tac(req_pa_drivd_req_va_axiom |> spec_let_elim[`rs`, `K`, `req`])
+        \\ assume_tac(no_aliasing_kernel_axiom 
+           |> INST_TYPE[alpha |-> ``:real_state``]
+	   |> spec_let_elim[`rs.ms.MC.curr.va`, `va`, `rs`, `req`])
+        \\ PAIR_SPLIT_TAC
+	\\ fs[]
+	\\ THM_SPECL_ASSM "CacheWrite" (cacheWrite_setCell_thm |> SIMP_RULE(srw_ss())[LET_DEF]) [`state`]
+	\\ rfs[field_id_imp])
+
+        \\ CCONTR_TAC
+	\\ UNDISCH_MATCH_TAC``a.value c <> v2w(b)``
+	\\ THM_SPECL_ASSM "CacheWrite" cacheWrite_read_DiffAdr_thm [`va`, `pa`, `state`]
+	\\ THM_SPECL_ASSM "CacheWrite" cacheWrite_paHitdc'_thm [`state`]
+	\\ fs[CacheRead_def, Touch_def, combinTheory.UPDATE_def, Hit_def, field_id_imp]
+	\\ THM_SPECL_ASSM "CacheWrite" CacheWrite_DiffPa_EqReadMemPa'_thm3 [`va`, `pa`, `state`]
+        \\ THM_SPECL_ASSM "Fill" fill_dcEQpm_thm  [`state`]
+	\\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine``
+	\\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+	\\ mfs[CellRead_def]
+	\\ THM_SPECL_ASSM "Fill" fill_pm'EQpm_diffIn_thm [`va`, `pa`, `state`]
+	\\ fs[]
+	\\ rw[]
+	\\ undisch_all_tac
+	\\ fs_lambda_elim[Hit_def]
+	\\ lrw[]
+	\\ mfs[w2vWordsEq_impl_wordsEq])
+
+    >-(PAT_ASSUM ``a`` (fn thm => let val c = concl thm in assume_tac thm \\ `~^c` by rfs[] end)
+      \\ (UNDISCH_MATCH_TAC``a`` >> fs[])
+      \\ EVAL_TAC
+      \\ rfs[]
+      \\ abr_lineSpec_tac_sgl
+      \\ abr_tac_goal is_cacheWrite "cw" (SOME ``state:dharma8_state``)
+      \\ Q.ABBREV_TAC`conf = rs.ms.MC with CW := (47 >< 3) rs.ms.MC.curr.desc.paddress::rs.ms.MC.CW`
+      \\ fs[(write_mem32_thm2 |> SIMP_RULE(srw_ss())[LET_DEF] |> PairedLambda.GEN_BETA_RULE)]
+      \\ Cases_on `rs.ms.MC.curr.desc.paddress = pa`
+
+    >-(rfs[(write_read_thm |> SIMP_RULE(srw_ss())[LET_DEF])]
+      \\ assume_tac(req_pa_drivd_req_va_axiom |> spec_let_elim[`rs`, `K`, `req`])
+      \\ assume_tac(no_aliasing_kernel_axiom 
+          |> INST_TYPE[alpha |-> ``:real_state``]
+	  |> spec_let_elim[`rs.ms.MC.curr.va`, `va`, `rs`, `req`])
+      \\ ntac 2 PAIR_SPLIT_TAC
+      \\ THM_SPECL_ASSM "CacheWrite" (cacheWrite_setCell_thm |> SIMP_RULE(srw_ss())[LET_DEF]) [`state`]
+      \\ fs[field_id_imp]
+      \\ unabbrev_all_tac
+      \\ rfs[])
+
+    \\ THM_SPECL_ASSM "CacheWrite" cacheWrite_read_DiffAdr_thm [`va`, `pa`, `state`]
+    \\ THM_SPECL_ASSM "CacheWrite" cacheWrite_paHitdc'_thm [`state`]
+    \\ fs_lambda_elim[CacheRead_def, Touch_def, combinTheory.UPDATE_def, Hit_def]
+    \\ lrw[]
+    \\ rfs[field_id_imp]
+    \\ (fs[field_id_imp] >> rfs[])
+    \\ assume_tac(write_read_unch_thm 
+        |> spec_let_elim[`rs.ms.MC.curr.desc.paddress`, `pa`,`v2w rs.ms.MC.curr.data`, 
+                 `SND (cw :(word48 -> CSET) # (word48 -> word8))`])
+    \\ PAT_ASSUM ``a ==> b`` (fn thm => let val c = (fst o dest_imp o concl) thm 
+                                   in assume_tac thm \\ `^c` by fs[] end)
+    >- (THM_KEEP_TAC ``invariant_cache`` (fs[invariant_cache_def])
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`rs.ms.MC.curr.desc.paddress`] assume_tac)
+       \\ fs[invariant_cache_def]
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`pa`] assume_tac)
+       \\ (ntac 2 (UNDISCH_MATCH_TAC ``a``) >> UNDISCH_MATCH_TAC `` a <> b``)
+       \\ blastLib.BBLAST_PROVE_TAC)
+    \\ EVERY [THM_SPECL_ASSM "CacheWrite" CacheWrite_DiffPa_EqReadMemPa'_thm3 [`va`, `pa`, `state`]
+       \\ THM_SPECL_ASSM "Fill" fill_dcEQpm_thm  [`state`]
+       \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine``
+       \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+       \\ mfs[CellRead_def]
+       \\ THM_SPECL_ASSM "Fill" fill_pm'EQpm_diffIn_thm [`va`, `pa`, `state`]
+       \\ rwsimp[]
+       \\ schneiderUtils.UNDISCH_ALL_TAC
+       \\ fs_lambda_elim[Hit_def]
+       \\ lrw[]
+       \\ mfs[w2vWordsEq_impl_wordsEq]])
+);
+
+(* --------------------------------------------------------------------------------------------------------- *)
+val rtranslation_eq_axiom = new_axiom("rtranslation_eq_axiom",
+``!(r1:real_state) (state:dharma8_state). 
+  let (rmr, rms) = reply(nofault, r1.ms) state in
+  let r1' = r1 with ms := rms                  in
+  (!va attrs req.
+      (rtranslation(r1, va, K, req) = rtranslation(r1', va, K, req))
+  )``
+);
+
+val countermeasure_imp_coherency_thm = Q.store_thm("countermeasure_imp_coherency_thm",
+`!(r1:real_state) (state:dharma8_state). 
+     let (rmr, rms) = reply(nofault, r1.ms) state in
+     (drivedByInvariant_real_inst r1) ==>
+     invariant_mem                    ==>
+     invariant_cache                  ==>
+     (r1.ms.MC.S = mem_serve)         ==>
+     (r1.ms.MC.curr.bytesize = 4)     ==>
+     (LENGTH r1.ms.MC.curr.data = 32) ==> 
+     (r1.ms.MC.curr.acctype  =  AccType_NORMAL) ==>
+     (r1.ms.MC.curr.write = access_policy(r1.ms.MC.curr.desc.paddress, T))  ==>
+
+     (!va pa attrs req.
+      let (i, t, wi) = lineSpec(va, pa) state in
+      (cacheable attrs) ==>
+      ((pa, attrs) = THE(rtranslation(r1, va, K, req))) ==>
+      (Hit(va, pa, r1.ms.CACHE) state ==>
+      ((CellRead(i,t,wi, r1.ms.CACHE) = (v2w(read_mem32(pa, r1.ms.PM)):word32)) /\ (~LineDirty(i,t, r1.ms.CACHE))))
+     ) ==>
+
+     (!va pa attrs req.
+      let (i, t, wi) = lineSpec(va, pa) state in
+      let r1' = r1 with ms := rms             in
+      (cacheable attrs) ==>
+      ((pa, attrs) = THE(rtranslation(r1', va, K, req)))  ==>
+      (Hit(va, pa, rms.CACHE) state ==>
+      (CellRead(i, t, wi, rms.CACHE) <> (v2w(read_mem32(pa, rms.PM)):word32)) ==> (LineDirty(i,t, rms.CACHE)))
+     )`,
+
+       lrw[]
+    \\ PairedLambda.GEN_BETA_TAC
+    \\ assume_tac(rtranslation_eq_axiom |> spec_let_elim [`r1`, `state`])
+    \\ rpt strip_tac
+    \\ xfs [replyseq_def, reply_def, Once LET_DEF, CellRead_def]
+    \\ REVERSE CASE_TAC
+    \\ fs[LET_DEF]
+    \\ qpat_assum `!x y. P` (qspecl_then [`va`, `pa`, `attrs`, `req`] assume_tac)
+    \\ Q.ABBREV_TAC`nl = (w2n state.DC.ctr.DminLine)`  
+    \\ Q.ABBREV_TAC`ns = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))`
+    \\ rfs[]
+    \\ WEAKEN_TAC is_forall
+
+
+    \\ fs[LineDirty_def, combinTheory.UPDATE_def]
+    \\ REVERSE CASE_TAC
+    \\ rfs[]
+    \\ undisch_all_tac
+    \\ PairedLambda.GEN_BETA_TAC
+    \\ lrw[]
+    \\ abr_lineSpec_tac_sgl
+
+    \\ Cases_on`Hit (va,pa,r1.ms.CACHE) state`
+    >-(assume_tac(readReq_notInLoadedLine_eqMemCache_thm |> spec_let_elim[`r1.ms`, `va`, `pa`, `state`]) 
+      \\ rfs[CellRead_def])
+    \\ (assume_tac(readReq_inLoadedLine_eqMemCache_thm |> spec_let_elim[`r1.ms`, `va`, `pa`, `state`]) 
+    \\ rfs[CellRead_def])
+
+    \\ assume_tac(rtranslation_eq_axiom |> spec_let_elim [`r1`, `state`])
+    \\ qpat_assum`!a. b`(qspecl_then [`va`, `req`] assume_tac)
+    \\ undisch_hd_tac
+    \\ fs_lambda_elim [replyseq_def, reply_def, Once LET_DEF, CellRead_def]
+    \\ lrw[]
+    \\ Cases_on`Hit (va,pa,r1.ms.CACHE) state`
+    >-(assume_tac(writeReq_NotEqMemCache_imp_dirty_notInLoadedLine_thm 
+        |> spec_let_elim[`r1`, `va`, `pa`, `req`, `attrs`, `state`]
+	 ) 
+      \\ mfs[LineDirty_def, CellRead_def]
+      )
+    \\ assume_tac(writeReq_NotEqMemCache_imp_dirty_inLoadedLine_thm 
+        |> spec_let_elim[`r1`, `va`, `pa`, `req`, `attrs`, `state`]) 
+    \\ mfs[LineDirty_def, CellRead_def]
+);
+
+(* --------------------------------------------------------------------------------------------------------- *)
+
+val crUnionGcr_consistent_transformation_axiom = new_axiom("crUnionGcr_consistent_transformation_axiom",
+``!(r1:real_state) (state:dharma8_state) pa. 
+  let (rmr, rms) = reply(nofault, r1.ms) state in
+  let r1' = r1 with ms := rms                  in
+  (smember (rgcr r1 ∪ rdomain (r1,cr),memory,pa)  
+      = smember (rgcr r1' ∪ rdomain (r1',cr),memory,pa))``
+);
+
+
+val writeReq_paHitdc'_thm = Q.prove(
+  `!(va:word64) (pa:word48) data ms bs cbl state.
+   let ms' = writeReq(bs, cbl, va, pa, data, ms) state in   
+   ((cbl = 2w) \/ (cbl = 3w)) ==>
+    (Hit(va, pa, ms'.CACHE) state)`,
+
+    fs_lambda_elim[Hit_def, writeReq_def, write_cache_def]
+    \\ rw[]
+    \\ EVAL_TAC
+    \\ THM_SPECL_GOAL "CacheWrite" cacheWrite_paHitdc'_thm [``state:dharma8_state``] 
+    \\ undisch_all_tac >> fs_lambda_elim[Hit_def] >> fs[]
+);
+
+(* --------------------------------------------------------------------------------------------------------- *)
+fun laziness_tac ls = (undisch_all_tac >> fs_lambda_elim ls >> lrw[]);
+
+local
+val tac1 =
+abr_lineSpec_tac_sgl
+    \\ Cases_on`(msb_extract rs.ms.MC.curr.va rs.ms.MC.curr.desc.paddress state) = (msb_extract va pa state)`
+
+    >-(THM_SPECL_ASSM "Hit" msbEqAdrs_Hit_dc_thm [`rs.ms.MC.curr.va`, `rs.ms.MC.curr.desc.paddress`, `state`]
+      \\ laziness_tac [msb_extract_def]
+      \\ assume_tac(req_pa_drivd_req_va_axiom |> spec_let_elim[`rs`, `K`, `req`])
+      \\ assume_tac (no_aliasing_kernel_axiom |> INST_TYPE[alpha |-> ``:real_state``]
+                  |> spec_let_elim[`rs.ms.MC.curr.va`, `va`, `rs:real_state`, `req`])
+      \\ ntac 2 PAIR_SPLIT_TAC
+      \\ THM_SPECL_ASSM "CacheInvalidateByAdr" CacheInvalidate_missDc'_thm [`state`]
+      \\ rfs[])
+    \\ Cases_on `~(Hit(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.CACHE) state)`
+    >- (fs_lambda_elim[CacheInvalidateByAdr_def] >> fs[])
+    \\ THM_SPECL_ASSM "CacheInvalidateByAdr" CacheInvalidate_dcEQdc'_diffAddr_thm [`va`, `pa`, `state`]
+    \\ laziness_tac [msb_extract_def, CellRead_def]
+
+val tac2 =
+(THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine``
+    \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+    \\ Cases_on `~(Hit(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.CACHE) state)`
+    >- laziness_tac[CacheInvalidateByAdr_def, CellRead_def]
+
+    \\ THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine`` 
+    \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`] >> mfs[]
+    \\ THM_SPECL_ASSM "Fill" fill_pm'EQpm_diffIn_thm [`va`, `pa`, `state`]
+    \\ rw[] >> laziness_tac [ CellRead_def]
+    \\ THM_SPECL_GOAL "CacheInvalidateByAdr" CacheInvalidate_dcEQpm'_thm[``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ mfs[]
+    \\ CASE_ON_LEFT_IMPL_TAC 
+    >- laziness_tac [CellRead_def]
+    \\ THM_SPECL_GOAL "CacheInvalidateByAdr" CacheInvalidate_hitDc'_diffAddr_thm [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[msb_extract_def, CellRead_def])
+
+val tac3 =
+(Cases_on `~(Hit(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.CACHE) state)`
+    >- laziness_tac[CacheInvalidateByAdr_def, CellRead_def]
+    \\ Cases_on`(msb_extract rs.ms.MC.curr.va rs.ms.MC.curr.desc.paddress state) = (msb_extract va pa state)`
+    >- (THM_SPECL_ASSM "Hit" msbEqAdrs_Hit_dc_thm [`va`, `pa`, `state`] >> laziness_tac [msb_extract_def])
+    \\ THM_SPECL_GOAL "CacheInvalidateByAdr" CacheInvalidate_keepMiss_diffMsb_thm
+              [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[msb_extract_def, CellRead_def])
+
+val tac4 = 
+(Cases_on `~(Hit(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.CACHE) state)`
+    >- laziness_tac[CacheInvalidateByAdr_def, CellRead_def]
+    \\ Cases_on`(msb_extract rs.ms.MC.curr.va rs.ms.MC.curr.desc.paddress state) = (msb_extract va pa state)`
+    >- (THM_SPECL_ASSM "Hit" msbEqAdrs_Hit_dc_thm [`va`, `pa`, `state`] >> laziness_tac[msb_extract_def])
+    \\ THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine``
+    \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+    \\ abr_tac_goal is_Fill "fill" NONE
+    \\ THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ laziness_tac[CellRead_def]
+    \\ fs[Abbr`fill`]
+    \\ THM_SPECL_ASSM "Fill" fill_pm'EQpm_diffIn_thm [`va`, `pa`, `state`]
+    \\ laziness_tac [ CellRead_def]
+    \\ THM_SPECL_GOAL "CacheInvalidateByAdr" CacheInvalidate_pmEqpm'_diffMsb_thm [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[msb_extract_def])
+in
+
+val cacheinvalidate_readReqEq_thm = Q.prove(
+`!attrs req (va:word64) (pa:word48) rs (state:dharma8_state).
+     let (dc', pm') = CacheInvalidateByAdr(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.PM, rs.ms.CACHE) state in
+     let ms' = rs.ms with <|CACHE := dc';MC := rs.ms.MC with S := mem_wait; PM := pm' |>      in
+     let (_, vl1)   = readReq (4,attrs,va,pa, rs.ms) state  in
+     let (_, vl2)   = readReq (4,attrs,va,pa, ms') state in
+     ((pa, attrs) = THE(rtranslation(rs, va, K, req)))   ==>
+     (cacheable rs.ms.MC.curr.desc.memattrs.inner.attrs) ==>
+     (drivedByInvariant_real_inst rs) ==>
+     (invariant_cache) ==>
+     (cacheable attrs) ==>
+     (vl1 = vl2)`,
+
+    fs_lambda_elim[readReq_def, read_cache_def, CacheRead_def, Touch_def, combinTheory.UPDATE_def]
+    \\ lrw[]
+    \\ rfs[]
+    >|[tac1, tac2, tac3, tac4,tac1, tac2, tac3, tac4, rfs[cacheable_def], rfs[cacheable_def]]
+)
+end
+ 
+
+(* --------------------------------------------------------------------------------------------------------- *)
+
+local
+val tac1 =
+       abr_lineSpec_tac_sgl
+    \\ Cases_on`(msb_extract rs.ms.MC.curr.va rs.ms.MC.curr.desc.paddress state) = (msb_extract va pa state)`
+    >-( THM_SPECL_GOAL "CacheCleanByAdr" CacheClean_dcEQdc'_thm [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[CellRead_def, Hit_def, msb_extract_def])
+    \\ THM_SPECL_GOAL "CacheCleanByAdr" CacheClean_dcEQdc'_diffMsb_thm  [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[CellRead_def, Hit_def, msb_extract_def]
+
+val tac2 = 
+    (THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine``
+    \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+    \\ Cases_on `~(Hit(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.CACHE) state)`
+    >- laziness_tac[CacheCleanByAdr_def, CellRead_def]
+    \\ THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine`` 
+    \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`] >> mfs[]
+    \\ THM_SPECL_ASSM "Fill" fill_pm'EQpm_diffIn_thm [`va`, `pa`, `state`]
+    \\ rw[] >> laziness_tac [ CellRead_def]
+    \\ THM_SPECL_GOAL "CacheCleanByAdr" CacheClean_dcEQpm'_thm[``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ mfs[]
+    \\ CASE_ON_LEFT_IMPL_TAC 
+    >- laziness_tac [CellRead_def]
+    \\ THM_SPECL_GOAL "CacheCleanByAdr" CacheClean_hitDc'_diffAddr_thm [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[msb_extract_def, CellRead_def])
+
+val tac3 = 
+    (Cases_on `~(Hit(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.CACHE) state)`
+    >- laziness_tac[CacheCleanByAdr_def, CellRead_def]
+    \\ Cases_on`(msb_extract rs.ms.MC.curr.va rs.ms.MC.curr.desc.paddress state) = (msb_extract va pa state)`
+    >- (THM_SPECL_ASSM "Hit" msbEqAdrs_Hit_dc_thm [`va`, `pa`, `state`] >> laziness_tac [msb_extract_def])
+    \\ THM_SPECL_GOAL "CacheCleanByAdr" CacheClean_keepMiss_diffMsb_thm
+              [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[msb_extract_def, CellRead_def])
+
+val tac4 = 
+    (Cases_on `~(Hit(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.CACHE) state)`
+    >- laziness_tac[CacheCleanByAdr_def, CellRead_def]
+    \\ Cases_on`(msb_extract rs.ms.MC.curr.va rs.ms.MC.curr.desc.paddress state) = (msb_extract va pa state)`
+    >- (THM_SPECL_ASSM "Hit" msbEqAdrs_Hit_dc_thm [`va`, `pa`, `state`] >> laziness_tac[msb_extract_def])
+    \\ THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ line_size_lt_dimword15``w2n state.DC.ctr.DminLine``
+    \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+    \\ abr_tac_goal is_Fill "fill" NONE
+    \\ THM_SPECL_GOAL "Fill" fill_dcEQpm_thm [``state:dharma8_state``]
+    \\ laziness_tac[CellRead_def]
+    \\ fs[Abbr`fill`]
+    \\ THM_SPECL_ASSM "Fill" fill_pm'EQpm_diffIn_thm [`va`, `pa`, `state`]
+    \\ laziness_tac [ CellRead_def]
+    \\ THM_SPECL_GOAL "CacheCleanByAdr" CacheClean_pmEqpm'_diffMsb_thm [``va:word64``, ``pa:word48``, ``state:dharma8_state``]
+    \\ laziness_tac[msb_extract_def])
+
+in
+
+val cacheclean_readReqEq_thm = Q.prove(
+`!attrs req (va:word64) (pa:word48) rs (state:dharma8_state).
+     let (dc', pm') = CacheCleanByAdr(rs.ms.MC.curr.va, rs.ms.MC.curr.desc.paddress, rs.ms.PM, rs.ms.CACHE) state in
+     let ms' = rs.ms with <|CACHE := dc';MC := rs.ms.MC with S := mem_wait; PM := pm' |>      in
+     let (_, vl1)   = readReq (4,attrs,va,pa, rs.ms) state  in
+     let (_, vl2)   = readReq (4,attrs,va,pa, ms') state in
+     ((pa, attrs) = THE(rtranslation(rs, va, K, req)))   ==>
+     (cacheable rs.ms.MC.curr.desc.memattrs.inner.attrs) ==>
+     (drivedByInvariant_real_inst rs) ==>
+     (invariant_cache) ==>
+     (cacheable attrs) ==>
+     (vl1 = vl2)`,
+
+    fs_lambda_elim[readReq_def, read_cache_def, CacheRead_def, Touch_def, combinTheory.UPDATE_def]
+    \\ lrw[]
+    \\ rfs[]
+    >|[tac1, tac2, tac3, tac4, tac1, tac2, tac3, tac4, rfs[cacheable_def], rfs[cacheable_def]]
+)
+end;
+
+
+
+local
+  val undisch_case_tac  = undisch_hd_tac \\ CASE_TAC \\ PAIR_SPLIT_TAC \\ lrw []
+(* FIRST & SECOND SUBGOALs attrs = 2w \/ 3w *)
+  val cbl_subgoal_tac = 
+      undisch_all_tac
+   \\ fs_lambda_elim[readReq_def, read_cache_def]
+   \\ lrw[]
+   \\ EVERY[rpt CASE_TAC
+     \\ Q.UNABBREV_TAC`ms'`
+     \\ PAIR_SPLIT_TAC
+     \\ Q.ABBREV_TAC`crr = (CacheRead (s1.ms.MC.curr.va,s1.ms.MC.curr.desc.paddress,r1.ms.PM,r1.ms.CACHE) state)`
+     \\ THM_SPECL_ASSM "CacheRead" CacheRead_lfoldEQval_thm [`va`, `pa`, `state`]
+     \\ Cases_on`s1.ms.MC.curr.desc.paddress ≠ pa` \\ rfs[]
+     \\ (THM_SPECL_ASSM "CacheRead" CacheRead_vaEQva'_thm  [`va`, `state`] \\ fs[])
+     \\ THM_SPECL_ASSM "CacheRead" CacheRead_lfoldEQval_SameAddress_thm [`state`]
+     \\ rfs[]]
+
+val tac1 =
+       (simp [replyseq_def, reply_def, Once LET_DEF]
+    \\ CASE_TAC
+    \\ fs[LET_DEF]
+    \\ qpat_assum `!x y. P` (qspecl_then [`va`, `pa`, `attrs`, `req`] assume_tac)
+    \\ Q.ABBREV_TAC`nl = (w2n state.DC.ctr.DminLine)`  
+    \\ Q.ABBREV_TAC`ns = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))`
+    \\ rfs[]
+
+    \\ assume_tac(rtranslation_eq_axiom |> spec_let_elim[`r1`, `state`])
+    \\ qpat_assum`!a. b`(qspecl_then [`va`, `req`] assume_tac)
+    \\ assume_tac(crUnionGcr_consistent_transformation_axiom |> spec_let_elim[`r1`, `state`, `pa`])
+    \\ mfs[]
+
+(* ---------------------- first sub-goal ------------------------------ *)
+    >-(assume_tac(readReq_NOTCHGmc_thm
+         |> spec_let_elim [`va`, `pa`, `attrs`, `r1.ms`, `r1.ms with MC := r1.ms.MC with S := mem_wait`, `state`])
+    \\ Cases_on`r1.ms.MC = r1.ms.MC with S := mem_wait`    
+    >-(assume_tac (readReq_NOTCHGconfigS_thm  
+       |> spec_let_elim [`s1.ms.MC.curr.va`, `s1.ms.MC.curr.desc.paddress`,
+                    `s1.ms.MC.curr.desc.memattrs.inner.attrs`, `r1.ms`, `state`] 
+       |> LET_ELIM_RULE)
+
+    \\ `(r1.ms.MC with S := mem_wait).S = mem_wait` by fs[]
+    \\ SYM_ASSUMPTION_TAC ``r1.ms.MC = r1.ms.MC with S := mem_wait``
+    \\ FULL_SIMP_TAC(bool_ss) []
+    \\ `mem_wait <> mem_serve` by EVAL_TAC
+    \\ rfs[])
+    \\ lfs[])
+(* --------------------------- end ----------------------------------- *)
+
+    \\ (BasicProvers.EVERY_CASE_TAC
+    \\ rfs_lambda_elim [read_cache_def,read_mem32_thm])
+
+(* ---------------------- write sub-goal------------------------------ *)
+
+    >-((fn (asl, g) => let val _::trm::_ = find_terms is_writeReq g in (Q.ABBREV_TAC `ms' = (^trm state)`) (asl, g) end) 
+    \\ assume_tac(readReq_NOTCHGmc_thm
+            |> spec_let_elim [`va`, `pa`, `attrs`, `ms'`, `ms' with MC := ms'.MC with S := mem_wait`, `state`])
+    
+    \\ Cases_on`ms'.MC = ms'.MC with S := mem_wait`
+    >-(THM_SPECL_ASSM "writeReq" writeReq_NOTCHGconfigS_thm [`state`]
+    \\ `(ms'.MC with S := mem_wait).S = mem_wait` by fs[]
+    \\ SYM_ASSUMPTION_TAC ``ms'.MC = ms'.MC with S := mem_wait``
+    \\ FULL_SIMP_TAC(bool_ss) []
+    \\ `mem_wait <> mem_serve` by EVAL_TAC)
+    \\ lfs[]
+    \\ SYM_ASSUMPTION_TAC``SND(x) = SND(y)``
+    \\ fs[]
+    \\ (THM_SPECL_GOAL "write_mem" write_mem32_thm2 [] >> rfs[])
+
+(* Doing case analysis on the equality of physical addresses*)
+    \\ (Cases_on`s1.ms.MC.curr.desc.paddress = pa` >> fs[])
+(* --------------------------- `s1.ms.MC.curr.desc.paddress = pa` ----------------------------------- *)
+    >-(assume_tac(req_pa_drivd_req_va_axiom |> spec_let_elim[`r1:real_state`, `K`, `req`]) >> rfs[]
+      \\ assume_tac (no_aliasing_kernel_axiom |> INST_TYPE[alpha |-> ``:real_state``]
+                  |> spec_let_elim[`s1.ms.MC.curr.va`, `va`, `r1:real_state`, `req`])
+      \\ (SYM_ASSUMPTION_TAC ``rtranslation x = rtranslation y`` >> fs[])
+      \\ ntac 2 PAIR_SPLIT_TAC >> fs[]
+      \\ THM_SPECL_ASSM "writeReq" cache_writeReq_readReq_thm [`state`]
+      \\ fs[(write_read_thm |> SIMP_RULE(srw_ss())[LET_DEF])])
+(* --------------------------- `s1.ms.MC.curr.desc.paddress <> pa` ----------------------------------- *)
+    \\ (THM_SPECL_ASSM "writeReq" cache_writeReq_readReq_DiffAdr_kernel_thm [`attrs`, `va`, `pa`, `state`] >> rfs[])
+    \\ assume_tac(write_read_unch_thm 
+        |> spec_let_elim[`s1.ms.MC.curr.desc.paddress`, `pa`,`v2w s1.ms.MC.curr.data`, `s1.ms.PM`])
+    \\ PAT_ASSUM ``a ==> b`` (fn thm => let val c = (fst o dest_imp o concl) thm 
+                                   in assume_tac thm \\ `^c` by fs[] end)
+    >- (THM_KEEP_TAC ``invariant_cache`` (fs[invariant_cache_def])
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`s1.ms.MC.curr.desc.paddress`] assume_tac)
+       \\ fs[invariant_cache_def]
+       \\ qpat_assum `!pa:word48. n && pa = pa` (qspecl_then [`pa`] assume_tac)
+       \\ (ntac 2 (UNDISCH_MATCH_TAC ``a``) >> UNDISCH_MATCH_TAC `` a <> b``)
+       \\ blastLib.BBLAST_PROVE_TAC)
+       \\ fs[])
+   
+(* ----------------------- Read sub-goal ----------------------------- *)
+    \\ (fn (asl, g) => let val _::trm::_ = find_terms is_readReq g in (Q.ABBREV_TAC `ms' = FST(^trm state)`) (asl, g) end) 
+    \\ assume_tac(readReq_NOTCHGmc_thm
+            |> spec_let_elim [`va`, `pa`, `attrs`, `ms'`, `ms' with MC := ms'.MC with S := mem_wait`, `state`])
+    
+    \\ Cases_on`ms'.MC = ms'.MC with S := mem_wait`
+    >-(assume_tac (readReq_NOTCHGconfigS_thm  
+        |> spec_let_elim [`s1.ms.MC.curr.va`, `s1.ms.MC.curr.desc.paddress`, 
+            `s1.ms.MC.curr.desc.memattrs.inner.attrs`, `r1.ms`, `state`] 
+	|> LET_ELIM_RULE)
+    \\ `(ms'.MC with S := mem_wait).S = mem_wait` by fs[]
+    \\ SYM_ASSUMPTION_TAC ``ms'.MC = ms'.MC with S := mem_wait``
+    \\ FULL_SIMP_TAC(bool_ss) []
+    \\ `mem_wait <> mem_serve` by EVAL_TAC)
+    \\ lfs[]
+    \\ SYM_ASSUMPTION_TAC``SND(x) = SND(y)``
+    \\ fs[]
+    \\ simp_tac(srw_ss()) [readReq_def, LET_DEF]
+    \\ PairedLambda.GEN_BETA_TAC
+    \\ (BasicProvers.EVERY_CASE_TAC  \\ rfs_lambda_elim[read_cache_def])
+    >|[ cbl_subgoal_tac, cbl_subgoal_tac, fs[cacheable_def]])
+
+val tac2 =
+    simp [replyseq_def, reply_def, Once LET_DEF]
+    \\ REVERSE CASE_TAC
+    \\ fs[LET_DEF, Abbr`cnd`]
+    \\ qpat_assum `!x y. P` (qspecl_then [`va`, `pa`, `attrs`, `req`] assume_tac)
+    \\ Q.ABBREV_TAC`nl = (w2n state.DC.ctr.DminLine)`  
+    \\ Q.ABBREV_TAC`ns = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))`
+    \\ rfs[]
+
+    \\ assume_tac(rtranslation_eq_axiom |> spec_let_elim[`r1`, `state`])
+    \\ qpat_assum`!a. b`(qspecl_then [`va`, `req`] assume_tac)
+    \\ assume_tac(crUnionGcr_consistent_transformation_axiom |> spec_let_elim[`r1`, `state`, `pa`])
+    \\ mfs[]
+
+(* ---------------------- second sub-goal ------------------------------ *)
+
+
+    \\ (BasicProvers.EVERY_CASE_TAC
+    \\ rfs_lambda_elim [read_cache_def])
+
+
+
+    \\ EVERY[(assume_tac(readReq_NOTCHGmc_thm
+            |> spec_let_elim [`va`, `pa`, `attrs`, `r1.ms`, `r1.ms with MC := r1.ms.MC with S := mem_wait`, `state`])
+    
+    \\ Cases_on`r1.ms.MC = r1.ms.MC with S := mem_wait`
+    >-(`(r1.ms.MC with S := mem_wait).S = mem_wait` by fs[]
+    \\ SYM_ASSUMPTION_TAC ``r1.ms.MC = r1.ms.MC with S := mem_wait``
+    \\ FULL_SIMP_TAC(bool_ss) []
+    \\ `mem_wait <> mem_serve` by EVAL_TAC)
+    \\ fs[])]
+    >- (assume_tac(cacheinvalidate_readReqEq_thm |> spec_let_elim[`attrs`, `req`, `va`, `pa`, `r1`,`state`]) >> laziness_tac[])
+    >- (assume_tac(cacheclean_readReqEq_thm |> spec_let_elim[`attrs`, `req`, `va`, `pa`, `r1`,`state`]) >> laziness_tac[])
+    >- (assume_tac(cacheinvalidate_readReqEq_thm |> spec_let_elim[`attrs`, `req`, `va`, `pa`, `r1`,`state`]) >> laziness_tac[])
+    \\ (assume_tac(cacheclean_readReqEq_thm |> spec_let_elim[`attrs`, `req`, `va`, `pa`, `r1`,`state`]) >> laziness_tac[])
+in
+val reply_thm = Q.store_thm("reply_thm",
+`!(s1:real_state) (r1:real_state) (state:dharma8_state). 
+    let (smr, sms) = replyseq(nofault, s1.ms) in 
+    let (rmr, rms) = reply(nofault, r1.ms) state in
+     (drivedByInvariant_real_inst r1) ==>
+     (drivedByInvariant_isa_inst s1)  ==>
+     invariant_mem                    ==>
+     invariant_cache                  ==>
+     (r1.ms.TZC = s1.ms.TZC)          ==> 
+     (r1.ms.MC.S = mem_serve)         ==>
+     (r1.ms.MC.curr.bytesize = 4)     ==>
+     (r1.ms.MC.curr  = s1.ms.MC.curr) ==> 
+     (LENGTH r1.ms.MC.curr.data = 32) ==> 
+     (
+      (r1.ms.MC.curr.acctype  =  AccType_NORMAL) \/
+      ((r1.ms.MC.curr.acctype  =  AccType_DC)    /\
+      ((r1.ms.MC.curr.sopar = DFlush(true, false, false , _)) \/ (r1.ms.MC.curr.sopar = DFlush(_, true, false , _))))
+     )  ==>
+     (cacheable r1.ms.MC.curr.desc.memattrs.inner.attrs) ==>
+     (r1.ms.MC.curr.write = access_policy(r1.ms.MC.curr.desc.paddress, T))  ==>
+
+     (!va pa attrs req.   
+       (cacheable(attrs)) ==>
+       ((pa, attrs) = THE(rtranslation(r1, va, K, req)))  ==>
+       (smember(rgcr(r1) ∪ rdomain(r1, cr), (memory, pa))) ==> 
+       (v2w(read_mem(0w:word32, pa, s1.ms.PM)):word32 = v2w(SND(readReq(4n,  attrs, va, pa, r1.ms)  state)))) ==>
+
+     (!va pa attrs req.
+      (cacheable(attrs)) ==>
+      let r1' = r1 with ms := rms             in
+      ((pa, attrs) = THE(rtranslation(r1', va, K, req)))  ==>
+       (* This condition is correct based on  constant_mem_transformation_axiom :
+          (smember(rgcr(r1) ∪ rdomain(r1, cr), (memory, pa)))  *)
+       (smember(rgcr(r1') ∪ rdomain(r1', cr), (memory, pa))) ==>
+       (v2w(read_mem(0w:word32, pa, sms.PM)):word32  = v2w(SND(readReq(4n,  attrs, va, pa, rms)  state)))
+     )`,
+
+        lrw[]
+    \\ PairedLambda.GEN_BETA_TAC
+    \\ Q.ABBREV_TAC`cnd = 
+        ((s1.ms.MC.curr.sopar = DFlush (true,false,false,_0)) ∨ (s1.ms.MC.curr.sopar = DFlush (_1,true,false,_2)))`
+    \\ rpt strip_tac
+    >|[tac1, tac2]
+)
+end;

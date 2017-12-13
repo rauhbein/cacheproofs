@@ -1,0 +1,51 @@
+<<HOL message: Created theory "cache">>
+Defined type: "wrTyp"
+Defined type: "CCSIDR"
+Defined type: "CSSELR_EL1"
+Defined type: "CTR"
+Defined type: "CACHE_CONFIG"
+Defined type: "SLVAL"
+Defined type: "actions"
+Defined type: "CSET"
+Defined type: "exception"
+Defined type: "cache_state"
+Defined: raise'exception
+Defined: rec'CCSIDR
+Defined: reg'CCSIDR
+Defined: write'rec'CCSIDR
+Defined: write'reg'CCSIDR
+Defined: rec'CSSELR_EL1
+Defined: reg'CSSELR_EL1
+Defined: write'rec'CSSELR_EL1
+Defined: write'reg'CSSELR_EL1
+Defined: rec'CTR
+Defined: reg'CTR
+Defined: write'rec'CTR
+Defined: write'reg'CTR
+Defined: EP
+Defined: read_mem_inner
+Defined: read_mem32
+Defined: si
+Defined: tag
+Defined: wIdx
+Defined: lineSpec
+Defined: WriteBack
+Defined: WriteBackLine
+Defined: Alias
+Defined: Touch
+Defined: Evict
+Defined: CellFill
+Defined: LineFill
+Defined: Hit
+Defined: LineDirty
+Defined: lDirty
+Defined: EvictAlias
+Defined: CacheInvalidateByAdr
+Defined: CacheCleanByAdr
+Defined: Fill
+Defined: CellRead
+Defined: CacheRead
+Defined: CacheWrite
+Defined: mv
+Exporting theory "cache" ... done.
+Theory "cache" took 6.1s to build

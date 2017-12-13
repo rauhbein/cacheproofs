@@ -1,0 +1,160 @@
+HOL_Interactive.toggle_quietdec();
+open wordsLib wordsTheory bitstringTheory;
+HOL_Interactive.toggle_quietdec();
+
+(* ----------------- *)
+(* Real model        *)
+(* ----------------- *)
+(* Set of consistenat states of the real model *)
+val _ = new_constant ("rQ", ``:real_state -> bool``); 
+
+(* Kernel memory space *)
+val _ = new_constant ("KMemory", ``:(resource_class#word48)->bool``);
+
+(* ----------------- *)(* ----------------- *)(* ----------------- *)
+(* Cache model invariant *)
+val real_invariant_def = Define`
+ real_invariant rs =
+   !res. lmember(cr_domain(rs), res) ==> KMemory(res)
+`;
+
+(* Kernel memory is critical *)
+val kmem_critical_axiom = new_axiom("kmem_critical_axiom",
+ ``!rs res. KMemory(res) ==> lmember(rdomain (rs,cr), res)``
+);
+
+(* Coherency : if value of a resource in the memory  and the cache is not the same, then the
+ correponding cache line should be dirty *)
+val cohere_def = Define`
+ cohere rs typ r P = 
+   lmember(rdomain(rs, typ), r) ==> P(r)
+`;
+
+(* Safety property *)
+val safe_def = Define`
+ safe rs = !n R pa req.
+  let rt = Treal(rs, F, n, R) in 
+  drvable(rs, rt, F) ==>
+  (raccess_policy(rs, pa, F, req) =   raccess_policy(rt, pa, F, req))`;
+
+
+val state_safe_axiom = new_axiom("state_safe_axiom",
+ ``!rs. rQ(rs) ==> safe(rs)``
+);
+
+val state_coherence_axiom = new_axiom("state_coherence_axiom",
+ ``!rs res P. rQ(rs) ==> (cohere rs cr res P)``
+);
+(* ----------------- *)(* ----------------- *)(* ----------------- *)
+
+(* val write_drvability_axiom = new_axiom("write_drvability_axiom", *)
+(*  ``!rs rt pa P.  *)
+(*   safe(rs)                    ==>  *)
+(*   drvable(rs, rt, F)          ==> *)
+(*   (cohere rs _ (memory,pa) P) ==>  *)
+(*   (rcontent(rs, (memory,pa)) <> rcontent(rt, (memory,pa))) ==> *)
+(*   raccess_policy(rs, pa, F, 0b11w)``     *)
+(* ) *)
+
+val write_drvability_axiom = new_axiom("write_drvability_axiom",
+ ``!rs rt res P. 
+  safe(rs)            ==> 
+  drvable(rs, rt, F)  ==>
+  (cohere rs _ res P) ==> 
+  (rcontent(rs, res) <> rcontent(rt, res)) ==>
+  raccess_policy(rs, res, F, 0b11w)``    
+);
+
+
+(* Critical resource write protection in user mode 
+ ==> it would be possible to prove this by adding relevant properties to the invariant *)
+val critical_protected_userStep_axiom = new_axiom("critical_protected_userStep_axiom",
+ ``!rs res. 
+   let CR = rdomain(rs, cr) in
+   rQ(rs) ==> 
+   lmember(CR, res) ==> 
+   ~(raccess_policy(rs, res, F, (0b11w:2 word)))``
+);
+
+(* User integrity : Theorem 6 *)
+val critical_resource_equiv_userStep_thm = Q.prove(
+ `!rs rt. 
+  rQ(rs) ==>
+  let CR = rdomain(rs, cr) in
+  drvable(rs, rt, F) ==>
+  (!res. lmember(CR, res) ==> 
+  (rcontent(rs, res) = rcontent(rt, res)))`,
+  (* (rextract(rs, cr) = rextract(rt, cr)) *)
+
+    rw[]
+    \\ imp_res_tac (critical_protected_userStep_axiom |> spec_let_elim [`rs`])
+    \\ imp_res_tac state_safe_axiom
+    \\ assume_tac (state_coherence_axiom |> spec_let_elim [`rs`, `res`, `P`])
+    \\ rfs[]
+    \\ imp_res_tac write_drvability_axiom
+    \\ rfs[]
+);
+
+  (* ~lmember(rdomain (rs,cr),res) ==>  ~lmember(rdomain (rt,cr),res)`` *) 
+val critical_resource_no_extension_userStep_axiom = new_axiom("critical_resource_no_extension_userStep_axiom",
+ ``!rs rt res.
+  rQ(rs) ==>
+  real_invariant rs  ==>
+  drvable(rs, rt, F) ==>
+  (cr_domain(rs) = cr_domain(rt))``
+);
+
+
+
+    rfs[real_invariant_def]
+    \\ rw[]
+    \\ assume_tac((GSYM listTheory.EVERY_MEM) |> Q.ISPECL[`KMemory`, `cr_domain rs`])
+    \\ fs[lmember_def, 
+          listTheory.EVERY_EL, 
+          (listTheory.LIST_EQ_REWRITE |> Q.ISPECL[`cr_domain rs`, `cr_domain rt`])]
+    \\ rw[]
+(* First subgoal goes here *)
+    \\ qpat_assum`!a. b`(qspecl_then [`x`] assume_tac)
+    \\ rfs[]
+    \\ imp_res_tac(kmem_critical_axiom) >> qpat_assum`!a. b`(qspecl_then [`rs`] assume_tac)
+    \\ imp_res_tac (critical_resource_equiv_userStep_thm |> spec_let_elim[`rs`, `rt`])
+
+
+
+(*     \\ assume_tac(kmem_critical_axiom |> spec_let_elim[`rs`]) *)
+(*     \\ ntac 2 (qpat_assum`!a. b`(qspecl_then [`res`] assume_tac)) *)
+(*     \\ `lmember (cr_domain rs,res) ==> lmember (rdomain (rs,cr),res)` by lfs[] *)
+(*     \\ imp_res_tac (critical_resource_equiv_userStep_thm |> spec_let_elim[`rs`, `rt`]) *)
+(*     \\ (qpat_assum`!a. b`(qspecl_then [`res`] assume_tac)) *)
+
+
+(*     \\ assume_tac(real_invariant_def |> spec_let_elim [`rs`]) *)
+(* \\ rfs[lmember_def, listTheory.MEM_EL |> Q.ISPECL[`cr_domain rs`], *)
+(*     (listTheory.LIST_EQ_REWRITE |> Q.ISPECL[`cr_domain rs`, `cr_domain rt`])] *)
+(* \\ rw[] *)
+(* Cases_on`(∃n. n < LENGTH (cr_domain rs) ∧ (res = EL n (cr_domain rs)))` *)
+(* fs[] *)
+
+(*     \\ imp_res_tac (critical_protected_userStep_axiom |> spec_let_elim [`rs`]) *)
+(*     \\ imp_res_tac state_safe_axiom *)
+(*     \\ assume_tac (state_coherence_axiom |> spec_let_elim [`rs`, `res`, `P`]) *)
+
+
+
+(* User integrity : Lemma 2 *)
+val critical_resource_coherence_derivableState_userStep = Q.prove(
+`!rs rt. 
+  rQ(rs) ==>
+  drvable(rs, rt, F) ==>
+  (!res P. cohere rt cr res P)`,
+  
+  rw[]
+  \\ assume_tac (state_coherence_axiom |> spec_let_elim [`rs`, `res`, `P`])
+  \\ assume_tac (critical_resource_equiv_userStep_thm |> spec_let_elim[`rs`, `rt`])
+  \\ rfs[cohere_def]
+  \\ qpat_assum`!a. x`(qspecl_then[`res`] assume_tac)
+  \\ Cases_on`lmember (rdomain (rs,cr),res)`
+  >- (rfs[])
+  \\ fs[]
+  \\ (imp_res_tac critical_resource_no_extension_userStep_axiom >> fs[])
+);

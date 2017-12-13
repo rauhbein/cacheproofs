@@ -1,0 +1,570 @@
+val _ = new_constant("encode", ``:string -> word48``);
+(* eviced is the set of resources being evicted from the cache up to the current state *)
+val _ = new_constant("evicted", ``:'c -> (resource_class#word48) set``);
+(* To get input argument of an evict instruction *)
+val _ = new_constant("evict_domain", ``:string -> (resource_class#word48) set``);
+(* Returning an ISA state whihc ahs the same value assigned to the evicted resources as the in the real model *)
+val _ = new_constant("update_state", ``:'a#'b#(resource_class#word48) set -> 'b``);
+
+val evicted_res_relation_def = Define`evicted_res_relation (rs:'a) (is:'b) = 
+ (evicted(rs) = evicted(is))  /\
+ (!r. smember(evicted(rs), r) ==>
+   (rcontent(rs, r) = icontent(is, r)))`;
+
+val evicted_extension_axiom = new_axiom("evicted_extension_axiom", 
+``! s:'c inst.
+  let s' = drived(s, inst) in
+    if (inst = (encode "evict rset"))
+    then evicted(s') = (evicted(s) ∪ (evict_domain "evict rset"))
+    else evicted(s') = evicted(s)``
+);
+
+val idrvd_evict_notInRange_content_axiom = new_axiom("idrvd_evict_notInRange_content_axiom",
+``!is:'b inst.
+  let is' = drived (is, inst)  in
+  (inst = encode "evict rset") ==>
+  (!r. ~smember(evict_domain "evict rset", r) ==>
+     (icontent (is,r) = icontent (is',r))
+  )``
+);
+
+val rdrvd_evict_notInRange_content_axiom = new_axiom("rdrvd_evict_notInRange_content_axiom",
+``!rs:'a inst.
+  let rs' = drived (rs, inst) in
+  (inst = encode "evict rset") ==>
+  (!r. ~smember(evict_domain "evict rset", r) ==>
+     (rcontent (rs,r) = rcontent (rs',r))
+  )``
+);
+
+val cohere_resource_evict_axiom = new_axiom("cohere_resource_evict_axiom",
+``!rs rset inst P.
+  let rs' = drived (rs, inst) in
+  (inst = encode "evict rset") ==>
+  (cohere rset P) ==>
+  (!r. smember(rset, r) ==>
+    (rcontent(rs, r) = rcontent(rs', r))
+  )``
+);
+
+val update_state_axiom = new_axiom("update_state_axiom",
+``!rs is rset. 
+     let is' = update_state(rs, is, rset) in
+     (!r. smember(rset, r) ==>
+          (rcontent(rs, r) = icontent(is', r))
+     )
+``);
+
+val update_state_notChng_domain_axiom = new_axiom("update_state_notChng_domain_axiom",
+``!is:'b rs:'a rset. 
+  let is'  = update_state(rs, is, rset) in
+   (evicted(is) = evicted(is'))``
+);
+
+val drvd_updated_state_satisfies_inext_axiom = new_axiom("drvd_updated_state_satisfies_inext_axiom",
+``!(is:'b) (rs:'a) inst rset. let is' = update_state(rs, drived(is, inst), rset) in
+     inext(is, is')``
+);
+
+
+val update_state_notInRange_axiom = new_axiom("update_state_notInRange_axiom",
+``!rs:'a is:'b rset. 
+     let is' = update_state(rs, is, rset) in
+     (!r. ~smember(rset, r) ==>
+          (icontent(is, r) = icontent(is', r))
+     )
+``);
+
+
+val resource_inclusion_in_critical_and_evicted_axiom = new_axiom("resource_inclusion_in_critical_and_evicted_axiom",
+``!is:'b is' is''.
+  winext(is, is') ==>
+  inext(is', is'') ==>
+  iQ(is) ==>
+  (!r. smember(Touched(is, is''), r) ==> smember((idomain (is', cr)) ∪ evicted(is'), r))``
+);
+
+val drivedByInvariant_real_slEvict_def = Define` drivedByInvariant_real_slEvict (rs:'a) =
+    (drivedByInvariant_real_generic rs)  /\
+    (!P. cohere (rdomain(rs, cr) ) P)    (* for the selective eviction countermeasure*)  
+`;
+
+val inv_imp_drivedByInvariant_realSlEvict_axiom = new_axiom("inv_imp_drivedByInvariant_realSlEvict_axiom",
+  ``!rs. rQ(rs) ==> drivedByInvariant_real_slEvict(rs) ``
+);
+
+(* -------------------------------------------------------------------------
+   Extension of cr
+   ------------------------------------------------------------------------- *)
+val evicted_extend_cr_isa_thm = Q.prove(
+ `!is:'b is' is''. 
+  iQ(is) ==>(winext(is, is'))  ==>
+  drivedByInvariant_isa(is')   ==>
+  (!r. ~smember(idomain(is',cr), r) ==>
+  smember(idomain(is'',cr), r) ==>
+  inext(is', is'')             ==>
+  smember(evicted(is'), r))` ,
+  
+      rw[]
+    \\ imp_res_tac resource_inclusion_in_critical_and_evicted_axiom
+    \\ qpat_assum `!r. a` (qspecl_then[`r`] assume_tac)
+    \\ imp_res_tac Touched_isa_axiom2
+    \\ imp_res_tac Touched_isa_axiom1
+    \\ rfs[smember_def, (pred_setTheory.EXTENSION |> INST_TYPE[alpha |-> ``:(resource_class#word48)``])]
+);
+
+val evicted_extend_cr_real_axiom = new_axiom("evicted_extend_cr_real_axiom",
+ ``!rs:'a rs' rs''. 
+  rQ(rs) ==>(wrnext(rs, rs'))  ==>
+  drivedByInvariant_real_slEvict(rs')  ==>
+  (!r. ~smember(rdomain(rs',cr), r) ==>
+  smember(rdomain(rs'',cr), r) ==>
+  rnext(rs', rs'')             ==>
+  smember(evicted(rs'), r))``
+);
+(*  ------------------------------------------------------------------------- *)
+(* -------------------------------------------------------------------------
+   Proof obligations to prove integrity property
+   ------------------------------------------------------------------------- *)
+val cohere_content_axiom = new_axiom("cohere_content_axiom",
+  ``!rs:'a rs':'a is:'b is':'b rset P.    
+   (cohere rset P) ==>
+   (drivedByInvariant_real_slEvict rs  /\ drivedByInvariant_isa is) ==> 
+   ((Mode(rs) = K) /\ (Mode(is) = K)) ==>
+   (rnext(rs, rs') /\ inext(is, is')) ==>
+   (!res. (rcontent(rs, res) = icontent(is, res)) ==>
+          (rcontent(rs', res) = icontent(is', res))
+   )``
+);
+(*  ------------------------------------------------------------------------- *)
+
+val update_state_notChang_mode_axiom = new_axiom("update_state_notChang_mode_axiom",
+``!rs is inst.
+   let is' = update_state(rs, is, evict_domain inst) in
+   (Mode(is) = Mode(is'))``
+);
+
+val evicted_is_cohere_axiom = new_axiom("evicted_is_cohere_axiom",
+``! rs:'a P. ((Mode(rs) = K) /\ drivedByInvariant_real_slEvict(rs)) ==> (cohere (evicted(rs)) P) ``
+);
+
+val rstate_coherence_single_transition_thm = Q.prove(
+`!r1 r2 r3 P. 
+  rQ(r1)         ==> 
+  wrnext(r1, r2) ==>
+  rnext(r2, r3)  ==>
+  (Mode(r2) = K) ==>
+  drivedByInvariant_real_slEvict(r2) ==>
+  (cohere (rdomain(r3, cr)) P)`,
+
+    rw[]
+    \\ Cases_on`rdomain(r3, cr) = rdomain(r2, cr)` 
+    >-(fs[drivedByInvariant_real_slEvict_def])
+    \\ Cases_on`rdomain (r3,cr) ⊂ rdomain (r2,cr)`
+    >- fs[pred_setTheory.PSUBSET_DEF, pred_setTheory.SUBSET_DEF, drivedByInvariant_real_slEvict_def, 
+                   drivedByInvariant_real_generic_def,cohere_def, smember_def]
+    \\ rfs[pred_setTheory.PSUBSET_DEF, pred_setTheory.SUBSET_DEF, cohere_def, smember_def]
+    \\ ntac 2 strip_tac
+    \\ Cases_on`r ∈ rdomain (r2,cr)`
+    >- rfs[drivedByInvariant_real_slEvict_def, drivedByInvariant_real_generic_def, cohere_def, smember_def]
+
+    \\ imp_res_tac evicted_extend_cr_real_axiom
+    \\ qpat_assum`!a. b`(qspecl_then[`r`] assume_tac)
+    \\ rfs[smember_def]
+    \\ qpat_assum`!a. b`(qspecl_then[`r3`] assume_tac)
+    \\ imp_res_tac evicted_is_cohere_axiom
+    \\ mfs[cohere_def, smember_def]
+);
+
+val cr_domain_equiv_in_evict_thm = Q.prove(
+`!rs is inst.
+  let rs' = drived (rs,inst) in
+  let is' = update_state (rs',drived (is,inst),evict_domain "evict rset") in
+  (inst = encode "evict rset") ==>
+  (simul rs is) ==>
+  (domain_equiv rs' is' {cr})`,
+
+    xrw[]
+    \\ fs[domain_equiv_def, simul_def, (pred_setTheory.EXTENSION |> INST_TYPE[alpha |-> ``:(resource_class#word48)``])] >> lrw[]
+    \\ ntac 2 (THROW_ONE_AWAY_TAC``!a . b``)
+    \\ assume_tac(rcritical_satisfy_P_axiom |> spec_let_elim[`rs'`, `x`, `P`])
+    \\ assume_tac(icritical_satisfy_P_axiom |> spec_let_elim[`is'`, `x`, `P`])
+    \\ assume_tac(crdom_axiom |> spec_let_elim[`x`])
+    \\ assume_tac(crdom_in_kmem_axiom |> spec_let_elim [`entry_crdom x`])
+    \\ assume_tac(rkmem_critical_axiom |> spec_let_elim[ `rs`, `entry_crdom x`])
+    \\ assume_tac(ikmem_critical_axiom |> spec_let_elim[ `is`, `entry_crdom x`])
+    \\ Cases_on `~smember((evict_domain "evict rset"), entry_crdom x)`
+    >- (assume_tac (rdrvd_evict_notInRange_content_axiom 
+           |> spec_let_elim[`rs`, `encode "evict rset"`])
+       \\ assume_tac (update_state_notInRange_axiom 
+           |> spec_let_elim [`rs'`, `drived (is,encode "evict rset")`, `evict_domain "evict rset"`])
+       \\ assume_tac (idrvd_evict_notInRange_content_axiom 
+           |> spec_let_elim[`is`, `encode "evict rset"`])
+       \\ ntac 3 (qpat_assum`!r. a`(qspecl_then[`entry_crdom x`] assume_tac))
+       \\ mfs[content_equiv_def, smember_def]
+       )
+    \\ assume_tac(update_state_axiom |> spec_let_elim[`rs'`, `drived (is,encode "evict rset")`, `evict_domain "evict rset"`])
+    \\ qpat_assum`!r. a`(qspecl_then[`entry_crdom x`] assume_tac)
+    \\ mfs[content_equiv_def, smember_def]
+)
+
+local 
+val cr_dom_tac =
+   (rw[]
+   \\ fs[domain_equiv_def, (pred_setTheory.EXTENSION |> INST_TYPE[alpha |-> ``:(resource_class#word48)``])] >> lrw[]
+   \\ Q.ABBREV_TAC`r2 = drived (r3, rcontent (r3,get_pc r3))`
+   \\ assume_tac(rcritical_satisfy_P_axiom |> spec_let_elim[`r2`, `x`, `P`])
+   \\ assume_tac(icritical_satisfy_P_axiom |> spec_let_elim[`s2`, `x`, `P`])
+   \\ assume_tac(crdom_axiom |> spec_let_elim[`x`])
+   \\ assume_tac(crdom_in_kmem_axiom |> spec_let_elim [`entry_crdom x`])
+   \\ assume_tac(rkmem_critical_axiom |> spec_let_elim[ `r3`, `entry_crdom x`])
+   \\ assume_tac(ikmem_critical_axiom |> spec_let_elim[ `s3`, `entry_crdom x`])
+   \\ assume_tac(cohere_content_axiom |> spec_let_elim[`r3`, `r2`, `s3`, `s2`, `rdomain (r3,cr)`, `P`])
+   \\ (`cohere (rdomain (r3,cr)) P` by fs[drivedByInvariant_real_slEvict_def] >> mfs[])
+   \\ qpat_assum`!a. b`(qspecl_then[`entry_crdom x`]assume_tac)
+   \\ rfs[smember_def]
+   \\ PAT_ASSUM``a``(fn thm => let val c = (fst o dest_imp o concl) thm in 
+    assume_tac thm \\ `^c` by fs[content_equiv_def, smember_def] end)
+   \\ rfs[])
+
+
+val cr_content_tac =
+   (fs[content_equiv_def]
+   \\ THROW_AWAY_TAC ``!r. f(rdomain (rs,sr), r) ==> a``
+   \\ THROW_AWAY_TAC ``!r. f(rdomain (rs,ccr), r) ==> a``
+   \\ strip_tac
+   \\ qpat_assum `!r:resource_class#word48. a` (qspecl_then[`r`] assume_tac)
+   \\ Q.ABBREV_TAC`r2 =drived (r3,rcontent (r3,get_pc r3))`
+   \\ assume_tac(cohere_content_axiom |> spec_let_elim[`r3`, `r2`, `s3`, `s2`, `rdomain (r3,cr)`, `P`])
+   \\ (`cohere (rdomain (r3,cr)) P` by fs[drivedByInvariant_real_slEvict_def] >> mfs[])
+   \\ qpat_assum`!a. b`(qspecl_then[`r`]assume_tac)
+
+   (* \\ assume_tac(critical_content_axiom |> spec_let_elim[`r3`, `r2`, `s3`, `s2`, `r`]) *)
+   \\ rfs[smember_def, domain_equiv_def]
+   \\ Cases_on`r ∈ idomain (s3,cr)` >- rfs[]
+   \\ assume_tac(evicted_extend_cr_real_axiom |> spec_let_elim[`r1`,`r3`,`r2`] |> SIMP_RULE(srw_ss())[smember_def])
+   \\ assume_tac(evicted_extend_cr_isa_thm |> spec_let_elim[`s1`,`s3`,`s2`] |> SIMP_RULE(srw_ss())[smember_def])
+   \\ imp_res_tac (GSYM nrnext_axiom)
+   \\ imp_res_tac (GSYM ninext_axiom)
+   \\ rfs[evicted_res_relation_def]
+   \\ (res_tac >> mfs[])
+   \\ strip_tac
+   \\ qpat_assum `!r:resource_class#word48. a` (qspecl_then[`r`] assume_tac)
+   \\ assume_tac(evicted_extension_axiom |> INST_TYPE[gamma |-> ``:'b``] |> spec_let_elim[`s3`, `rcontent (r3,get_pc r3)`])
+   \\ mfs[smember_def]
+)
+
+val ccr_tac = 
+    (CONJ_ASM1_TAC
+    >-((CONJ_ASM1_TAC >-(imp_res_tac iccr_dom_axiom >> imp_res_tac rccr_dom_axiom >> fs[domain_equiv_def]))
+    \\ simp[content_equiv_def]
+    \\ assume_tac(simialr_states_ccr_transformation_thm |> spec_let_elim[`r3`, `s3`, `r2`, `s2`])
+    \\ imp_res_tac iccr_dom_axiom
+    \\ rfs[simul_def, domain_equiv_def])
+)
+
+val sr_resource_not_in_evict_domain_axiom = new_axiom("sr_resource_not_in_evict_domain_axiom",
+``!is:'b inst.
+   (!r. smember(idomain (is,sr), r)  ==> (~smember(evict_domain inst, r)))``
+);
+
+val update_noChang_sr_axiom = new_axiom("update_noChang_sr_axiom",
+``!rs is rset. 
+     let is' = update_state(rs, is, rset) in
+     (idomain(is, sr) = idomain(is', sr))``
+);
+
+val sr_tac =
+    (CONJ_ASM1_TAC
+    >-(imp_res_tac rsr_dom_axiom >>  imp_res_tac isr_dom_axiom >> rfs[ domain_equiv_def])
+    \\ Cases_on`Mode(r2) = Mode(r3)`
+    >-(simp[content_equiv_def]        
+      \\ assume_tac(simialr_states_sr_transformation_thm |> spec_let_elim[`r3`, `s3`, `r2`, `s2`])
+      \\ imp_res_tac isr_dom_axiom
+       \\ rfs[simul_def, domain_equiv_def])
+
+    \\ rfs[content_equiv_def, domain_equiv_def]
+    \\ ntac 2 strip_tac
+    \\ assume_tac(sr_resource_not_in_evict_domain_axiom    |> spec_let_elim[`s3`, `"evict rset"`])
+    \\ assume_tac(simialr_states_mode_switch_to_user_axiom |> spec_let_elim [`r3`, `s3`, `inst`])
+    \\ mfs[simul_def]
+    \\ assume_tac(imode_switch_resINsr_content_axiom |> spec_let_elim[`s3`, `drived (s3,inst)`, `inst`])
+    \\ assume_tac(rmode_switch_resINsr_content_axiom |> spec_let_elim[`r3`, `r2`, `inst`])
+    \\ imp_res_tac isr_dom_axiom
+    \\ assume_tac(update_noChang_sr_axiom |> spec_let_elim[`r2`, `drived (s3,inst)`, `evict_domain "evict rset"`])
+    \\ imp_res_tac rsr_dom_axiom
+    \\ fs[domain_equiv_def,content_equiv_def]
+    \\ assume_tac(update_state_notInRange_axiom |> spec_let_elim[`r2`, `drived (s3,inst)`, `evict_domain "evict rset"`])
+    \\ qpat_assum`!r. a` (qspecl_then[`r`] assume_tac)
+    \\ mfs[]
+)
+
+val isa_invarinat_tac =
+    (CONJ_ASM1_TAC
+    >-(fs[drivedByInvariant_isa_def]
+    \\ assume_tac(page_table_no_change_axiom |> spec_let_elim [`s1`, `s2`, `s3`])
+    \\ (imp_res_tac (GSYM ninext_axiom) >> rfs[])
+    \\ (res_tac >> mfs[])
+    \\ strip_tac
+    \\ imp_res_tac program_counter_validity_axiom)
+)
+
+val real_invariant_tac =
+    (Cases_on`Mode(r2) = Mode(r3)`
+     \\ (fs[drivedByInvariant_real_slEvict_def, drivedByInvariant_real_generic_def]
+     \\ assume_tac(page_table_no_change_axiom |> spec_let_elim [`s1`, `s2`, `s3`])
+     \\ imp_res_tac (GSYM ninext_axiom)
+     \\ rfs[]
+     \\ (res_tac >> mfs[])
+     \\ assume_tac(same_translation_axiom |> spec_let_elim [`r2`, `s2`])
+     \\ imp_res_tac similar_states_pt_equiv_thm
+     \\ (res_tac >> mfs[])
+     \\ qpat_assum `!a b c. d`(qspecl_then [`K`] assume_tac)
+     \\ fs[drivedByInvariant_isa_def]
+
+     \\ THROW_AWAY_TAC ``T``
+     \\ (imp_res_tac program_counter_IdEq_axiom >> rfs[])
+
+     \\ assume_tac(simialr_states_modeEq_axiom2 |> spec_let_elim [`r3`, `s3`, `inst`])
+     \\ REVERSE (rw[])
+     \\ rfs[simul_def]
+     \\ assume_tac(update_state_notChang_mode_axiom |> spec_let_elim[`r2`, `s3`, `"evict rset"`])
+     \\ imp_res_tac program_counter_validity_axiom (* -- check this *)
+
+     \\ (`wrnext(r1, r3)` by (assume_tac(nrnext_impl_wrnext_thm |> spec_let_elim [`r1`, `r3`]) >> mfs[] >> (res_tac >> fs[])))
+     \\ `(Mode r3 = K)` by fs[]
+     \\ imp_res_tac rstate_coherence_single_transition_thm 
+     \\ simp[pred_setTheory.UNION_DEF]
+     \\ mfs[cohere_def, smember_def, drivedByInvariant_real_slEvict_def, drivedByInvariant_real_generic_def]
+     \\ strip_tac
+     \\ (res_tac 
+     \\ qpat_assum`!a:resource_class#word48. b`(qspecl_then[`r`] assume_tac)
+     \\ (CASE_ON_LEFT_IMPL_TAC >> rfs[])))
+)
+
+in
+  
+val kernel_integrity_SlEvict_thm = Q.prove(
+`!(r1:'a) (s1:'b).
+   ((Mode(r1) = K) /\ (Mode(s1) = K)) ==>
+   rQ(r1) ==> iQ(s1) ==> 
+   (simul r1 s1)     ==>
+   (evicted(r1) = pred_set$EMPTY) ==>
+   (evicted(s1) = pred_set$EMPTY) ==>
+   (!r2. wrnext(r1, r2)  ==>
+          (?s3. winext(s1, s3)         /\
+          (evicted_res_relation r2 s3) /\
+          (simul r2 s3)             /\
+           drivedByInvariant_isa(s3)   /\
+           drivedByInvariant_real_slEvict(r2) 
+	  ) 
+   )
+`,
+    rw[]
+    \\ imp_res_tac inv_imp_drivedByInvariant_isa_axiom
+    \\ imp_res_tac inv_imp_drivedByInvariant_realSlEvict_axiom
+    \\ imp_res_tac nrnext_axiom
+    \\ assume_tac(ninext_axiom |> spec_let_elim [`s1`])
+    \\ fs[PULL_EXISTS, (SWAP_EXISTS_THM |> INST_TYPE[alpha |-> ``:'b``, beta |-> ``:num``])]
+    \\ EXISTS_TAC ``n:num``
+
+    \\ THROW_AWAY_TAC ``wrnext (r1,r2)``
+    \\ WEAKEN_TAC is_forall
+    \\ undisch_all_tac
+    \\ SPEC_TAC (``r1:'a``, ``r1:'a``)
+    \\ SPEC_TAC (``r2:'a``, ``r2:'a``)
+    \\ SPEC_TAC (``s1:'b``, ``s1:'b``)
+
+    \\ REVERSE (Induct_on `n`)
+    >-((`SUC n = n + 1` by decide_tac >> rw[])
+      \\ (assume_tac(nrnext_axiom_ind|> spec_let_elim[`r1`, `r2`, `n`, `1`]) >> rfs[])
+      \\ qpat_assum `!a b c. d` (qspecl_then[`s1`, `r3`, `r1`] assume_tac)
+      \\ rfs[]
+      \\ REVERSE CASE_ON_LEFT_IMPL_TAC
+      >-(rfs[]
+        \\ qpat_assum`!n:num r3. a` (qspecl_then[`n'`, `r3'`] assume_tac) 
+	\\ `n' < n + 1` by decide_tac
+	\\ fs[])
+      \\ (qpat_assum `A` (fn thm => let val c = concl thm 
+           in assume_tac thm >> Q.ABBREV_TAC`lft = ^c` end)
+          >> fs[])
+      \\ assume_tac((GSYM ninext_axiom_ind) |> spec_let_elim [`s1`, `n`, `1`])
+      \\ rfs[PULL_EXISTS, Once SWAP_EXISTS_THM, Abbr`lft`]
+      \\ EXISTS_TAC ``s3:'b``
+      \\ imp_res_tac simialr_states_modeEq_axiom
+      \\ rfs[]
+      \\ THROW_AWAY_TAC ``T``
+      \\ imp_res_tac nrnext_axiom_base
+      \\ imp_res_tac reachable_states_satisfy_rdrvd_axiom
+      \\ `drivedByInvariant_real_generic r3` by fs[drivedByInvariant_real_slEvict_def]
+(*  ------------------------------------------------------------------------- *)
+(* Cases `inst = encode("evict rset")` *)
+(*  ------------------------------------------------------------------------- *)
+      \\ Cases_on `inst = encode("evict rset")`
+
+      >-(EXISTS_TAC ``update_state(r2, drived(s3:'b, inst), (evict_domain "evict rset"))``
+      \\ assume_tac(drvd_updated_state_satisfies_inext_axiom
+          |> spec_let_elim[`s3`, `r2`, `inst`, `(evict_domain "evict rset")`])
+      \\ imp_res_tac ninext_axiom_base
+      \\ Q.ABBREV_TAC `s2 = update_state (r2,drived (s3,inst),evict_domain "evict rset")`
+      \\ SYM_ASSUMPTION_TAC ``r2 = drived(a)``
+      \\ fs[]
+      (* Solving mode consisteny of states reached in less than n step *)
+      \\ CONJ_ASM1_TAC >-(state_mode_consistency_tac)
+      
+
+      \\ CONJ_ASM1_TAC 
+      >-(fs_lambda_elim[evicted_res_relation_def]
+      \\ assume_tac (evicted_extension_axiom |> INST_TYPE[gamma |-> ``:'b``] |> spec_let_elim[`s3`, `inst`])
+      \\ assume_tac (evicted_extension_axiom |> INST_TYPE[gamma |-> ``:'a``] |> spec_let_elim[`r3`, `inst`])
+      \\ assume_tac (update_state_notChng_domain_axiom 
+          |> spec_let_elim[`drived (s3,rcontent (r3,get_pc r3))`, `r2`, `evict_domain "evict rset"`])
+      \\ rfs[]
+
+      \\ assume_tac(update_state_axiom |> spec_let_elim[`r2`, `drived (s3:'b,encode "evict rset")`, `evict_domain "evict rset"`])
+      \\ strip_tac
+      \\ qpat_assum`!r. a` (qspecl_then[`r`] assume_tac)
+      \\ (Cases_on`smember (evict_domain "evict rset",r)` >> mfs[])
+
+      \\ fs[smember_def, (pred_setTheory.EXTENSION |> INST_TYPE[alpha |-> ``:(resource_class#word48)``])]
+      \\ qpat_assum`!r. a` (qspecl_then[`r`] assume_tac)
+      \\ TAKE_DOWN_TAC``∀r'. r' ∈ evicted s3 ⇒ (rcontent (r3,r') = icontent (s3,r'))``
+      \\ qpat_assum`!r. a` (qspecl_then[`r`] assume_tac)
+      \\ strip_tac
+      \\ assume_tac(update_state_notInRange_axiom
+           |> spec_let_elim [`r2`, `drived (s3 ,encode "evict rset")`, `evict_domain "evict rset"`])
+      \\ qpat_assum`!r. a` (qspecl_then[`r`] assume_tac)
+      \\ rfs[smember_def]
+      \\ assume_tac (idrvd_evict_notInRange_content_axiom 
+	   |> SIMP_RULE(srw_ss())[LET_DEF, smember_def]
+           |> spec_let_elim[`s3`, `r`])
+      \\ assume_tac (rdrvd_evict_notInRange_content_axiom 
+           |> SIMP_RULE(srw_ss())[LET_DEF, smember_def]
+	   |> spec_let_elim[`r3`, `r`])
+      \\ rfs[])
+
+      (* Reached to simul relation *)
+      \\ CONJ_ASM1_TAC
+      >-((THROW_ONE_AWAY_TAC ``simul r1 r2`` >> THROW_AWAY_TAC ``T``)
+        \\ fs[simul_def]
+        \\ CONJ_ASM1_TAC
+
+	>- (assume_tac(cr_domain_equiv_in_evict_thm 
+             |> spec_let_elim[`r3`, `s3`, `inst`]
+	     |> SIMP_RULE(srw_ss())[simul_def]
+           )  >> rfs[]
+
+        \\ (fs[content_equiv_def]
+          \\ ntac 3 strip_tac
+	  \\ Cases_on`smember(evict_domain"evict rset", r)`
+	  >-(assume_tac(update_state_axiom 
+              |> spec_let_elim[`r2`, `drived (s3,rcontent (r3,get_pc r3))`, `evict_domain"evict rset"`])
+            \\ qpat_assum`!a. b`(qspecl_then[`r`]assume_tac)
+	    \\ rfs[])
+
+         \\ assume_tac(rdrvd_evict_notInRange_content_axiom 
+             |> spec_let_elim[`r3`, `rcontent (r3,get_pc r3)`])
+	 \\ assume_tac(update_state_notInRange_axiom 
+             |> spec_let_elim[`r2`, `drived (s3,rcontent (r3,get_pc r3))`, `evict_domain"evict rset"`])
+         \\ assume_tac(idrvd_evict_notInRange_content_axiom 
+             |> spec_let_elim[`s3`, `rcontent (r3,get_pc r3)`])
+         \\ rfs[]
+	 \\ ntac 3 (qpat_assum`!a. b`(qspecl_then[`r`]assume_tac))
+	 \\ mfs[content_equiv_def] 
+	 \\ THROW_ONE_AWAY_TAC``!r:resource_class#word48. a``
+	 \\ qpat_assum`!r:resource_class#word48. a` (qspecl_then[`r`] assume_tac)
+	 \\ `smember (rdomain (r3,cr),r)` by (
+                  assume_tac(rcritical_satisfy_P_axiom |> spec_let_elim[`r2`, `r`, `P`])
+               \\ assume_tac(rcritical_satisfy_P_axiom |> spec_let_elim[`r3`, `r`, `P`])
+	       \\ assume_tac(icritical_satisfy_P_axiom |> spec_let_elim[`s2`, `r`, `P`])
+	       \\ assume_tac(crdom_axiom |> spec_let_elim[`r`])
+	       \\ assume_tac(crdom_in_kmem_axiom |> spec_let_elim [`entry_crdom r`])
+	       \\ assume_tac(rkmem_critical_axiom |> spec_let_elim[ `r3`, `entry_crdom r`])
+	       \\ assume_tac(ikmem_critical_axiom |> spec_let_elim[ `s3`, `entry_crdom r`])
+	       \\ Cases_on `~smember((evict_domain "evict rset"), entry_crdom r)`
+	       >- (assume_tac (rdrvd_evict_notInRange_content_axiom 
+                     |> spec_let_elim[`r3`, `encode "evict rset"`])
+                 \\ assume_tac (update_state_notInRange_axiom 
+                     |> spec_let_elim [`r2`, `drived (s3,encode "evict rset")`, `evict_domain "evict rset"`])
+                 \\ assume_tac (idrvd_evict_notInRange_content_axiom 
+                     |> spec_let_elim[`s3`, `encode "evict rset"`])
+                 \\ ntac 3 (qpat_assum`!r. a`(qspecl_then[`entry_crdom r`] assume_tac))
+                 \\ mfs[content_equiv_def, smember_def]
+		  )
+	       \\ assume_tac(cohere_resource_evict_axiom |> spec_let_elim[`r3`, `rdomain (r3,cr)`, `inst`, `P`])
+	       \\ rfs[drivedByInvariant_real_slEvict_def, domain_equiv_def])
+        \\ `smember (idomain (s3,cr),r)` by rfs[domain_equiv_def]
+	\\ (res_tac >> fs[])))
+
+        (* Solving ccr *)
+        \\ ccr_tac
+
+        (* Solving sr *)
+        \\ sr_tac)
+
+	(* Invariant *)
+        \\ isa_invarinat_tac
+        \\ real_invariant_tac)
+
+(*  ------------------------------------------------------------------------- *)
+(* Cases_on `inst <> encode("evict rset")` *)
+(*  ------------------------------------------------------------------------- *)
+      \\ (imp_res_tac reachable_states_satisfy_rdrvd_axiom
+      \\ EXISTS_TAC ``drived(s3:'b, inst)``
+      \\ assume_tac(drvd_state_satisfies_inext_axiom |> spec_let_elim[`s3`, `inst`])
+      \\ imp_res_tac ninext_axiom_base
+      \\ Q.ABBREV_TAC `s2 = drived(s3:'b, inst)`
+      \\ SYM_ASSUMPTION_TAC ``r2 = drived(a)``
+      \\ fs[]
+      (* Solving mode consisteny of states reached in less than n step *)
+      \\ CONJ_ASM1_TAC >-(state_mode_consistency_tac)
+
+      \\ CONJ_ASM1_TAC 
+      >-(fs_lambda_elim[evicted_res_relation_def]
+      \\ assume_tac (evicted_extension_axiom |> INST_TYPE[gamma |-> ``:'b``] |> spec_let_elim[`s3`, `inst`])
+      \\ assume_tac (evicted_extension_axiom |> INST_TYPE[gamma |-> ``:'a``] |> spec_let_elim[`r3`, `inst`])
+      \\ rfs[]
+
+
+      \\ strip_tac
+      \\ fs[smember_def, (pred_setTheory.EXTENSION |> INST_TYPE[alpha |-> ``:(resource_class#word48)``])]
+      \\ qpat_assum`!r. a` (qspecl_then[`r`] assume_tac)
+      \\ TAKE_DOWN_TAC``∀r'. r' ∈ evicted s3 ⇒ (rcontent (r3,r') = icontent (s3,r'))``
+      \\ qpat_assum`!r. a` (qspecl_then[`r`] assume_tac)
+      \\ strip_tac
+      \\ imp_res_tac evicted_is_cohere_axiom
+      \\ `(Mode r3 = K)` by fs[]
+      \\ qpat_assum`!a. b`(qspecl_then[`P`] assume_tac)
+      \\ assume_tac(cohere_content_axiom |> spec_let_elim[`r3`, `r2`, `s3`, `s2`, `(evicted r3)`, `P`])
+      \\ mfs[])
+
+
+      (* Reached to simul relation *)
+      \\ CONJ_ASM1_TAC
+      >-((THROW_ONE_AWAY_TAC ``simul r1 r2`` >> THROW_AWAY_TAC ``T``)
+        \\ fs[simul_def]
+        \\ CONJ_ASM1_TAC
+        (* Solving cr *)
+        >-(CONJ_ASM1_TAC >- cr_dom_tac >> cr_content_tac)
+
+        (* Solving ccr *)
+        \\ ccr_tac
+
+        (* Solving sr *)
+        \\ sr_tac)
+
+	(* Invariant *)
+        \\ isa_invarinat_tac
+	\\ real_invariant_tac))
+
+
+
+    \\ rw[]
+    \\ EXISTS_TAC``s1:'b``
+    \\ fs[ninext_axiom_id]
+    \\ (Cases_on`r1 = r2` >- fs[evicted_res_relation_def, smember_def])
+    \\ fs[nrnext_zero_step_ret_initial_axiom]
+
+
+)
+end;

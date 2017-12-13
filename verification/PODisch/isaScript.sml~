@@ -1,0 +1,49 @@
+HOL_Interactive.toggle_quietdec();
+open wordsLib wordsTheory bitstringTheory;
+HOL_Interactive.toggle_quietdec();
+
+(* ----------------- *)
+(* ISA model         *)
+(* ----------------- *)
+(* Set of consistenat states of the ISA model *)
+val _ = new_constant ("iQ", ``:isa_state -> bool``); 
+
+ (* Kernel memory space *)
+val _ = new_constant ("KMemory", ``:isa_state->bool``);
+
+val ISA_functional_correctness_axiom = new_axiom("ISA_functional_correctness_axiom",
+``!is n.
+ let is' = Tisa(is, T, n, _) in
+ iQ(is) ==> iQ(is')``
+);
+
+val constant_mem_transformation_axiom = new_axiom("constant_mem_transformation_axiom",
+``!is state n. 
+ let is'' = Tisa(is, T, n, _)   in
+ let is'  = Tisa(is'', T, 1, _) in 
+ let pre  = (domain (is, cr)) ++state.gcr  in 
+ let post = (domain (is', cr))++state.gcr  in
+ iQ(is) ==> ( pre = post )``
+);
+
+val program_counter_validity_axiom = new_axiom("program_counter_validity_axiom",
+``!is n. 
+ let is'' = Tisa(is, T, n, _)   in
+ let is'  = Tisa(is'', T, 1, _) in 
+ iQ(is) ==> KMemory(is')``
+);
+
+val page_table_no_change_axiom = new_axiom("page_table_no_change_axiom",
+``!is n va req. 
+ let is'' = Tisa(is, T, n, _)   in
+ let is'  = Tisa(is'', T, 1, _) in 
+  iQ(is) ==> (translation(is, va, T, req) = translation(is', va, T, req))``
+);
+
+val resource_inclusion_in_critical_and_gcr_axiom = new_axiom("resource_inclusion_in_critical_and_gcr_axiom",
+``!is state n R r.
+ let is'' = Tisa(is, T, n, _)   in
+ let is'  = Tisa(is'', T, 1, r) in 
+ iQ(is) ==> lmember((domain (is, cr))++state.gcr, r)``
+);
+
