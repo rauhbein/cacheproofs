@@ -5,7 +5,7 @@ val dest_cacheRead : term -> term
 val dest_cacheWrite: term -> term
 val dest_evict : term -> term
 val dest_lineFill : term -> term
-val dest_linespec : term -> term
+val dest_lineSpec : term -> term
 val dest_writeBackLine: term -> term
 val is_Fill : term -> bool
 val is_cacheRead : term -> bool

@@ -121,10 +121,10 @@ val chit_other_oblg_disch = Q.prove(
 val ccnt_oblg_disch = Q.prove(
 `!va pa  dc dc' state.
  let (i, t, wi) = lineSpec(va, pa) state in
- (((dc i).sl t) = ((dc' i).sl t))  ==>
- ((THE((dc i).sl t)).value = (THE ((dc' i).sl t)).value)`,
+ ((ca i t dc) = (ca i t dc'))  ==>
+ ((ccnt va pa dc state) = (ccnt va pa dc' state))`,
   
-  xrw[]
+  xrw[ccnt_def, ca_def]
   \\ fs[]
 );
     
@@ -141,8 +141,6 @@ val ccnt_other_oblg_disch = Q.prove(
   \\ fs[CellRead_def]
 );
 
-
-
 val ccntw_oblg_disch = Q.prove(
 `!va pa  dc dc' state.
  let (i, t, wi) = lineSpec(va, pa) state in
@@ -153,6 +151,17 @@ val ccntw_oblg_disch = Q.prove(
   \\ fs[CellRead_def]
 );
 
+
+val ccntw_ccnt_oblg = Q.prove(
+`!va pa dc dc' state.
+  Hit(va, pa, dc)  state ==>
+  Hit(va, pa, dc') state ==>
+  ((ccnt va pa dc state) = (ccnt va pa dc' state)) ==>
+  ((ccntw va pa dc state) = (ccntw va pa dc' state))`,
+ 
+  fs_lambda_elim[ccnt_def, ccntw_def, Hit_def, CellRead_def]
+  \\ lrw[]
+);  
 
 val ccntw_other_oblg_disch = Q.prove(
 `!(va:word64) (pa:word48) (dc:(48 word -> CSET)) (va':word64) (pa':word48) state.
@@ -179,7 +188,7 @@ val ccntw_ccnt_diff_oblg_disch = Q.prove(
   (?x. (CellRead(i,t,x,dc) <> CellRead(i,t,x,dc')))`,
 
       xrw[] 
-   \\ fs_lambda_elim[CellRead_def]
+   \\ fs_lambda_elim[CellRead_def, ccntw_def]
    \\ Q.ABBREV_TAC `f = (THE ((dc i).sl t)).value`
    \\ Q.ABBREV_TAC `g = (THE ((dc' i).sl t)).value`
    \\ assume_tac(FUN_NEQ_THM |> Q.ISPECL[`f:word48->word32`, `g:word48->word32`])
@@ -187,21 +196,6 @@ val ccntw_ccnt_diff_oblg_disch = Q.prove(
    \\ EXISTS_TAC ``w2n (x:word48)``
    \\ lrw[]
 );
-
-
-
-
-(* val chit_oblg_disch = Q.prove ( *)
-(* `!dc:(48 word -> CSET) dc':(48 word -> CSET) pa va state. *)
-(*  let (i, t, wi) = lineSpec(va, pa) state     in *)
-(*  let val1 = Hit (va, pa, dc)  state in *)
-(*  let val2 = Hit (va, pa, dc') state in *)
-(*      (((dc i).sl t) = ((dc' i).sl t)) ==> *)
-(*       (val1 = val2)`, *)
-
-(*    fs_lambda_elim[combinTheory.UPDATE_def,Touch_def, Hit_def] *)
-(*    \\ rwsimp [] *)
-(* ); *)
 
 local
 val subgoal_tac1 =
@@ -301,21 +295,28 @@ val ccnt_oblg_disch = Q.prove (
 )
 end;
 
+val ccnt_lcnt_oblg_disch = Q.prove(
+`!va pa dc state.
+  let (i, t, wi) = lineSpec(va, pa) state in
+   ((ccnt va pa dc state) = (lcnt i t dc))`,
 
+        lrw[]
+     \\ fs_lambda_elim[ca_def, ccnt_def, lcnt_def]
+     \\ rfs[]
+);
 
-val ccnt_not_eq_oblg = Q.prove (
+val ccnt_not_eq_oblg_disch = Q.prove (
 `!dc:(48 word -> CSET) dc':(48 word -> CSET) pm pa va state.
  let (i, t, wi) = lineSpec(va, pa) state     in
      Hit(va, pa, dc) state  ==>
      Hit(va, pa, dc') state ==>
      LineDirty (i,t,dc)     ==>
      LineDirty (i,t,dc')    ==>
-     (THE((dc i).sl t) <> THE((dc' i).sl t)) ==>
-      ((THE((dc i).sl t)).value <> (THE ((dc' i).sl t)).value)`,
-
+     (THE(ca i t dc) <> THE(ca i t dc')) ==>
+     ((ccnt va pa dc state) <> (ccnt va pa dc' state))`,
 
         lrw[]
-     \\ fs_lambda_elim[Hit_def, combinTheory.UPDATE_def,LineDirty_def]
+     \\ fs_lambda_elim[Hit_def, combinTheory.UPDATE_def,LineDirty_def, ca_def, ccnt_def]
      \\ abr_lineSpec_tac_sgl
      \\ Q.ABBREV_TAC `f = (THE ((dc i').sl t'))`
      \\ Q.ABBREV_TAC `g = (THE ((dc' i').sl t'))`
@@ -325,14 +326,13 @@ val ccnt_not_eq_oblg = Q.prove (
 );
 
 
-
 val miss_oblg_disch = Q.prove (
 `!dc:(48 word -> CSET) pa va state.
   let (i, t, wi) = lineSpec(va, pa) state     in
   ~(Hit (va, pa, dc)  state) ==> 
-  (((dc i).sl t) = NONE)`,
+  ((ca i t dc) = NONE)`,
 
-   fs_lambda_elim[Hit_def]
+   fs_lambda_elim[Hit_def, ca_def]
    \\ rwsimp []
 );
 
@@ -392,39 +392,75 @@ val cdirty_ldirty_oblg_disch = Q.prove(
   \\ ntac 2 CASE_TAC
 );
 
+val lw_lv_oblg_disch = Q.prove(
+`!va pa pm dc h n state.
+  let (i,t,wi) = lineSpec(va, pa) state in
+  let sl = THE(FST(lv i t pm dc h n state) t) in 
+  let mvl = read32(pa, (mv T pm dc2 (fmem:(word48->word8)#(word48->CSET)-> (word48 -> word8)) fcm), read_mem32) in 
+  (invariant_cache) ==>
+  (n <= dimword(:15)) ==>
+  (wi <= n) ==>
+  ((sl.value (n2w wi)) = v2w (mvl):word32)`,
 
-(* val THE_NONE = Q.prove ( *)
-(*   `THE NONE = FAIL THE ^(mk_var("applied to NONE",bool)) NONE`, *)
-(*   REWRITE_TAC [combinTheory.FAIL_THM]); *)
+    fs_lambda_elim[lv_def, mv_def, fmem_def, read32_def]
+  \\ lrw[]
+  \\ abr_lineSpec_tac_sgl
+  \\ THM_SPECL_GOAL "LineFill" linefill_memeq_thm [``state:cache_state``]
+  \\ rfs[]
+  \\ qpat_assum `!wi. P`(qspecl_then[`wi`] assume_tac)
+  \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]  
+  \\ THM_SPECL_ASSM "lineSpec" lineSpec_thm [`state`]
+  \\ rfs[]
+);
+    
 
-(* `!va pa dc state. *)
-(*  ~Hit(va, pa, dc) state ==>  *)
-(*  ~lDirty(va, pa, dc) state` *)
+val lv_oblg_disch = Q.prove(
+`!va pa va' pa' pm dc h n state. 
+  let (i,t,wi) = lineSpec(va, pa) state in
+  let (i',t',wi') = lineSpec(va', pa') state in
+  ((i=i') /\ (t=t')) ==> 
+  ((lv i' t' pm dc h n state) = (lv i' t' pm dc h n state))`,
+  
+  fs_lambda_elim[lv_def, mv_def, fmem_def]
+  \\ lrw[]
+);
+      
+val mllu_lv_oblg_disch = Q.prove(
+` ∀ va pa va' pa' pm dc h n state.
+  let (i,t,wi) = lineSpec(va, pa) state in
+  let (i',t',wi') = lineSpec(va', pa') state in
+  ((i=i') /\ (t=t')) ==> 
+  (((lv i' t' pm dc h n state) = (mllu i t pm dc h n state)) <=> 
+  (!va'' pa''.
+   let (i'', t'', wi'') = lineSpec(va'', pa'') state in
+   let sl = THE ((FST (lv i' t' pm dc h n state)) t') in
+   let sl' = THE ((FST (mllu i t pm dc h n state)) t) in
+    ((sl.value (n2w wi'')) = (sl'.value (n2w wi'')))))`,
+  
+  fs_lambda_elim[lv_def, mllu_def, mv_def, fmem_def]
+  \\ lrw[]
+);
 
-(*     fs_lambda_elim[Hit_def, lDirty_def, LineDirty_def] *)
-(*     \\ lrw[] *)
-(*     \\ ntac 2 CASE_TAC *)
-(*     \\ fs[optionTheory.THE_DEF] *)
-(*     \\ assume_tac(THE_NONE |> INST_TYPE [alpha |-> ``:SLVAL``]) *)
-(*     \\ rfs[] *)
+
+(* Transition function obligations*)
+    
 val ctf_chit_oblg_disch = Q.prove(
 `!dc pm dop state.
  let (dc', pm', _) = ctf pm dc state dop in
  let (va, pa) = ADD dop in 
   ~cl dop ==> (Hit(va, pa, dc') state)`,
 
-      fs_lambda_elim[ctf_def,ADD_def]
+      fs_lambda_elim[ctf_def, fmem_def, mv_def, ca_def, ADD_def]
     \\ lrw[]
     \\ Cases_on`dop`
     \\ rfs[]
     \\ rpt CASE_TAC
-
-    >- (assume_tac(cacheRead_paHitdc'_thm |> spec_let_elim[`q`,`q'`, `pm`, `dc`, `state`]) >> fs[])
-    >- (assume_tac(cacheWrite_paHitdc'_thm |> spec_let_elim[`q`,`q'`, `q''`, `pm`, `dc`, `state`]) >> fs[])
-    \\ rfs[cl_def]
+    \\ FIRST[metis_tac[cl_def], all_tac]
+    \\ rpt (FIRST_PROVE[(assume_tac(cacheRead_paHitdc'_thm |> spec_let_elim[`q`,`q'`, `pm`, `dc`, `state`]) >> fs[]),
+                   (assume_tac(cacheWrite_paHitdc'_thm |> spec_let_elim[`q`,`q'`, `q''`, `pm`, `dc`, `state`]) >> fs[])])
 );
 
-val ctf_cl_miss_oblg =Q.prove(
+val ctf_cl_miss_oblg_disch =Q.prove(
 `!dc pm dop state .
  let (dc', pm', _) = ctf pm dc state dop in
  let (va, pa) = ADD dop in 
@@ -441,8 +477,6 @@ val ctf_cl_miss_oblg =Q.prove(
     \\ fs_lambda_elim[CacheInvalidateByAdr_def, combinTheory.UPDATE_def, Hit_def, Evict_def]
     \\ rwsimp[]
 );
-
-
 
 local
 val tac = 
@@ -490,9 +524,8 @@ val ctf_cl_other_oblg_disch = Q.prove(
     \\ rpt CASE_TAC
     >- ((`t <> t'` by (CCONTR_TAC >> fs[])) \\ ( rfs[] >>  tac ))
     \\ tac
-);
-
-
+)
+end;
 
 val ctf_cl_wb_oblg_disch = Q.prove(
 `!dc pm dop state.
@@ -512,23 +545,6 @@ val ctf_cl_wb_oblg_disch = Q.prove(
     \\ fs_lambda_elim[CacheInvalidateByAdr_def, combinTheory.UPDATE_def, Hit_def, Evict_def]
     \\ rfs[Abbr`t'`]
 );
-
-val ctf_wt_cdirty_oblg_disch = Q.prove(
- `!(va:word64) (pa:word48) (data:wrTyp) (pm:(word48->word8)) (dc:(48 word -> CSET)) (state:cache_state).
-  let (dc', _)= CacheWrite (va, pa, data, pm, dc) state in 
-  let (i, t, wi) = lineSpec(va, pa) state  in
-      (data.flag = T) ==> LineDirty(i,t,dc')`,
-
-
-      lrw[]
-   \\ PairedLambda.GEN_BETA_TAC
-   \\ fs[LineDirty_def]
-   \\ assume_tac(cacheWrite_setCell_thm |> spec_let_elim [`va`, `pa`, `data`,`pm`, `dc`, `state`])
-   \\ rfs[]
-
-);
-
-
 
 val Fill_NotchgCacheLineForTag'_thm = Q.prove(
   `!(va:word64) (pa:word48)  (pm:(word48->word8)) (dc:(48 word -> CSET)) n (va':word64) (pa':word48) state.
@@ -567,7 +583,8 @@ val Fill_NotchgCacheLineForTag'_thm = Q.prove(
     \\ ASSUME_TAC( rich_listTheory.COUNT_LIST_ADD
 			 |> Q.ISPECL[`(n:num) + 1`, `1:num`]
 			 |> SIMP_RULE(srw_ss())[listTheory.MAP, EVAL ``COUNT_LIST  (1)``])
-    \\ rfs[rich_listTheory.FOLDL_APPEND |> SIMP_RULE(srw_ss())[]]);
+    \\ rfs[rich_listTheory.FOLDL_APPEND |> SIMP_RULE(srw_ss())[]]
+);
 
 val Fill_KeepHitDC'Tag_thm = Q.prove(
  `!(va:word64) (pa:word48) (va':word64) (pa':word48) (pm:(word48->word8)) (dc:(48 word -> CSET)) (x:word48) state.
@@ -612,7 +629,6 @@ val Fill_KeepHitDC'Tag_thm = Q.prove(
     \\ qpat_assum`!a. P` (qspecl_then[`n`] assume_tac)
     \\ fs[]
 );
-
 
 local
 val tac =
@@ -683,42 +699,39 @@ val ctf_not_cl_other_oblg_disch = Q.prove(
 )
 end;
  
-   
-
-val ctf_rd_hit_oblg_disch = Q.prove(
-`!(va:word64) (pa:word48) (data:wrTyp) (pm:(word48->word8)) (dc:(48 word -> CSET)) (state:dharma8_state).
- let (dc', pm', vlc) = CacheRead (va, pa, pm, dc) state in
- let (i, t, wi) = lineSpec(va, pa) state  in
- (Hit(va, pa, dc) state) ==>
- (((dc i).sl t) = ((dc' i).sl t))`,
-
-
-    lrw[]
-     \\ fs_lambda_elim[CacheRead_def, combinTheory.UPDATE_def,Touch_def, Hit_def]
-     \\ abr_lineSpec_tac_sgl
-     \\ CASE_TAC
-     \\ fs[]
-);
-
-
-val ctf_rd_miss_oblg_disch_2 = Q.prove(
-`!(va:word64) (pa:word48) (pm:(word48->word8)) (dc:(48 word -> CSET)) (state:dharma8_state).
-  let (dc', pm', _)= CacheRead(va, pa, pm, dc) state in 
-  let (i, t, wi) = lineSpec(va, pa) state  in
-   (~(Hit(va, pa, dc) state)) ==>
-   (~LineDirty(i,t, dc'))`,
-
-    lrw[]
-     \\ fs_lambda_elim[CacheRead_def, combinTheory.UPDATE_def,Touch_def, Fill_def, Hit_def,LineDirty_def, LineFill_def]
-     \\ abr_lineSpec_tac_sgl
-     \\ CASE_TAC
-     \\ fs[]
-);
-
-
-val ctf_wt_cdirty_oblg = Q.prove(
+val ctf_not_cl_wb_oblg_disch = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', h) = ctf' pm dc state dop in
+  let (dc', pm', (_, y)) = ctf pm dc state dop in 
+  let (va, pa) = ADD dop in
+  let (i, t, wi) = lineSpec(va, pa) state  in  
+  (~Hit(va, pa, dc) state) ==>
+  (invariant_cache) ==>
+  ~cl dop    ==> 
+  (y = if (EP ((dc i).hist,t,dc) = NONE)
+       then (NONE,NONE)
+       else if (LineDirty(i, THE (EP ((dc i).hist,t,dc)), dc)) /\ (THE (EP ((dc i).hist,t,dc)) <> t)
+       then ((EP ((dc i).hist,t,dc)), (ca i (THE (EP ((dc i).hist,t,dc))) dc))
+       else (NONE,NONE))`,
+
+       fs_lambda_elim[ctf_def, ADD_def, ca_def, Hit_def, LineDirty_def,CacheWrite_def,CacheRead_def, Fill_def, Touch_def, combinTheory.UPDATE_def, Evict_def, LineFill_def]
+    \\ Cases_on`dop`
+    \\ rfs[cl_def]
+    \\ rpt CASE_TAC
+    \\ lrw[]
+    \\ FIRST [metis_tac[cl_def,optionTheory.IS_SOME_DEF],  all_tac] 
+    \\ UNDISCH_ALL_TAC
+    \\ abr_lineSpec_tac_sgl
+    \\ rpt (CASE_TAC >> rfs [])  
+    \\ (CCONTR_TAC
+    \\ rfs[invariant_cache_def]
+    \\ ntac 3 (WEAKEN_TAC is_forall)
+    \\ qpat_assum `∀h i t dc x. P` (qspecl_then [`(dc i').hist`, `i'`, `t'`, `dc`, `t'`] assume_tac)
+    \\ rfs[])
+);
+
+val ctf_wt_cdirty_oblg_disch = Q.prove(
+`!dc pm dop state.
+  let (dc', pm', h) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   wt dop ==> 
@@ -727,7 +740,7 @@ val ctf_wt_cdirty_oblg = Q.prove(
 
       Cases_on`dop`
     \\ rpt CASE_TAC
-    \\ fs_lambda_elim[ctf'_def, mv_def, fmem_def, ADD_def, wt_def, VAL_def, LineDirty_def]
+    \\ fs_lambda_elim[ctf_def, mv_def, fmem_def, ADD_def, wt_def, VAL_def, LineDirty_def]
     \\ lrw[]      
     \\ abr_lineSpec_tac_sgl
     \\ rfs[]
@@ -736,10 +749,9 @@ val ctf_wt_cdirty_oblg = Q.prove(
     \\ rfs[VAL_def]
 );
 
-
-val ctf_rd_hit_oblg = Q.prove(
+val ctf_rd_hit_oblg_disch = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', h) = ctf' pm dc state dop in
+  let (dc', pm', h) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   rd dop ==>
@@ -747,16 +759,15 @@ val ctf_rd_hit_oblg = Q.prove(
   (ca i t dc = ca i t dc')`,
 
        Cases_on`dop`
-    \\ fs_lambda_elim[ctf'_def, mv_def, fmem_def, ADD_def, ca_def, rd_def, Hit_def, CacheRead_def, combinTheory.UPDATE_def]
+    \\ fs_lambda_elim[ctf_def, mv_def, fmem_def, ADD_def, ca_def, rd_def, Hit_def, CacheRead_def, combinTheory.UPDATE_def]
     \\ lrw[]      
     \\ abr_lineSpec_tac_sgl
     \\ rpt (CASE_TAC >> rfs [])
 ); 
 
-
 val ctf_rd_miss_oblg_disch = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', h) = ctf' pm dc state dop in
+  let (dc', pm', _) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   invariant_cache ==>
@@ -769,28 +780,41 @@ val ctf_rd_miss_oblg_disch = Q.prove(
        Cases_on`dop`
     \\ rfs[rd_def]
     \\ rpt CASE_TAC
-    \\ fs_lambda_elim[ctf'_def, mv_def, fmem_def, ADD_def, CellRead_def, rd_def, Hit_def, CacheRead_def, Touch_def, combinTheory.UPDATE_def]
+    \\ fs_lambda_elim[ctf_def, mv_def, fmem_def, ADD_def, CellRead_def, rd_def, Hit_def, CacheRead_def, Touch_def, combinTheory.UPDATE_def]
     \\ lrw[]      
     \\ abr_lineSpec_tac_sgl
     \\ rfs[]
     \\ rpt (CASE_TAC >> rfs [])
-    >- (assume_tac(fill_hit_thm |> spec_let_elim[`q`, `q'`, `pm`, `dc`, `state`])
-    \\ fs[Hit_def]
-    \\ ntac 3 PAIR_SPLIT_TAC 
-    \\ rfs[])
-    >- (assume_tac(cacheRead_miss_thm |> spec_let_elim [`q`, `q'`,`pm`, `dc`, `state`]
+    \\ FIRST_PROVE[(assume_tac(fill_hit_thm |> spec_let_elim[`q`, `q'`, `pm`, `dc`, `state`])
+            \\ fs[Hit_def]
+	    \\ ntac 3 PAIR_SPLIT_TAC 
+	    \\ rfs[]),
+                   (assume_tac(cacheRead_miss_thm |> spec_let_elim [`q`, `q'`,`pm`, `dc`, `state`]
 			      |> SIMP_RULE(srw_ss())[LET_DEF, Hit_def, CacheRead_def] 
 			      |> PairedLambda.GEN_BETA_RULE )
-    \\ rfs[])
-    \\ fs_lambda_elim[LineDirty_def,Fill_def, combinTheory.UPDATE_def, LineFill_def]
-    \\ rpt (CASE_TAC >> rfs [])
+            \\ rfs[]),
+                   fs_lambda_elim[LineDirty_def,Fill_def, combinTheory.UPDATE_def, LineFill_def]
+            \\ rpt (CASE_TAC >> rfs [])
+      ]
 );
 
 
+local 
+
+val tac_1 =
+    (assume_tac(wIdx_lt_dimword48_thm |> spec_let_elim[`q`, `q'`, `state`])
+      \\ assume_tac(wIdx_lt_dimword48_thm |> spec_let_elim[`va'`, `pa'`, `state`])
+      \\ `wi'' MOD 281474976710656 = wi''` by rfs[]
+      \\ `wi' MOD 281474976710656 = wi'` by rfs[]
+      \\ fs[]
+      \\ assume_tac (diffPa_imply_diffElement_thm |> spec_let_elim [`q`, `q'`, `va'`, `pa'`, `state`])
+      \\ rfs[])
+
+in
 
 val ctf_wt_fill_oblg_disch = Q.prove(
 `!dc pm dop state va' pa'.
-  let (dc', pm', h) = ctf' pm dc state dop in
+  let (dc', pm', _) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   let (i', t', wi') = lineSpec(va', pa') state  in   
@@ -802,72 +826,52 @@ val ctf_wt_fill_oblg_disch = Q.prove(
    (CellRead(i',t',wi',dc') = v2w(read_mem32(pa', pm)):word32)
   )`,
 
-       Cases_on`dop`
-    \\ rfs[wt_def]
+    fs_lambda_elim[ctf_def, mv_def, fmem_def, ADD_def, CellRead_def, Hit_def, CacheWrite_def, Touch_def, combinTheory.UPDATE_def]
+    \\ Cases_on`dop`
+    \\ rfs[wt_def, mv_def]
     \\ rpt CASE_TAC
-    \\ fs_lambda_elim[ctf'_def, mv_def, fmem_def, ADD_def, CellRead_def, wt_def, Hit_def, CacheWrite_def, Touch_def, combinTheory.UPDATE_def]
-    \\ lrw[]      
+    \\ ntac 5 strip_tac
     \\ abr_lineSpec_tac_sgl
-    \\ rfs[]
+    \\ lrw[]      
     \\ rpt (CASE_TAC >> rfs [])
-     >- (assume_tac(wIdx_lt_dimword48_thm |> spec_let_elim[`q`, `q'`, `state`])
-    \\ assume_tac(wIdx_lt_dimword48_thm |> spec_let_elim[`va'`, `pa'`, `state`])
-    \\ `wi'' MOD 281474976710656 = wi''` by rfs[]
-    \\ `wi' MOD 281474976710656 = wi'` by rfs[]
-    \\ fs[]
-    \\ assume_tac (diffPa_imply_diffElement_thm |> spec_let_elim [`q`, `q'`, `va'`, `pa'`, `state`])
-    \\ rfs[])
+    \\ rpt (FIRST_PROVE [tac_1,
+        (fs_lambda_elim[Fill_def, combinTheory.UPDATE_def]
+	\\ abr_lineSpec_tac_sgl
+	\\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
+	\\ CASE_TAC 
+	\\ rfs[]
+	\\ abr_tac_goal is_writeBackLine "pm'" (SOME ``state:cache_state``)
+	\\ abr_tac_goal is_evict "h'" NONE
+	\\ abr_tac_goal is_pabs "proc" NONE
+	\\ line_size_lt_dimword15 ``nl:num``
+	\\ THM_SPECL_GOAL "LineFill" linefill_memeq_thm [``state:cache_state``]
+	\\ rfs[]
+	\\ qpat_assum `!wi. P`(qspecl_then[`wi'`] assume_tac)
+	\\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
+	\\ THM_SPECL_ASSM "lineSpec" lineSpec_thm [`state`]
+	\\ assume_tac(fill_pm'EQpm_diffIn_thm |> spec_let_elim [`q`, `q'`, `pm`, `dc`, `va'`, `pa'`, `state`])
+	\\ UNDISCH_ALL_TAC
+	\\ fs_lambda_elim[ Hit_def, combinTheory.UPDATE_def,Fill_def]
+	\\ lrw[]      
+	\\ rfs[])])
 
     \\ fs_lambda_elim[Fill_def, combinTheory.UPDATE_def]
-    \\ lrw[]
     \\ abr_lineSpec_tac_sgl
     \\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
-    \\ CASE_TAC
-    >-(rfs[CellRead_def, Touch_def]
-      \\ THM_SPECL_GOAL "LineFill" linefill_memeq_thm [``state:cache_state``]
-      \\ line_size_lt_dimword15 ``nl:num``
-      \\ fs[]
-      \\ qpat_assum `!wi. P`(qspecl_then[`wi'`] assume_tac)
-      \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]  
-      \\ THM_SPECL_ASSM "lineSpec" lineSpec_thm [`state`]
-      \\ rfs[])
-   \\ rfs[CellRead_def, Touch_def]
-   \\ abr_tac_goal is_writeBackLine "pm'" (SOME ``state:cache_state``)
-   \\ abr_tac_goal is_evict "h'" NONE
-   \\ abr_tac_goal is_pabs "proc" NONE
-   \\ Cases_on` t' = x`
-   >- (THM_SPECL_ASSM "EP" eviction_policy_axiom [`FST (lineSpec (q,q') state)`, `x`] 
-       \\  rfs[Hit_def]
-       \\ ntac 3 PAIR_SPLIT_TAC 
-       \\ fs[] >> rfs[])
-   \\ THM_SPECL_ASSM "WriteBackLine" writebackline_mem_eq_thm [`q`, `q'`, `state`]
-   \\ Q.ABBREV_TAC`ns = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))`
-   \\ FIRST_ASSUM (fn thm => let val trm = (fst o dest_imp o concl) thm in `^trm`by all_tac end)
-   >- (assume_tac(adr_thm 
-              |> spec_let_elim [`x`, `i'`, `t'`, `i'`, `ns`, `(nl + 2)`]
-	      |> SIMP_RULE(arith_ss)[])
-     	   \\ THM_KEEP_TAC``invariant_cache`` (fs[invariant_cache_def])
-     	   \\ qpat_assum `!i t wi ni nt s. P` 
-              (qspecl_then [`i'`, `x`, `_`, `nl + 2n`, `ns`, `state`] ASSUME_TAC)
-     	   \\ rpt (WEAKEN_TAC is_forall)
-	   \\ fs[])
-   \\ line_size_lt_dimword15 ``nl:num``
-   \\ THM_SPECL_GOAL "LineFill" linefill_memeq_thm [``state:cache_state``]
-   \\ rfs[]
-   \\ qpat_assum `!wi. P`(qspecl_then[`wi'`] assume_tac)
-   \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]
-   \\ THM_SPECL_ASSM "lineSpec" lineSpec_thm [`state`]
-   \\ assume_tac(fill_pm'EQpm_diffIn_thm |> spec_let_elim [`q`, `q'`, `pm`, `dc`, `va'`, `pa'`, `state`])
-   \\ UNDISCH_ALL_TAC
-   \\ fs_lambda_elim[ Hit_def, combinTheory.UPDATE_def,Fill_def]
-   \\ lrw[]      
-   \\ rfs[]
-);
+    \\ THM_SPECL_GOAL "LineFill" linefill_memeq_thm [``state:cache_state``]
+    \\ line_size_lt_dimword15 ``nl:num``
+    \\ fs[]
+    \\ qpat_assum `!wi. P`(qspecl_then[`wi'`] assume_tac)
+    \\ THM_SPECL_ASSM "lineSpec" wi_lt_line_size_thm [`state`]  
+    \\ THM_SPECL_ASSM "lineSpec" lineSpec_thm [`state`]
+    \\ rfs[]
 
+)
+end;
 
 val ctf_wt_ccnt_oblg_disch = Q.prove(
 `!dc pm dop state va' pa'.
-  let (dc', pm', h) = ctf' pm dc state dop in
+  let (dc', pm', _) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   let (i', t', wi') = lineSpec(va', pa') state  in   
@@ -879,13 +883,14 @@ val ctf_wt_ccnt_oblg_disch = Q.prove(
     (CellRead(i',t',wi',dc) = CellRead(i',t',wi',dc')))
   )`,
 
-     fs_lambda_elim[ctf'_def, mv_def,fmem_def, ADD_def, CellRead_def]
+     fs_lambda_elim[ctf_def, mv_def,fmem_def, ADD_def, CellRead_def]
     \\ Cases_on`dop`
     \\ rfs[wt_def]
     \\ rpt CASE_TAC
     \\ lrw[]      
     \\ abr_lineSpec_tac_sgl
-    >- (assume_tac(cacheWrite_setCell_thm |> spec_let_elim[`q`, `q'`, `q''`, `pm`, `dc`, `state`]) >> rfs[VAL_def])
+    >- (assume_tac(cacheWrite_setCell_thm |> spec_let_elim[`q`, `q'`, `q''`,
+          `mv T pm dc2 (fmem:(word48->word8)#(word48->CSET)-> (word48 -> word8)) fcm`, `dc`, `state`]) >> rfs[VAL_def, mv_def, fmem_def])
     \\ UNDISCH_ALL_TAC
     \\ fs_lambda_elim[CacheWrite_def, Touch_def, combinTheory.UPDATE_def, Hit_def]
     \\ xrw[]
@@ -898,28 +903,41 @@ val ctf_wt_ccnt_oblg_disch = Q.prove(
     \\ rfs[]
 );
 
-
-
-
-val ctf_wb_not_cl_evpol_some_oblg_disch = Q.prove(
-`!dc pm dop state va' pa' x.
-  let (dc', pm', h) = ctf' pm dc state dop in
+val ctf_wb_not_cl_evpol_oblg = Q.prove(
+`!dc pm dop state.
+  let (dc', pm', (_, tg, v)) = ctf pm dc state dop in 
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
-  let (act, tg, _) = HD(TL (TL (dc' i).hist)) in 
-  ~cl dop ==> 
-  (EP ((dc i).hist,t,dc) = SOME x) ==>
-  (~Hit(va, pa, dc) state) ==>
-  (n2w tg = x)`,
+  ~cl dop    ==> 
+  IS_SOME tg ==>
+  (~Hit(va, pa, dc) state) ==> 
+  (EP ((dc i).hist,t,dc) = tg ) ==>
+  ((ca i (THE tg) dc) = v) ==>
+  (LineDirty(i, THE tg, dc))`,
 
-
-       fs_lambda_elim[ctf'_def, ctf_def, ctf_eq_ctf'_thm, ADD_def, ca_def, Hit_def]
+       fs_lambda_elim[ctf_def, ADD_def, ca_def, Hit_def, LineDirty_def,CacheWrite_def,CacheRead_def, combinTheory.UPDATE_def]
     \\ Cases_on`dop`
     \\ rfs[cl_def]
     \\ rpt CASE_TAC
-    \\ lrw[]      
-    \\ UNDISCH_ALL_TAC
-    \\ fs_lambda_elim[CacheWrite_def,CacheRead_def, Hit_def, Fill_def, Touch_def, combinTheory.UPDATE_def, Evict_def, LineFill_def]
     \\ lrw[]
-    \\ metis_tac[cl_def]
+);
+
+val ctf_wb_not_cl_evpol_some_oblg_disch = Q.prove(
+`!dc pm dop state x.
+  let (dc', pm', (_, tg, _)) = ctf pm dc state dop in
+  let (va, pa) = ADD dop in
+  let (i, t, wi) = lineSpec(va, pa) state  in  
+  ~cl dop ==> 
+  (EP ((dc i).hist,t,dc) = SOME x) ==>
+  (~Hit(va, pa, dc) state)    ==>
+  (LineDirty(i, x, dc)) ==>
+  (THE tg = x)`,
+
+
+       fs_lambda_elim[ctf_def, ADD_def, ca_def, Hit_def, LineDirty_def,CacheWrite_def,CacheRead_def, Fill_def, Touch_def, combinTheory.UPDATE_def, Evict_def, LineFill_def]
+    \\ Cases_on`dop`
+    \\ rfs[cl_def]
+    \\ rpt CASE_TAC
+    \\ lrw[]
+    \\ FIRST [metis_tac[cl_def], all_tac]  
 );

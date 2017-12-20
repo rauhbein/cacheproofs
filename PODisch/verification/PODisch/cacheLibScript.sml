@@ -2138,4 +2138,44 @@ val Fill_dcEqPm_thm = Q.prove(
   \\ rfs[]
 );
 
+val Miss_After_Evict_thm = Q.store_thm("Miss_After_Evict_th",
+ `!(va:word64) (pa:word48) (pm:(word48->word8)) (dc:(48 word -> CSET)) (t':word48) (state:cache_state).
+  let (i, t, wi) = lineSpec(va, pa) state     in
+  let (dc', pm') = Fill(va, pa, pm, dc) state in 
+      (EP ((dc i).hist,t,dc) = SOME t') ==>  
+      (~Hit(va, pa, dc) state) ==>
+      (invariant_cache) ==>
+      ((dc' i).sl t' = NONE)`,
+
+     fs_lambda_elim[Fill_def, combinTheory.UPDATE_def, Hit_def]
+    \\ lrw[] 
+    \\ abr_lineSpec_tac_sgl
+    \\ abr_tac_goal wordsSyntax.is_w2n "nl" NONE
+
+    \\ abr_tac_goal is_snd "h'" NONE
+    \\ abr_tac_goal is_writeBackLine "wbs'" (SOME ``state:cache_state``)
+    \\ abr_tac_goal is_pabs "dc'"  NONE
+    \\ mk_subgoal_then ``(n <= dimword(:15))`` ``2 ** nl − 1n``
+    >- ( xrw[]
+	 \\ fs_lambda_elim[LineFill_def, CellFill_def, combinTheory.UPDATE_def, FOR_FOLDL]
+	 \\ CASE_TAC
+	 >-(fs[invariant_cache_def]
+           \\ qpat_assum`∀h i t dc x. P` (qspecl_then[`((dc:word48->CSET) (i':word48)).hist`, `i'`, `t'`, `dc`, `t'`] assume_tac)
+	   \\ rfs[])
+         \\ Induct_on `n`
+	 >- fs_lambda_elim[EVAL``COUNT_LIST 1``, Abbr`dc'`, Evict_def, combinTheory.UPDATE_def]
+
+         \\ strip_tac
+	 \\ `n ≤ 32768` by decide_tac
+	 \\ fs[DECIDE``SUC n = n + 1``]
+	 \\ ASSUME_TAC( rich_listTheory.COUNT_LIST_ADD
+			 |> Q.ISPECL[`(n:num) + 1`, `1:num`]
+			 |> SIMP_RULE(srw_ss())[listTheory.MAP, EVAL ``COUNT_LIST  (1)``])
+ 	 \\ rfs[rich_listTheory.FOLDL_APPEND |> SIMP_RULE(srw_ss())[]])
+   \\ qpat_assum` !a. P` (qspecl_then[`n`] assume_tac)
+   \\ Q.UNABBREV_TAC `n`
+   \\ line_size_lt_dimword15 ``nl:num``
+   \\ fs[]
+);
+
 val () = export_theory ()
