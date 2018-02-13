@@ -26,6 +26,9 @@ val invariant_cache_def = Define `
 
 `;
 
+val dirty_axiom = new_axiom ("dirty_axiom", 
+``!l: SLVAL option. ~(IS_SOME l) ==> ~((THE l).dirty)``
+);
 (* --------------------------------------------------------------------------------------------- *)
 
 val lt_mod_thm = Q.store_thm("lt_mod_thm",

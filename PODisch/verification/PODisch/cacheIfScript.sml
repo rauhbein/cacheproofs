@@ -61,10 +61,11 @@ val lv_def =
 ;
 
 val lw_def =
-   Define `lw va pa dc state =
+   Define `lw va pa l state =
      let (i,t,wi) = lineSpec(va, pa) state in
-     CellRead(i,t,wi,dc)`
+     l(n2w wi)`
 ;
+
 
 
 val _ = Datatype `dop = RD word64#word48#bool | WT word64#word48#wrTyp#bool | CL word64#word48`;

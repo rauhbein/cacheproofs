@@ -392,6 +392,30 @@ val cdirty_ldirty_oblg_disch = Q.prove(
   \\ ntac 2 CASE_TAC
 );
 
+val not_chit_not_cdirty_oblg_disch = Q.prove(
+`!dc va pa state. (~Hit(va, pa, dc) state) ==> (~lDirty(va, pa, dc) state)`,
+
+    fs_lambda_elim[Hit_def, lDirty_def, LineDirty_def]
+    \\ lrw[]
+    \\ ntac 2 CASE_TAC
+    \\ assume_tac(dirty_axiom)
+    \\ qpat_assum `!l. P`(qspecl_then[`(dc (FST (q,q',r'))).sl (FST (SND (q,q',r')))`] assume_tac)
+    \\ rfs[]
+);
+
+val lw_ccntw_oblg_disch = Q.prove(
+`!va pa va' pa' dc state.
+    let (i, t, wi) = lineSpec(va, pa) state in
+    let (i', t', wi') = lineSpec(va, pa) state in
+    ((i= i') /\ (t = t')) ==> 
+    ((lw va pa (ccnt va pa dc state) state) =
+      (ccntw va pa dc state))`,
+
+  RW_TAC std_ss [ ccntw_def, ccnt_def, CellRead_def, lw_def]
+);
+
+
+
 val lw_lv_oblg_disch = Q.prove(
 `!va pa pm dc h n state.
   let (i,t,wi) = lineSpec(va, pa) state in

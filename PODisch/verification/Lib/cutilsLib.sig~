@@ -7,6 +7,13 @@ val dest_evict : term -> term
 val dest_lineFill : term -> term
 val dest_linespec : term -> term
 val dest_writeBackLine: term -> term
+val is_Fill : term -> bool
+val is_cacheRead : term -> bool
+val is_cacheWrite : term -> bool
+val is_evict : term -> bool
+val is_lineFill : term -> bool
+val is_lineSpec : term -> bool
+val is_writeBackLine : term -> bool
 val xrw : thm list -> tactic
 val do_nothing : tactic
 val undisch_hd_tac : schneiderUtils.tactic
