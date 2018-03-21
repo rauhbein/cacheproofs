@@ -1,5 +1,6 @@
 signature cutilsLib =
 sig
+     include Abbrev
 val dest_Fill : term -> term
 val dest_cacheRead : term -> term
 val dest_cacheWrite: term -> term
