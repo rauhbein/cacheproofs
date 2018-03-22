@@ -1,4 +1,4 @@
-INCLUDES = ${HOLDIR}/examples/l3-machine-code/common ${HOLDIR}/examples/l3-machine-code/arm/step ../model Lib/
+INCLUDES = ${HOLDIR}/examples/l3-machine-code/common ${HOLDIR}/examples/l3-machine-code/arm/step ../model/ Lib/ theoremStore/ interface/ .
 OPTIONS = QUIT_ON_FAILURE
 
 ifdef POLY

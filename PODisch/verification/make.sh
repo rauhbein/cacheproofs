@@ -1,8 +1,8 @@
 #!/bin/bash
-
+export HOLDIR=~/HOL/
 name=$1
 if   [ "$name" = "clean"   ]; then
-    ../../../HOL/bin/Holmake clean; ../../../HOL/bin/Holmake cleanAll
+    ${HOLDIR}/bin/Holmake clean; ${HOLDIR}/bin/Holmake cleanAll
 else 
-    ../../../HOL/bin/Holmake
+    ${HOLDIR}/bin/Holmake
 fi

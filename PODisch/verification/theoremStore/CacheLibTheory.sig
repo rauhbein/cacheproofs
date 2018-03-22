@@ -43,10 +43,15 @@ sig
     val Fill_dcEqPm_thm : thm
     val Fill_ifInLineRange_HitDC'Pa_thm : thm
     val Fill_someEPevict_dcEQpm'_thm : thm
-    val Miss_After_Evict_th : thm
+    val Miss_After_Evict_thm : thm
+    val WriteBackLine_CellRead_dcEQdc'_thm : thm
+    val WriteBackLine_Dont_change_Mem_IfNotDirty_thm : thm
+    val WriteBackLine_Dont_change_cache_value : thm
     val adr_neq2_thm : thm
     val adr_neq3_thm : thm
     val adr_neq_thm : thm
+    val adr_segNeq_thm : thm
+    val adr_thm : thm
     val cacheRead_hit_thm : thm
     val cacheRead_miss_thm : thm
     val cacheRead_paHitdc'_thm : thm
@@ -59,22 +64,28 @@ sig
     val fill_dcEQpm_thm : thm
     val fill_hit_thm : thm
     val fill_pm'EQpm_diffIn_thm : thm
+    val lineSpecEq_thm : thm
     val lineSpec_eq_thm : thm
     val lineSpec_thm : thm
     val linefill_hit_t : thm
-    val linefill_memeq_t : thm
+    val linefill_memeq_thm : thm
     val linefill_slEq_diffInputDcAndalsoPM_thm : thm
     val linefill_slEq_diffInputDc_thm : thm
     val lt_mod_thm : thm
     val msbEqAdrs_Hit_dc_thm : thm
+    val neg_word_msb : thm
     val shift_add_thm : thm
     val si_extract_thm : thm
+    val si_ge_1_thm : thm
     val tag_extract_thm : thm
     val thm1 : thm
+    val w2vWordsEq_impl_wordsEq : thm
     val wIdx_extract_thm : thm
     val wIdx_lt_dimword48_thm : thm
     val wi_lt_line_size_thm : thm
     val word_log2_lt_adrSize : thm
+    val writBckLine_NotchgSidx'_thm : thm
+    val writBckLine_NotchgTag'_thm : thm
     val write_read_thm : thm
     val write_read_unch_thm : thm
     val writeback_mem_eq_thm : thm
@@ -519,7 +530,6 @@ sig
 
    [Fill_someEPevict_dcEQpm'_thm]  Theorem
 
-      [oracles: DISK_THM, cheat] [axioms: ] []
       |- ∀va pa va' pa' pm dc x state.
            (let (dc',pm') = Fill (va,pa,pm,dc) state in
             let (i,t,wi) = lineSpec (va,pa) state in
@@ -533,7 +543,7 @@ sig
               (EP ((dc i).hist,t,dc) = SOME x) ⇒
               (CellRead (i',t',wi',dc) = v2w (read_mem32 (pa',pm'))))
 
-   [Miss_After_Evict_th]  Theorem
+   [Miss_After_Evict_thm]  Theorem
 
       |- ∀va pa pm dc t' state.
            (let (i,t,wi) = lineSpec (va,pa) state in
@@ -544,9 +554,38 @@ sig
               invariant_cache ⇒
               ((dc' i).sl t' = NONE))
 
+   [WriteBackLine_CellRead_dcEQdc'_thm]  Theorem
+
+      |- ∀i t pm dc state n.
+           (let (dc',_) = WriteBackLine (i,t,pm,dc,n) state
+            in
+              n ≤ dimword (:15) ⇒
+              ∀wi. wi ≤ n ⇒ (CellRead (i,t,wi,dc) = CellRead (i,t,wi,dc')))
+
+   [WriteBackLine_Dont_change_Mem_IfNotDirty_thm]  Theorem
+
+      |- ∀i t pm dc state n.
+           (let (dc',pm') = WriteBackLine (i,t,pm,dc,n) state in
+            let (dc'',pm'') = WriteBackLine_simp (i,t,pm,dc,n) in
+            let sn = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w)) in
+            let ln = w2n state.DC.ctr.DminLine
+            in
+              ¬LineDirty (i,t,dc) ⇒
+              ∀pa'.
+                v2w (read_mem32 (pa',pm')) = v2w (read_mem32 (pa',pm'')))
+
+   [WriteBackLine_Dont_change_cache_value]  Theorem
+
+      |- ∀i t pm dc state n.
+           (let (dc',_) = WriteBackLine (i,t,pm,dc,n) state in
+            let (dc'',_) = WriteBackLine_simp (i,t,pm,dc,n) in
+            let sn = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w)) in
+            let ln = w2n state.DC.ctr.DminLine
+            in
+              n ≤ dimword (:15) ⇒ ((dc' i).sl t = (dc'' i).sl t))
+
    [adr_neq2_thm]  Theorem
 
-      [oracles: cheat] [axioms: ] []
       |- ∀a b c n.
            (let bmM = 0xFFFFFFFFFFFFw ⋙ n in
             let bmL = ¬(0xFFFFFFFFFFFFw ⋙ n ≪ n)
@@ -578,6 +617,25 @@ sig
               (c && bmL = c) ∧ (d && bmL = d) ⇒
               a ≪ n ≠ b ≪ n ⇒
               (a ≪ n ‖ c) ≠ (b ≪ n ‖ d))
+
+   [adr_segNeq_thm]  Theorem
+
+      |- ∀a b c n m. (b ≪ (n + m) ‖ a ≪ m) ≠ (c ≪ (n + m) ‖ a ≪ m) ⇒ b ≠ c
+
+   [adr_thm]  Theorem
+
+      [oracles: cheat] [axioms: ] []
+      |- ∀a b c d n m.
+           (let bmM = 0xFFFFFFFFFFFFw ⋙ (n + m) in
+            let bmL = 0xFFFFFFFFFFFFw ≪ (48 − (n + m)) ⋙ (48 − n)
+            in
+              n < 48 ∧ m < 48 − n ⇒
+              (a && bmM = a) ∧ (b && bmL = b) ⇒
+              (c && bmM = c) ∧ (d && bmL = d) ⇒
+              (a ≠ c ⇒ (a ≪ (n + m) ‖ b ≪ m) ≠ (c ≪ (n + m) ‖ d ≪ m)) ∧
+              (d ≠ b ⇒ (a ≪ (n + m) ‖ b ≪ m) ≠ (c ≪ (n + m) ‖ d ≪ m)) ∧
+              ((a ≪ (n + m) ‖ b ≪ m = c ≪ (n + m) ‖ d ≪ m) ⇒
+               (a = c) ∧ (b = d)))
 
    [cacheRead_hit_thm]  Theorem
 
@@ -682,6 +740,10 @@ sig
               ¬Hit (va',pa',dc) state ⇒
               (v2w (read_mem32 (pa',pm')) = v2w (read_mem32 (pa',pm))))
 
+   [lineSpecEq_thm]  Theorem
+
+      |- ∀va pa va' state. lineSpec (va,pa) state = lineSpec (va',pa) state
+
    [lineSpec_eq_thm]  Theorem
 
       |- ∀s s' pa va.
@@ -709,7 +771,7 @@ sig
                  in
                    IS_SOME (sl t)))
 
-   [linefill_memeq_t]  Theorem
+   [linefill_memeq_thm]  Theorem
 
       |- ∀h i t pm dc n state.
            (let (sl,_) = LineFill (h,i,t,pm,dc,n) state in
@@ -765,6 +827,10 @@ sig
            (msb_extract va pa state = msb_extract va' pa' state) ⇒
            Hit (va',pa',dc) state
 
+   [neg_word_msb]  Theorem
+
+      |- ∀w. w ≥ 0w ⇒ ¬word_msb w
+
    [shift_add_thm]  Theorem
 
       |- ∀w1 w2 n m. w1 ≪ (n + m) ‖ w2 ≪ m = (w1 ≪ n ‖ w2) ≪ m
@@ -777,6 +843,10 @@ sig
             let s = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))
             in
               sid = (s + b >< b + 1) pa)
+
+   [si_ge_1_thm]  Theorem
+
+      |- ∀w. w ≥ 1w ⇒ word_log2 (w + 1w) ≥ 1w
 
    [tag_extract_thm]  Theorem
 
@@ -804,6 +874,10 @@ sig
               (t' ≪ ns ‖ i') ≪ (nl + 2) ≠ (t ≪ ns ‖ i) ≪ (nl + 2) ⇒
               (CellRead (i',t',wi',dc) = CellRead (i',t',wi',dc')))
 
+   [w2vWordsEq_impl_wordsEq]  Theorem
+
+      |- ∀w v. (w2v w = w2v v) ⇒ (w = v)
+
    [wIdx_extract_thm]  Theorem
 
       |- ∀pa state.
@@ -829,6 +903,22 @@ sig
    [word_log2_lt_adrSize]  Theorem
 
       |- ∀v. v ≠ 0w ⇒ w2n (word_log2 v) < 48
+
+   [writBckLine_NotchgSidx'_thm]  Theorem
+
+      |- ∀i i' t t' pm dc state n.
+           (let (dc',pm') = WriteBackLine (i,t,pm,dc,n) state
+            in
+              n ≤ dimword (:15) ⇒
+              i ≠ i' ⇒
+              ((dc i').sl t' = (dc' i').sl t'))
+
+   [writBckLine_NotchgTag'_thm]  Theorem
+
+      |- ∀i t pm dc n t' state.
+           (let (dc',pm') = WriteBackLine (i,t,pm,dc,n) state
+            in
+              t ≠ t' ⇒ n ≤ dimword (:15) ⇒ ((dc i).sl t' = (dc' i).sl t'))
 
    [write_read_thm]  Theorem
 
@@ -870,7 +960,6 @@ sig
 
    [wrtBckLine_dcEQpm'_thm]  Theorem
 
-      [oracles: DISK_THM, cheat] [axioms: ] []
       |- ∀i t pm dc n state.
            (let (dc',pm') = WriteBackLine (i,t,pm,dc,n) state in
             let sn = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w)) in
@@ -902,7 +991,6 @@ sig
 
    [wrtBck_memory_thm]  Theorem
 
-      [oracles: DISK_THM, cheat] [axioms: ] []
       |- ∀i t pm dc state n.
            (let (dc',pm') = WriteBackLine (i,t,pm,dc,n) state in
             let sn = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w)) in

@@ -1,11 +1,13 @@
 /home/hol4/Cache/cache-generic/model/cacheTheory
 /home/hol4/HOL/sigobj/Abbrev
 /home/hol4/HOL/sigobj/DB
+/home/hol4/HOL/sigobj/Drule
 /home/hol4/HOL/sigobj/HolKernel
 /home/hol4/HOL/sigobj/Overlay
 /home/hol4/HOL/sigobj/PairedLambda
 /home/hol4/HOL/sigobj/Parse
 /home/hol4/HOL/sigobj/Q
+/home/hol4/HOL/sigobj/arithmeticTheory
 /home/hol4/HOL/sigobj/bitstringTheory
 /home/hol4/HOL/sigobj/blastLib
 /home/hol4/HOL/sigobj/boolLib
@@ -24,6 +26,5 @@
 /home/hol4/HOL/sigobj/wordsTheory
 /home/hol4/Cache/cache-generic/verification/Lib/cutilsLib
 /home/hol4/Cache/cache-generic/verification/Lib/cutilsLib
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsSyntax
 /home/hol4/Cache/cache-generic/verification/Lib/cutilsSyntax
 /home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml

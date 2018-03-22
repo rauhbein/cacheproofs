@@ -1,0 +1,56 @@
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:91: warning: Pattern is not exhaustive. Found near val COMB (ab, c) = dest_term trm
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:92: warning: Pattern is not exhaustive. Found near val COMB (a, b) = dest_term ab
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:100: warning: Pattern is not exhaustive. Found near val COMB (ab, c) = dest_term trm
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:101: warning: Pattern is not exhaustive. Found near val COMB (a, b) = dest_term ab
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:456: warning: Pattern is not exhaustive.
+Found near val v :: [] = my_match (Parse.Term [...]) (concl thm)
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:502: warning: Pattern is not exhaustive. Found near val ([vars], body) = strip_pabs body
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:515: warning: Pattern is not exhaustive. Found near val ([vars], body) = strip_pabs body
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:688: warning: Pattern is not exhaustive.
+Found near val a :: b :: _ = rm_dup (find_terms ifilter g)
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:689: warning: Pattern is not exhaustive.
+Found near val c :: d :: _ = rm_dup (find_terms tfilter g)
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:696: warning: Pattern is not exhaustive.
+Found near val a :: _ = rm_dup (find_terms ifilter g)
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:696: warning: Pattern is not exhaustive.
+Found near val c :: _ = rm_dup (find_terms tfilter g)
+<<HOL message: Created theory "cacheIf">>
+Saved definition __ "ca_def"
+Saved definition __ "ccnt_def"
+Saved definition __ "lcnt_def"
+Saved definition __ "ccntw_def"
+Saved definition __ "mllu_def"
+Saved definition __ "mlwb_def"
+Saved definition __ "fmem_def"
+Saved definition __ "mv_def"
+Saved definition __ "read32_def"
+Saved definition __ "lv_def"
+Saved definition __ "lw_def"
+Saved theorem _____ "datatype_dop"
+Saved theorem _____ "dop_11"
+Saved theorem _____ "dop_distinct"
+Saved theorem _____ "dop_case_cong"
+Saved theorem _____ "dop_nchotomy"
+Saved theorem _____ "dop_Axiom"
+Saved theorem _____ "dop_induction"
+<<HOL message: Defined type: "dop">>
+<<HOL message: mk_functional: 
+  pattern completion has added 1 clause to the original specification.>>
+Saved definition __ "rd_def"
+Saved induction ___ "rd_ind"
+<<HOL message: mk_functional: 
+  pattern completion has added 1 clause to the original specification.>>
+Saved definition __ "wt_def"
+Saved induction ___ "wt_ind"
+<<HOL message: mk_functional: 
+  pattern completion has added 1 clause to the original specification.>>
+Saved definition __ "cl_def"
+Saved induction ___ "cl_ind"
+Saved definition __ "ADD_def"
+<<HOL message: mk_functional: 
+  pattern completion has added 2 clauses to the original specification.>>
+Saved definition __ "VAL_def"
+Saved induction ___ "VAL_ind"
+Saved definition __ "ctf_def"
+Exporting theory "cacheIf" ... done.
+Theory "cacheIf" took 2.6s to build

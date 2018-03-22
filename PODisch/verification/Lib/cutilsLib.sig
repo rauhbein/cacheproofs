@@ -19,6 +19,7 @@ val xrw : thm list -> tactic
 val do_nothing : tactic
 val undisch_hd_tac : schneiderUtils.tactic
 val undisch_all_tac : schneiderUtils.tactic
+val line_size_lt_dimword15 : term -> tactic
 val LET_ELIM_RULE : thm -> thm
 val fs_lambda_elim : thm list -> goal -> goal list * (thm list -> thm)
 val rwsimp : thm list -> goal -> goal list * (thm list -> thm)

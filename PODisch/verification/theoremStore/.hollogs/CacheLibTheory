@@ -1,35 +1,45 @@
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:76: warning: Pattern is not exhaustive. Found near val COMB (ab, c) = dest_term trm
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:77: warning: Pattern is not exhaustive. Found near val COMB (a, b) = dest_term ab
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:85: warning: Pattern is not exhaustive. Found near val COMB (ab, c) = dest_term trm
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:86: warning: Pattern is not exhaustive. Found near val COMB (a, b) = dest_term ab
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:441: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:91: warning: Pattern is not exhaustive. Found near val COMB (ab, c) = dest_term trm
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:92: warning: Pattern is not exhaustive. Found near val COMB (a, b) = dest_term ab
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:100: warning: Pattern is not exhaustive. Found near val COMB (ab, c) = dest_term trm
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:101: warning: Pattern is not exhaustive. Found near val COMB (a, b) = dest_term ab
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:456: warning: Pattern is not exhaustive.
 Found near val v :: [] = my_match (Parse.Term [...]) (concl thm)
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:487: warning: Pattern is not exhaustive. Found near val ([vars], body) = strip_pabs body
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:500: warning: Pattern is not exhaustive. Found near val ([vars], body) = strip_pabs body
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:673: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:502: warning: Pattern is not exhaustive. Found near val ([vars], body) = strip_pabs body
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:515: warning: Pattern is not exhaustive. Found near val ([vars], body) = strip_pabs body
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:688: warning: Pattern is not exhaustive.
 Found near val a :: b :: _ = rm_dup (find_terms ifilter g)
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:674: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:689: warning: Pattern is not exhaustive.
 Found near val c :: d :: _ = rm_dup (find_terms tfilter g)
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:681: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:696: warning: Pattern is not exhaustive.
 Found near val a :: _ = rm_dup (find_terms ifilter g)
-/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:681: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/Lib/cutilsLib.sml:696: warning: Pattern is not exhaustive.
 Found near val c :: _ = rm_dup (find_terms tfilter g)
 <<HOL message: Created theory "CacheLib">>
 Saved definition __ "invariant_cache_def"
 Saved theorem _____ "lt_mod_thm"
+Saved theorem _____ "adr_segNeq_thm"
 Saved theorem _____ "adr_neq3_thm"
-Saved CHEAT _______ "adr_neq2_thm"
+Saved CHEAT _______ "adr_thm"
+Saved theorem _____ "adr_neq2_thm"
 Saved theorem _____ "adr_neq_thm"
 Saved definition __ "write_mem32_def"
 Saved theorem _____ "write_read_thm"
 Saved theorem _____ "write_read_unch_thm"
 Saved theorem _____ "wrtBck_dirty_thm"
-Saved CHEAT _______ "wrtBck_memory_thm"
+Saved theorem _____ "wrtBck_memory_thm"
 Saved definition __ "WriteBackLine_simp_def"
-Saved CHEAT _______ "wrtBckLine_dcEQpm'_thm"
+Saved theorem _____ "WriteBackLine_Dont_change_cache_value"
+Saved theorem _____ "WriteBackLine_CellRead_dcEQdc'_thm"
+Saved theorem _____ "wrtBckLine_dcEQpm'_thm"
+Saved theorem _____ "WriteBackLine_Dont_change_Mem_IfNotDirty_thm"
 Saved theorem _____ "wrtBckLine_pmEQpm'IfNotDirty_thm"
+Saved theorem _____ "writBckLine_NotchgTag'_thm"
+Saved theorem _____ "writBckLine_NotchgSidx'_thm"
 Saved theorem _____ "cellFill_memeq_thm"
-Saved theorem _____ "linefill_memeq_t"
+Saved theorem _____ "linefill_memeq_thm"
+Saved theorem _____ "w2vWordsEq_impl_wordsEq"
+Saved theorem _____ "neg_word_msb"
+Saved theorem _____ "si_ge_1_thm"
 Saved theorem _____ "wIdx_extract_thm"
 Saved theorem _____ "wi_lt_line_size_thm"
 Saved theorem _____ "wIdx_lt_dimword48_thm"
@@ -37,16 +47,17 @@ Saved theorem _____ "si_extract_thm"
 Saved theorem _____ "word_log2_lt_adrSize"
 Saved theorem _____ "tag_extract_thm"
 Saved theorem _____ "lineSpec_thm"
-/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:686: warning: Pattern is not exhaustive.
+Saved theorem _____ "lineSpecEq_thm"
+/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:666: warning: Pattern is not exhaustive.
 Found near val a :: b :: c :: _ = (... o ... o fst o dest_eq) g
-/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:713: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:693: warning: Pattern is not exhaustive.
 Found near val a :: b :: c :: _ = (... o ... o fst o dest_eq) g
 Saved theorem _____ "fill_dcEQpm_thm"
 Saved theorem _____ "shift_add_thm"
-/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:762: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:742: warning: Pattern is not exhaustive.
 Found near
   val a :: b :: _ = find_terms wordsSyntax.is_w2n ((fst o dest_imp) g)
-/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:763: warning: Pattern is not exhaustive.
+/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:743: warning: Pattern is not exhaustive.
 Found near val c :: d :: _ = find_terms is_fst ((fst o dest_imp) g)
 Saved theorem _____ "writeback_mem_eq_thm"
 Saved theorem _____ "lineSpec_eq_thm"
@@ -70,10 +81,10 @@ Saved CHEAT _______ "cacheRead_miss_thm"
 Saved theorem _____ "cacheRead_hit_thm"
 Saved theorem _____ "cacheWrite_setCell_thm"
 Saved theorem _____ "linefill_hit_t"
-/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:1367: warning: Pattern is not exhaustive. Found near val a :: b :: _ = find_terms is_fst g
-/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:1374: warning: Pattern is not exhaustive. Found near val a :: b :: _ = find_terms is_fst g
+/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:1347: warning: Pattern is not exhaustive. Found near val a :: b :: _ = find_terms is_fst g
+/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:1354: warning: Pattern is not exhaustive. Found near val a :: b :: _ = find_terms is_fst g
 Saved theorem _____ "fill_hit_thm"
-/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:1402: warning: Pattern is not exhaustive. Found near val a :: b :: _ = find_terms is_fst g
+/home/hol4/Cache/cache-generic/verification/theoremStore/CacheLibScript.sml:1382: warning: Pattern is not exhaustive. Found near val a :: b :: _ = find_terms is_fst g
 Saved theorem _____ "cacheRead_paHitdc'_thm"
 Saved theorem _____ "cacheWrite_paHitdc'_thm"
 Saved CHEAT _______ "cacheWrite_paNOTCHGpm_thm"
@@ -86,7 +97,7 @@ Saved theorem _____ "EPNotEqNONE_impEvict_thm"
 Saved theorem _____ "Fill_NotchgTag'_thm"
 Saved theorem _____ "Fill_NotchgHitDC'Tag_thm"
 Saved theorem _____ "thm1"
-Saved CHEAT _______ "Fill_someEPevict_dcEQpm'_thm"
+Saved theorem _____ "Fill_someEPevict_dcEQpm'_thm"
 Saved theorem _____ "Fill_KeepHitDC'Tag_thm"
 Saved theorem _____ "Fill_EpEqtag_tagDc'Miss_thm"
 Saved theorem _____ "Fill_ifInLineRange_HitDC'Pa_thm"
@@ -100,6 +111,6 @@ Saved theorem _____ "Fill_Keep_Miss_DiffTag_thm"
 Saved CHEAT _______ "CacheWrite_DiffPa_EqReadMemPa'_thm"
 Saved CHEAT _______ "CacheWrite_DiffPa_EqReadMemPa'_thm3"
 Saved CHEAT _______ "Fill_dcEqPm_thm"
-Saved theorem _____ "Miss_After_Evict_th"
+Saved theorem _____ "Miss_After_Evict_thm"
 Exporting theory "CacheLib" ... done.
-Theory "CacheLib" took 1m20s to build
+Theory "CacheLib" took 1m31s to build

@@ -31,11 +31,19 @@ val dirty_axiom = new_axiom ("dirty_axiom",
 );
 (* --------------------------------------------------------------------------------------------- *)
 
+val set_size_lt_48 =
+    SUBGOAL_THEN ``w2n (word_log2 (state.DC.ccsidr.NumSets + 1w)) < 48`` (fn thm => assume_tac thm)
+    >- (xfs[word_log2_def]
+       \\ (qspecl_then [`state.DC.ccsidr.NumSets `] assume_tac) (INST_TYPE [alpha |-> ``:15``]LOG2_w2n_lt)
+       \\ `(state.DC.ccsidr.NumSets ≥ 1w) ==> (state.DC.ccsidr.NumSets + 1w ≠ 0w)` by blastLib.BBLAST_TAC
+       \\ res_tac
+       \\ rfs[invariant_cache_def]);
+    
 val lt_mod_thm = Q.store_thm("lt_mod_thm",
  `!a b c d. ((a < b) /\ (b <= c) /\ (c < d)) ==> ((a MOD d) < (b MOD d))`,
      fs []);
 
-val adr_segNeq_thm = Q.prove(
+val adr_segNeq_thm = Q.store_thm("adr_segNeq_thm",
  `!(a:word48) (b:word48) (c:word48) (n:num) (m:num).
    (((b << (n+m)) !! (a << m) ) <>  ((c << (n+m)) !! (a << m))) ==>
     (b <> c)`, fs []);
@@ -56,7 +64,7 @@ val adr_neq3_thm = Q.store_thm("adr_neq3_thm",
 );
 
 
-val adr_thm = Q.prove(
+val adr_thm = Q.store_thm("adr_thm",
  `!(a:word48) (b:word48) (c:word48) (d:word48) (n:num) (m:num).
    let bmM = ((0xffffffffffffw:word48) >>> (n + m)) in
    let bmL = (((0xffffffffffffw:word48) << (48 - (n + m))) >>> (48 - n)) in
@@ -67,11 +75,11 @@ val adr_thm = Q.prove(
   ((d <> b) ==> (((a << (n+m)) !! (b << m) ) <>  ((c << (n+m)) !! (d << m)))) /\
   ((((a << (n+m)) !! (b << m) ) =  ((c << (n+m)) !! (d << m))) ==> ((a = c) /\ (b = d)))`, cheat);
 
- (* ntac 4 strip_tac *)
- (*  \\ ntac 48 (FIRST[Cases_on`n`, Cases_on`n'`] *)
- (*  >- (ntac 48(Induct_on `m` *)
- (*  THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC, fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])) *)
- (*  \\ fs[]) *)
+(*  ntac 4 strip_tac *)
+(*   \\ ntac 48 (FIRST[Cases_on`n`, Cases_on`n'`] *)
+(*   >- (ntac 48(Induct_on `m` *)
+(*   THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC, fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])) *)
+(*   \\ fs[]) *)
 (* ); *)
 
 
@@ -82,13 +90,13 @@ val adr_neq2_thm = Q.store_thm("adr_neq2_thm",
   ((n < 48)) ==>
   ((a && bmM = a) /\ (b && bmL = b) /\ (c && bmL = c)) ==>
   (b <> c) ==>
-  (((a << n) !! b) <> ((a << n) !! c))`, cheat);
+  (((a << n) !! b) <> ((a << n) !! c))`,
 
-(*   ntac 3 strip_tac *)
-(*   \\ ntac 48 (Induct_on `n` *)
-(*    THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC,   *)
-(* 	 fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)]) *)
-(* ); *)
+  ntac 3 strip_tac
+  \\ ntac 48 (Induct_on `n`
+   THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC,
+	 fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])
+);
 
 val adr_neq_thm = Q.store_thm("adr_neq_thm",
  `!(a:word48) (b:word48) (c:word48) (d:word48) (n:num).
@@ -105,33 +113,6 @@ val adr_neq_thm = Q.store_thm("adr_neq_thm",
    THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC,
 	 fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])
 );
-
-(* --------------------------------------------------------------------------------------------- *)
-
-(* To prove that line  size is less that 2 ** 15 *)
-fun line_size_lt_dimword15 nl =
-      `2 ** ^nl ≤ 32769` by (all_tac
-    \\ assume_tac(Drule.ISPECL[``(state :cache_state).DC.ctr.DminLine``](w2n_lt) |> SIMP_RULE(srw_ss())[])
-    \\ `w2n state.DC.ctr.DminLine <= 15`  by decide_tac
-    \\ `!a b. a <= b ==> 2**a <= 2**b` by FULL_SIMP_TAC(arith_ss)[]
-    \\ REABBREV_TAC
-    \\ qpat_assum `!a b. P` (qspecl_then [`^nl`, `15n`] assume_tac)
-    \\ res_tac
-    \\ `(2 ** ^nl ≤ 2 ** 15) ==> (2 ** ^nl < (2 ** 15) + 1)` by FULL_SIMP_TAC (bool_ss)[]
-    >|[(qspecl_then [`2 ** ^nl`, `2 ** 15`] assume_tac) arithmeticTheory.LE_LT1
-    \\ res_tac
-    \\ FULL_SIMP_TAC (arith_ss)[], all_tac]
-    \\ fs[]);
-
-val set_size_lt_48 =
-    SUBGOAL_THEN ``w2n (word_log2 (state.DC.ccsidr.NumSets + 1w)) < 48`` (fn thm => assume_tac thm)
-    >- (xfs[word_log2_def]
-       \\ (qspecl_then [`state.DC.ccsidr.NumSets `] assume_tac) (INST_TYPE [alpha |-> ``:15``]LOG2_w2n_lt)
-       \\ `(state.DC.ccsidr.NumSets ≥ 1w) ==> (state.DC.ccsidr.NumSets + 1w ≠ 0w)` by blastLib.BBLAST_TAC
-       \\ res_tac
-       \\ rfs[invariant_cache_def]);
-
-(* --------------------------------------------------------------------------------------------- *)
 
 val write_mem32_def = Define `
 write_mem32 (add:bool[48], (pm:(word48->word8)), value:bool[32]) =
@@ -290,7 +271,7 @@ val WriteBackLine_simp_def = Define`
            dc,pm))
 `;
 
-val WriteBackLine_Dont_change_cache_value = Q.prove(
+val WriteBackLine_Dont_change_cache_value = Q.store_thm("WriteBackLine_Dont_change_cache_value",
    `!i:(48 word) t:(48 word) (pm:(word48->word8)) (dc:(48 word -> CSET)) (state:cache_state) (n:num).
     (let (dc', _) =  WriteBackLine(i, t, pm, dc, n) state in
      let (dc'', _) =  WriteBackLine_simp(i, t, pm, dc, n) in
@@ -312,7 +293,7 @@ val WriteBackLine_Dont_change_cache_value = Q.prove(
     \\ rfs[rich_listTheory.FOLDL_APPEND |> SIMP_RULE(srw_ss())[]]
 );
 
-val WriteBackLine_CellRead_dcEQdc'_thm = Q.prove(
+val WriteBackLine_CellRead_dcEQdc'_thm = Q.store_thm("WriteBackLine_CellRead_dcEQdc'_thm",
     `!i:(48 word) t:(48 word) (pm:(word48->word8)) (dc:(48 word -> CSET)) (state:cache_state) (n:num).
     (let (dc', _) =  WriteBackLine(i, t, pm, dc, n) state in
     ((n <= dimword(:15)) ==> (!wi:num. wi <= n ==>
@@ -346,7 +327,7 @@ val wrtBckLine_dcEQpm'_thm = Q.store_thm("wrtBckLine_dcEQpm'_thm",
     \\ rfs[]
 );
 
-val WriteBackLine_Dont_change_Mem_IfNotDirty_thm = Q.prove(
+val WriteBackLine_Dont_change_Mem_IfNotDirty_thm = Q.store_thm("WriteBackLine_Dont_change_Mem_IfNotDirty_thm",
    `!(i:word48) (t:word48) (pm:(word48->word8)) (dc:(48 word -> CSET)) (state:cache_state) n.
     (let (dc', pm')  =  WriteBackLine(i, t, pm, dc, n) state in
      let (dc'',pm'') =  WriteBackLine_simp(i, t, pm, dc, n) in
@@ -374,7 +355,7 @@ val wrtBckLine_pmEQpm'IfNotDirty_thm = Q.store_thm("wrtBckLine_pmEQpm'IfNotDirty
     \\ fs[WriteBackLine_simp_def]
 );
 
-val writBckLine_NotchgTag'_thm = Q.prove(
+val writBckLine_NotchgTag'_thm = Q.store_thm("writBckLine_NotchgTag'_thm",
    `!i:(48 word) t:(48 word)  (pm:(word48->word8)) (dc:(48 word -> CSET)) n t':(48 word) state.
     (let (dc', pm') =  WriteBackLine(i, t, pm, dc, n) state in
      (t <> t') ==>
@@ -396,7 +377,7 @@ val writBckLine_NotchgTag'_thm = Q.prove(
 	 |> SIMP_RULE(srw_ss())[listTheory.MAP, EVAL ``COUNT_LIST  (1)``])
     \\ rfs[rich_listTheory.FOLDL_APPEND |> SIMP_RULE(srw_ss())[]]);
 
-val writBckLine_NotchgSidx'_thm = Q.prove(
+val writBckLine_NotchgSidx'_thm = Q.store_thm("writBckLine_NotchgSidx'_thm",
     `!i:(48 word) i':(48 word) t:(48 word) t':(48 word) (pm:(word48->word8)) (dc:(48 word -> CSET)) state n.
     (let (dc', pm') =  WriteBackLine(i, t, pm, dc, n) state in
      (n <= dimword(:15) ==>
@@ -444,7 +425,7 @@ val mem_uchg_tac =
       \\ rfs[rich_listTheory.FOLDL_APPEND |> SIMP_RULE(srw_ss())[]]]
 );
 
-val linefill_memeq_thm = Q.store_thm ("linefill_memeq_t",
+val linefill_memeq_thm = Q.store_thm ("linefill_memeq_thm",
  `!(h:(actions # num # 48 word) list) i:(48 word) t:(48 word) (pm:(word48->word8)) (dc:(48 word -> CSET)) n state.
     (let (sl, _) =  LineFill(h, i, t, pm, dc, n) state in
      let sn = w2n (word_log2 (state.DC.ccsidr.NumSets + 1w))  in
@@ -489,9 +470,8 @@ val linefill_memeq_thm = Q.store_thm ("linefill_memeq_t",
 	      ]
 	 ]
 );
-
 (* --------------------------------------------------------------------------------------------- *)
-val w2vWordsEq_impl_wordsEq = Q.prove(
+val w2vWordsEq_impl_wordsEq = Q.store_thm("w2vWordsEq_impl_wordsEq",
  `! w v:word32. (w2v(w) = w2v(v)) ==> (w = v)`,
 
     rw[]
@@ -501,7 +481,7 @@ val w2vWordsEq_impl_wordsEq = Q.prove(
     \\ blastLib.BBLAST_PROVE_TAC
 );
 
-val neg_word_msb = Q.prove(
+val neg_word_msb = Q.store_thm("neg_word_msb",
   `!w. (w >= 0w) ==> ~(word_msb w)`,
     lrw[]
  \\ assume_tac (SPEC``w: 'a word``(GSYM word_msb_neg))
@@ -509,7 +489,7 @@ val neg_word_msb = Q.prove(
  \\ blastLib.BBLAST_PROVE_TAC
 );
 
-val si_ge_1_thm = Q.prove(
+val si_ge_1_thm = Q.store_thm("si_ge_1_thm",
  `!w:15 word. (w >= 1w) ==> (word_log2(w + 1w) >= 1w)`,
 
     SRW_TAC [ARITH_ss][word_log2_def, w2n_add, WORD_GE]
@@ -659,7 +639,7 @@ val lineSpec_thm = Q.store_thm("lineSpec_thm",
     \\ blastLib.BBLAST_PROVE_TAC
 );
 
-val lineSpecEq_thm = Q.prove(
+val lineSpecEq_thm = Q.store_thm("lineSpecEq_thm",
 `!(va:word64) (pa:word48) (va':word64)  state.
    lineSpec(va, pa) state = lineSpec(va', pa) state`,
 
@@ -2141,7 +2121,7 @@ val Fill_dcEqPm_thm = Q.store_thm("Fill_dcEqPm_thm",
   \\ rfs[]
 );
 
-val Miss_After_Evict_thm = Q.store_thm("Miss_After_Evict_th",
+val Miss_After_Evict_thm = Q.store_thm("Miss_After_Evict_thm",
  `!(va:word64) (pa:word48) (pm:(word48->word8)) (dc:(48 word -> CSET)) (t':word48) (state:cache_state).
   let (i, t, wi) = lineSpec(va, pa) state     in
   let (dc', pm') = Fill(va, pa, pm, dc) state in

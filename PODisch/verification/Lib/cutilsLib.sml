@@ -13,7 +13,7 @@ val xrw = fn tac => RW_TAC(srw_ss()) tac;
 val do_nothing = ALL_TAC;
 val undisch_all_tac = schneiderUtils.UNDISCH_ALL_TAC;
 val undisch_hd_tac  = schneiderUtils.UNDISCH_HD_TAC;
-
+   
 fun LET_ELIM_RULE thm = (thm |> SIMP_RULE(srw_ss()) [LET_DEF] |> PairedLambda.GEN_BETA_RULE);
 fun fs_lambda_elim ls = fs ls \\ PairedLambda.GEN_BETA_TAC;
 fun rfs_lambda_elim ls =  PairedLambda.GEN_BETA_TAC \\ fs ls;
@@ -25,6 +25,21 @@ fun mfs ls = (rfs ls \\ fs ls);
 
 val ifilter = (fn trm => (is_fst trm) andalso is_lineSpec ((fst o dest_comb o dest_fst) trm));
 val tfilter = (fn trm => (is_snd trm) andalso is_lineSpec ((fst o dest_comb o dest_snd) trm));
+
+(* To prove that line  size is less that 2 ** 15 *)
+fun line_size_lt_dimword15 nl =
+      `2 ** ^nl ≤ 32769` by (all_tac
+    \\ assume_tac(Drule.ISPECL[``(state :cache_state).DC.ctr.DminLine``](w2n_lt) |> SIMP_RULE(srw_ss())[])
+    \\ `w2n state.DC.ctr.DminLine <= 15`  by decide_tac
+    \\ `!a b. a <= b ==> 2**a <= 2**b` by FULL_SIMP_TAC(arith_ss)[]
+    \\ REABBREV_TAC
+    \\ qpat_assum `!a b. P` (qspecl_then [`^nl`, `15n`] assume_tac)
+    \\ res_tac
+    \\ `(2 ** ^nl ≤ 2 ** 15) ==> (2 ** ^nl < (2 ** 15) + 1)` by FULL_SIMP_TAC (bool_ss)[]
+    >|[(qspecl_then [`2 ** ^nl`, `2 ** 15`] assume_tac) arithmeticTheory.LE_LT1
+    \\ res_tac
+    \\ FULL_SIMP_TAC (arith_ss)[], all_tac]
+    \\ fs[]);
 
 val CASE_ON_LEFT_IMPL_TAC = 
    PAT_ASSUM ``A==>B`` 
@@ -681,5 +696,5 @@ val abr_lineSpec_tac_sgl =
  (fn (asl, g) => let val a::_ = rm_dup (find_terms ifilter g)  val c::_ = rm_dup (find_terms tfilter g)
 		in (Q.ABBREV_TAC `i' = ^a`  >> Q.ABBREV_TAC `t' = (FST ^c)` >> Q.ABBREV_TAC `wi' = (SND ^c)`)
  (asl ,g) end);
-
+   
 end
