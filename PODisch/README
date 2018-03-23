@@ -1,0 +1,11 @@
+Folder Structure:
+ Verification -
+               |- cachePoScript: is the file containing proof for discharging POes.
+               |- theoremStore -
+                                |- CacheLibScript: is the file containing all required lemmata used in the verification
+               |- Lib -
+                       |- conitains list of Tactics which I defined 
+               |- interface -
+                             |- defines cache interface (overriding Christoph's definitions)
+ Model -
+        |- generic cache model
