@@ -67,8 +67,6 @@ val lw_def =
      l(n2w wi)`
 ;
 
-
-
 val _ = Datatype `dop = RD word64#word48#bool | WT word64#word48#wrTyp#bool | CL word64#word48`;
 
 val rd_def = Define `
@@ -94,22 +92,6 @@ val ADD_def = Define`
 
 val VAL_def = Define `VAL (WT (va,pa,w, c)) = w`;
 
-
-val _ = new_constant("dummy1", ``:bitstring``);
-val _ = new_constant("dummy2", ``:word48``);
-val _ = new_constant("dummy3", ``:SLVAL option``);
-
-
-(* val ctf'_def =  *)
-(*   Define `ctf' pm dc state dop = *)
-(*       let f = (mv T pm dc fmem fcm)  in  *)
-(*       case dop of *)
-(*      (RD (va,pa,c))      => CacheRead(va, pa, f,dc) state *)
-(*    | (WT (va,pa,data,c)) =>  *)
-(*      let (cache, mem) = CacheWrite(va,pa,data,f,dc) state in (cache, mem, dummy1) *)
-(*    | (CL (va,pa))        => *)
-(*      let (cache, mem) = CacheInvalidateByAdr(va,pa,f,dc) state in (cache, mem, dummy1)`; *)
-
 val ctf_def = 
   Define `ctf pm dc state dop =
    let f = (mv T pm dc2 (fmem:(word48->word8)#(word48->CSET)-> (word48 -> word8)) fcm)  in 
@@ -120,34 +102,29 @@ val ctf_def =
      let (cache, mem) = CacheInvalidateByAdr(va,pa,f,dc) state in 
      let (tg, il) = SND(HD (cache i).hist)  in    
      if LineDirty(il,n2w(tg):word48, dc) 
-     then (cache, mem, (NONE, SOME ((n2w tg):word48), (ca il (n2w(tg)) dc)))
-     else (cache, mem, (NONE, NONE, NONE))
+     then (cache, (SOME ((n2w tg):word48), (ca il (n2w(tg)) dc)))
+     else (cache, (NONE, NONE))
 
-  | (WT (va,pa,data,c)) => 
+  | (WT (va,pa,data,c)) =>
      let (i, t, _) = lineSpec(va, pa) state         in
      let (cache, mem) = CacheWrite(va,pa,data,f,dc) state in
-     let (tg, il) = SND(HD(TL (TL (cache i).hist))) in 
+     let (tg, il) = SND(HD(TL (TL (cache i).hist))) in
      if ((~Hit(va, pa, dc) state) /\ (EP ((dc i).hist,t,dc) <> NONE))
-     then if LineDirty(il,n2w(tg):word48, dc) 
-          then (cache, mem, (NONE, SOME (n2w tg), (ca il (n2w(tg)) dc)))
-	  else (cache, mem, (NONE, NONE, NONE))
-     else (cache, mem, (NONE, NONE, NONE))
+     then if LineDirty(il,n2w(tg):word48, dc)
+          then (cache,  (SOME (n2w tg), (ca il (n2w(tg)) dc)))
+  	  else (cache,  ( NONE, NONE))
+     else (cache, ( NONE, NONE))
 
-  | (RD (va,pa,c)) => 
+  | (RD (va,pa,c)) =>
      let (i, t, _) = lineSpec(va, pa) state         in
      let (cache, mem, c) = CacheRead(va,pa,f,dc) state in
-     let (tg, il) = SND(HD(TL (TL (cache i).hist))) in 
+     let (tg, il) = SND(HD(TL (TL (cache i).hist))) in
      if ((~Hit(va, pa, dc) state) /\ (EP ((dc i).hist,t,dc) <> NONE))
-     then if LineDirty(il,n2w(tg):word48, dc) 
-          then (cache, mem, (SOME c, SOME (n2w tg), (ca il (n2w(tg)) dc)))
-	  else (cache, mem, (SOME c, NONE, NONE))
-     else (cache, mem, (SOME c, NONE, NONE))`
+     then if LineDirty(il,n2w(tg):word48, dc)
+          then (cache, (SOME (n2w tg), (ca il (n2w(tg)) dc)))
+  	  else (cache,  (NONE, NONE))
+     else (cache,  (NONE, NONE))`
 
 ;
 
 val _ = export_theory();
-
-
-
-
-

@@ -476,7 +476,7 @@ val mllu_lv_oblg_disch = Q.prove(
     
 val ctf_chit_oblg_disch = Q.prove(
 `!dc pm dop state.
- let (dc', pm', _) = ctf pm dc state dop in
+ let (dc', _) = ctf pm dc state dop in
  let (va, pa) = ADD dop in 
   ~cl dop ==> (Hit(va, pa, dc') state)`,
 
@@ -492,7 +492,7 @@ val ctf_chit_oblg_disch = Q.prove(
 
 val ctf_cl_miss_oblg_disch =Q.prove(
 `!dc pm dop state .
- let (dc', pm', _) = ctf pm dc state dop in
+ let (dc',_) = ctf pm dc state dop in
  let (va, pa) = ADD dop in 
  let (i,t,wi) = lineSpec(va, pa) state in
   cl dop ==>
@@ -530,7 +530,7 @@ val tac =
 in
 val ctf_cl_other_oblg_disch = Q.prove(
 `!dc pm dop state pa'.
- let (dc', pm', _) = ctf pm dc state dop in
+ let (dc',_) = ctf pm dc state dop in
  let (va, pa) = ADD dop in 
  let (i,t,wi) = lineSpec(va, pa) state in
  let (i',t',wi') = lineSpec(va, pa') state in
@@ -559,7 +559,7 @@ end;
 
 val ctf_cl_wb_oblg_disch = Q.prove(
 `!dc pm dop state.
- let (dc', pm', _) = ctf pm dc state dop in
+ let (dc',_) = ctf pm dc state dop in
  let (va, pa) = ADD dop in 
  let (i,t,wi) = lineSpec(va, pa) state in
  let (tg, il) = SND(HD (dc' i).hist) in
@@ -731,7 +731,7 @@ end;
  
 val ctf_not_cl_wb_oblg_disch = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', (_, y)) = ctf pm dc state dop in 
+  let (dc', y) = ctf pm dc state dop in 
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   (~Hit(va, pa, dc) state) ==>
@@ -761,7 +761,7 @@ val ctf_not_cl_wb_oblg_disch = Q.prove(
 
 val ctf_wt_cdirty_oblg_disch = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', h) = ctf pm dc state dop in
+  let (dc', h) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   wt dop ==> 
@@ -781,7 +781,7 @@ val ctf_wt_cdirty_oblg_disch = Q.prove(
 
 val ctf_rd_hit_oblg_disch = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', h) = ctf pm dc state dop in
+  let (dc', h) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   rd dop ==>
@@ -797,7 +797,7 @@ val ctf_rd_hit_oblg_disch = Q.prove(
 
 val ctf_rd_miss_oblg_disch = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', _) = ctf pm dc state dop in
+  let (dc', _) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   invariant_cache ==>
@@ -843,7 +843,7 @@ in
 
 val ctf_wt_fill_oblg_disch = Q.prove(
 `!dc pm dop state va' pa'.
-  let (dc', pm', _) = ctf pm dc state dop in
+  let (dc', _) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   let (i', t', wi') = lineSpec(va', pa') state  in   
@@ -900,7 +900,7 @@ end;
 
 val ctf_wt_ccnt_oblg_disch = Q.prove(
 `!dc pm dop state va' pa'.
-  let (dc', pm', _) = ctf pm dc state dop in
+  let (dc', _) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   let (i', t', wi') = lineSpec(va', pa') state  in   
@@ -934,7 +934,7 @@ val ctf_wt_ccnt_oblg_disch = Q.prove(
 
 val ctf_wb_not_cl_evpol_oblg = Q.prove(
 `!dc pm dop state.
-  let (dc', pm', (_, tg, v)) = ctf pm dc state dop in 
+  let (dc', (tg, v)) = ctf pm dc state dop in 
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
   ~cl dop    ==> 
@@ -953,10 +953,10 @@ val ctf_wb_not_cl_evpol_oblg = Q.prove(
 
 val ctf_wb_not_cl_evpol_some_oblg_disch = Q.prove(
 `!dc pm dop state x.
-  let (dc', pm', (_, tg, _)) = ctf pm dc state dop in
+  let (dc', (tg, _)) = ctf pm dc state dop in
   let (va, pa) = ADD dop in
   let (i, t, wi) = lineSpec(va, pa) state  in  
-  ~cl dop ==> 
+   ~cl dop ==> 
   (EP ((dc i).hist,t,dc) = SOME x) ==>
   (~Hit(va, pa, dc) state)    ==>
   (LineDirty(i, x, dc)) ==>
