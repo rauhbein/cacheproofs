@@ -7,15 +7,16 @@ val ca_def =
  Define`ca i t dc = (((dc i).sl) t)`
 ;
 
-val ccnt_def =
-  Define `ccnt va pa dc state =
-  let (i, t, wi) = lineSpec(va, pa) state in
-    (THE((dc i).sl t)).value`
-;
 
 val lcnt_def =
     Define `lcnt i t dc =
       (THE((dc i).sl t)).value`
+;
+
+val ccnt_def =
+  Define `ccnt va pa dc state =
+  let (i, t, wi) = lineSpec(va, pa) state in
+    (THE((dc i).sl t)).value`
 ;
 
 val ccntw_def =
@@ -102,8 +103,8 @@ val ctf_def =
      let (cache, mem) = CacheInvalidateByAdr(va,pa,f,dc) state in 
      let (tg, il) = SND(HD (cache i).hist)  in    
      if LineDirty(il,n2w(tg):word48, dc) 
-     then (cache, (SOME ((n2w tg):word48), (ca il (n2w(tg)) dc)))
-     else (cache, (NONE, NONE))
+     then (cache, (il, SOME ((n2w tg):word48), (ca il (n2w(tg)) dc)))
+     else (cache, (il, NONE, NONE))
 
   | (WT (va,pa,data,c)) =>
      let (i, t, _) = lineSpec(va, pa) state         in
@@ -111,9 +112,9 @@ val ctf_def =
      let (tg, il) = SND(HD(TL (TL (cache i).hist))) in
      if ((~Hit(va, pa, dc) state) /\ (EP ((dc i).hist,t,dc) <> NONE))
      then if LineDirty(il,n2w(tg):word48, dc)
-          then (cache,  (SOME (n2w tg), (ca il (n2w(tg)) dc)))
-  	  else (cache,  ( NONE, NONE))
-     else (cache, ( NONE, NONE))
+          then (cache,  (il, SOME (n2w tg), (ca il (n2w(tg)) dc)))
+  	  else (cache,  (il, NONE, NONE))
+     else (cache, (il, NONE, NONE))
 
   | (RD (va,pa,c)) =>
      let (i, t, _) = lineSpec(va, pa) state         in
@@ -121,10 +122,15 @@ val ctf_def =
      let (tg, il) = SND(HD(TL (TL (cache i).hist))) in
      if ((~Hit(va, pa, dc) state) /\ (EP ((dc i).hist,t,dc) <> NONE))
      then if LineDirty(il,n2w(tg):word48, dc)
-          then (cache, (SOME (n2w tg), (ca il (n2w(tg)) dc)))
-  	  else (cache,  (NONE, NONE))
-     else (cache,  (NONE, NONE))`
+          then (cache, (il, SOME (n2w tg), (ca il (n2w(tg)) dc)))
+  	  else (cache,  (il, NONE, NONE))
+     else (cache,  (il, NONE, NONE))`
 
 ;
 
 val _ = export_theory();
+
+
+
+
+

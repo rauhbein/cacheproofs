@@ -48,40 +48,21 @@ val adr_segNeq_thm = Q.store_thm("adr_segNeq_thm",
    (((b << (n+m)) !! (a << m) ) <>  ((c << (n+m)) !! (a << m))) ==>
     (b <> c)`, fs []);
 
-val adr_neq3_thm = Q.store_thm("adr_neq3_thm",
-  `!(a:word48) (b:word48) (c:word48) (n:num).
+val adr_neq_thm = Q.store_thm("adr_neq_thm",
+ `!(a:word48) (b:word48) (c:word48) (d:word48) (n:num).
    let bmM = ((0xffffffffffffw:word48) >>> n) in
    let bmL = ~((0xffffffffffffw:word48) >>> n << n) in
-   ((n < 48)) ==>
-   ((a && bmL = a) /\ (b && bmM = b) /\ (c && bmM = c)) ==>
-   (((b << n) !! a) <> ((c << n) !! a)) ==>
-    (b <> c) `,
+  ((n < 48)) ==>
+  ((a && bmM = a) /\ (b && bmM = b)) ==>
+  ((c && bmL = c) /\ (d && bmL = d)) ==>
+  ((a << n) <> (b << n)) ==>
+  (((a << n) !! c) <> ((b << n) !! d))`,
 
-     rpt strip_tac
-  \\ ntac 48 (FIRST[Cases_on `n`, Cases_on `n'`]
-  >- (EVAL_TAC \\ blastLib.BBLAST_PROVE_TAC))
-  \\ fs[]
+  ntac 4 strip_tac
+  \\ ntac 48 (Induct_on `n`
+   THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC,
+	 fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])
 );
-
-
-val adr_thm = Q.store_thm("adr_thm",
- `!(a:word48) (b:word48) (c:word48) (d:word48) (n:num) (m:num).
-   let bmM = ((0xffffffffffffw:word48) >>> (n + m)) in
-   let bmL = (((0xffffffffffffw:word48) << (48 - (n + m))) >>> (48 - n)) in
-  ((n < 48) /\ (m < (48 - n))) ==>
-  ((a && bmM = a) /\ (b && bmL = b)) ==>
-  ((c && bmM = c) /\ (d && bmL = d)) ==>
-  ((a <> c) ==> (((a << (n+m)) !! (b << m) ) <>  ((c << (n+m)) !! (d << m)))) /\
-  ((d <> b) ==> (((a << (n+m)) !! (b << m) ) <>  ((c << (n+m)) !! (d << m)))) /\
-  ((((a << (n+m)) !! (b << m) ) =  ((c << (n+m)) !! (d << m))) ==> ((a = c) /\ (b = d)))`, cheat);
-
-(*  ntac 4 strip_tac *)
-(*   \\ ntac 48 (FIRST[Cases_on`n`, Cases_on`n'`] *)
-(*   >- (ntac 48(Induct_on `m` *)
-(*   THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC, fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])) *)
-(*   \\ fs[]) *)
-(* ); *)
-
 
 val adr_neq2_thm = Q.store_thm("adr_neq2_thm",
   `!(a:word48) (b:word48) (c:word48) (n:num).
@@ -98,20 +79,37 @@ val adr_neq2_thm = Q.store_thm("adr_neq2_thm",
 	 fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])
 );
 
-val adr_neq_thm = Q.store_thm("adr_neq_thm",
- `!(a:word48) (b:word48) (c:word48) (d:word48) (n:num).
+val adr_neq3_thm = Q.store_thm("adr_neq3_thm",
+  `!(a:word48) (b:word48) (c:word48) (n:num).
    let bmM = ((0xffffffffffffw:word48) >>> n) in
    let bmL = ~((0xffffffffffffw:word48) >>> n << n) in
-  ((n < 48)) ==>
-  ((a && bmM = a) /\ (b && bmM = b)) ==>
-  ((c && bmL = c) /\ (d && bmL = d)) ==>
-  ((a << n) <> (b << n)) ==>
-  (((a << n) !! c) <> ((b << n) !! d))`,
+   ((n < 48)) ==>
+   ((a && bmL = a) /\ (b && bmM = b) /\ (c && bmM = c)) ==>
+   (((b << n) !! a) <> ((c << n) !! a)) ==>
+    (b <> c) `,
 
-  ntac 4 strip_tac
-  \\ ntac 48 (Induct_on `n`
-   THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC,
-	 fs[] \\ PAT_ASSUM ``a``(fn thm => all_tac)])
+     rpt strip_tac
+  \\ ntac 48 (FIRST[Cases_on `n`, Cases_on `n'`]
+  >- (EVAL_TAC \\ blastLib.BBLAST_PROVE_TAC))
+  \\ fs[]
+);
+
+val adr_thm = Q.store_thm("adr_thm",
+ `!(a:word48) (b:word48) (c:word48) (d:word48) (n:num) (m:num).
+   let bmM = ((0xffffffffffffw:word48) >>> (n + m)) in
+   let bmL = (((0xffffffffffffw:word48) << (48 - (n + m))) >>> (48 - n)) in
+  ((n < 48) /\ (m < (48 - n))) ==>
+  ((a && bmM = a) /\ (b && bmL = b)) ==>
+  ((c && bmM = c) /\ (d && bmL = d)) ==>
+  ((a <> c) ==> (((a << (n+m)) !! (b << m) ) <>  ((c << (n+m)) !! (d << m)))) /\
+  ((d <> b) ==> (((a << (n+m)) !! (b << m) ) <>  ((c << (n+m)) !! (d << m)))) /\
+  ((((a << (n+m)) !! (b << m) ) =  ((c << (n+m)) !! (d << m))) ==> ((a = c) /\ (b = d)))`,
+
+ ntac 4 strip_tac
+  \\ ntac 48 (FIRST[Cases_on`n`, Cases_on`n'`]
+  >- (ntac 48(Induct_on `m`
+  THENL[fs[] \\ blastLib.BBLAST_PROVE_TAC, PAT_ASSUM ``a``(fn thm => fs[])]))
+  \\ fs[])
 );
 
 val write_mem32_def = Define `
